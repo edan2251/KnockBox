@@ -1,0 +1,72 @@
+{
+  "name": "showcase_cp7_backthrow",
+  "arena": "Box",
+  "mode": "Swing",
+  "ticks": 60,
+  "spawn": {
+    "p1": [
+      -6,
+      -7.55
+    ],
+    "p2": [
+      -4.8,
+      -7.55
+    ]
+  },
+  "p1": [
+    {
+      "from": 10,
+      "to": 18,
+      "hold": [
+        "Grab"
+      ]
+    },
+    {
+      "at": 19,
+      "press": [
+        "Left"
+      ]
+    }
+  ],
+  "p2": [],
+  "captures": [
+    {
+      "tick": 17,
+      "name": "hold"
+    },
+    {
+      "tick": 20,
+      "name": "back_throw"
+    },
+    {
+      "tick": 24,
+      "name": "thrown_trail"
+    }
+  ],
+  "expect": [
+    {
+      "tick": 16,
+      "fighter": 1,
+      "field": "action",
+      "equals": "Held"
+    },
+    {
+      "tick": 20,
+      "fighter": 1,
+      "field": "action",
+      "equals": "Thrown"
+    },
+    {
+      "tick": 20,
+      "fighter": 1,
+      "field": "pos.x",
+      "max": -6.9
+    },
+    {
+      "tick": 20,
+      "fighter": 1,
+      "field": "vel.x",
+      "max": -27.9
+    }
+  ]
+}

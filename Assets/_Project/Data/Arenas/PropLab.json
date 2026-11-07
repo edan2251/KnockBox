@@ -1,0 +1,10 @@
+{
+  "theme": "A",
+  "light": [0, 25],
+  "rotation": false,
+  "props": [
+    {"kind": "hanging", "pos": [0, -3.8], "size": [1.6, 1.2], "anchor": [0, 3]},
+    {"kind": "pillar", "base": [-6, -5], "boxes": [[1.8, 1.6], [1.4, 2.0], [2.6, 0.9], [1.4, 1.6], [1.8, 1.1], [1.4, 1.4]]},
+    {"kind": "linked", "parts": [{"pos": [6, -0.6], "size": [1.2, 0.8], "anchor": [6, 3]}, {"pos": [6, -3.7], "size": [1.6, 1.4], "anchorPart": 0, "break": 6}]}
+  ]
+}

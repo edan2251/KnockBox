@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 21ae6276be4362248bd362ef047de3d7, type: 3}
+  m_Name: GameMaps
+  m_EditorClassIdentifier: Knockbox.Game::Knockbox.Game.Maps.MapCatalog
+  maps:
+  - {fileID: 11400000, guid: 7ae76ec49df51404ab034de576774d51, type: 2}
+  - {fileID: 11400000, guid: e921939546810684da9a4d8dd927e939, type: 2}
+  - {fileID: 11400000, guid: 31e669e28add03d4bb6399870ee8494d, type: 2}

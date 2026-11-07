@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!78 &1
+TagManager:
+  serializedVersion: 3
+  tags: []
+  layers:
+  - Default
+  - TransparentFX
+  - Ignore Raycast
+  - 
+  - Water
+  - UI
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  m_SortingLayers:
+  - name: Default
+    uniqueID: 0
+    locked: 0
+  - name: Background
+    uniqueID: 3137079997
+    locked: 0
+  - name: Shadow
+    uniqueID: 2194778241
+    locked: 0
+  - name: Terrain
+    uniqueID: 2818509998
+    locked: 0
+  - name: LimbBack
+    uniqueID: 4161958342
+    locked: 0
+  - name: Fighter
+    uniqueID: 2852776738
+    locked: 0
+  - name: LimbFront
+    uniqueID: 1230095252
+    locked: 0
+  - name: Weapon
+    uniqueID: 3082879841
+    locked: 0
+  - name: Fx
+    uniqueID: 1288901971
+    locked: 0
+  - name: UI
+    uniqueID: 2079568635
+    locked: 0
+  m_RenderingLayers:
+  - Default

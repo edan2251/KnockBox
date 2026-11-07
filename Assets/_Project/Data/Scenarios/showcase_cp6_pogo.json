@@ -1,0 +1,66 @@
+{
+  "name": "showcase_cp6_pogo",
+  "arena": "Box",
+  "mode": "Swing",
+  "ticks": 50,
+  "spawn": {
+    "p1": [
+      -9.1,
+      -5.6
+    ],
+    "p2": [
+      -8,
+      -7.55
+    ]
+  },
+  "p1": [
+    {
+      "at": 0,
+      "press": [
+        "Down",
+        "Attack"
+      ]
+    }
+  ],
+  "p2": [],
+  "captures": [
+    {
+      "tick": 8,
+      "name": "slam"
+    },
+    {
+      "tick": 9,
+      "name": "hit"
+    },
+    {
+      "tick": 21,
+      "name": "pogo_rise"
+    }
+  ],
+  "expect": [
+    {
+      "tick": 9,
+      "fighter": 1,
+      "field": "hp",
+      "equals": 90
+    },
+    {
+      "tick": 9,
+      "fighter": 0,
+      "field": "vel.y",
+      "equals": 18
+    },
+    {
+      "tick": 9,
+      "fighter": 0,
+      "field": "airJumps",
+      "equals": 1
+    },
+    {
+      "tick": 21,
+      "fighter": 0,
+      "field": "vel.y",
+      "min": 10
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "name": "matrix_charge_grab_vs_parry",
+  "arena": "Box",
+  "mode": "Charge",
+  "ticks": 40,
+  "spawn": {
+    "p1": [
+      -8.0,
+      -7.55
+    ],
+    "p2": [
+      -6.8,
+      -7.55
+    ]
+  },
+  "p1": [
+    {
+      "at": 10,
+      "press": [
+        "Grab"
+      ],
+      "holdFor": 1
+    }
+  ],
+  "p2": [
+    {
+      "at": 14,
+      "press": [
+        "Guard"
+      ],
+      "holdFor": 20
+    }
+  ],
+  "expect": [
+    {
+      "tick": 16,
+      "fighter": 0,
+      "field": "action",
+      "equals": "Holding"
+    },
+    {
+      "tick": 16,
+      "fighter": 1,
+      "field": "action",
+      "equals": "Held"
+    },
+    {
+      "tick": 15,
+      "fighter": 0,
+      "field": "action",
+      "equals": "Grab"
+    }
+  ]
+}

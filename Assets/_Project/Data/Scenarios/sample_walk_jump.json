@@ -1,0 +1,21 @@
+{
+  "name": "sample_walk_jump",
+  "arena": "Box",
+  "ticks": 90,
+  "p1": [
+    { "from": 0, "to": 29, "hold": ["Right"] },
+    { "at": 40, "press": ["Jump"], "holdFor": 30 }
+  ],
+  "p2": [],
+  "expect": [
+    { "tick": 0, "fighter": 0, "field": "grounded", "equals": true },
+    { "tick": 10, "fighter": 0, "field": "vel.x", "equals": 11 },
+    { "tick": 10, "fighter": 0, "field": "action", "equals": "Run" },
+    { "tick": 40, "fighter": 0, "field": "action", "equals": "Idle" },
+    { "tick": 45, "fighter": 0, "field": "grounded", "equals": false },
+    { "tick": 61, "fighter": 0, "field": "pos.y", "min": -3.8, "max": -3.6 },
+    { "tick": 90, "fighter": 0, "field": "grounded", "equals": true },
+    { "tick": 90, "fighter": 1, "field": "pos.x", "equals": 12.5 },
+    { "tick": 90, "fighter": 1, "field": "action", "equals": "Idle" }
+  ]
+}

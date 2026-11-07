@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9352b4d174a97194aa257c9ccf367007, type: 3}
+  m_Name: MovementTuning
+  m_EditorClassIdentifier: Knockbox.Game::Knockbox.Game.MovementTuning
+  Movement:
+    BodySize: 0.9
+    MaxRunSpeed: 11
+    GroundAccel: 110
+    GroundDecel: 80
+    TurnAccelMultiplier: 1.5
+    AirAccel: 70
+    AirDecel: 25
+    JumpSpeed: 22.9
+    RiseGravity: 65
+    FallGravityMultiplier: 1.6
+    EarlyReleaseGravityMultiplier: 2.5
+    ApexSpeedThreshold: 3
+    ApexGravityMultiplier: 0.5
+    ApexAirAccelMultiplier: 1.2
+    MaxFallSpeed: 30
+    FastFallMaxSpeed: 40
+    FastFallGravityMultiplier: 1.4
+    AirJumps: 1
+    AirJumpSpeed: 19
+    CoyoteTicks: 6
+    JumpBufferTicks: 8
+    WallSlideMaxSpeed: 5
+    WallJumpSpeedX: 13
+    WallJumpSpeedY: 20
+    WallJumpInputLockTicks: 7
+    WallCoyoteTicks: 5
+    DashSpeed: 26
+    DashTicks: 8
+    DashEndSpeedRetention: 0.55
+    DashCharges: 1
+    DashCooldownTicks: 18
+    DashJumpCancelEnabled: 1
+    DashJumpCancelMinTicks: 3
+    SubstepMaxDistance: 0.2
+    GroundProbeDistance: 0.02
+    DropThroughTicks: 12
+    BouncePadSpeed: 30
+  Match:
+    CountdownTicks: 90
+    KoTicks: 60
+    RoundsToWin: 5

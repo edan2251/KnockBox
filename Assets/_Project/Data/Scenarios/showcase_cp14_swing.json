@@ -1,0 +1,18 @@
+{
+  "name": "showcase_cp14_swing",
+  "arena": "PropLab",
+  "mode": "Charge",
+  "ticks": 70,
+  "spawn": { "p1": [-4.5, -4.55], "p2": [1.3, -4.55] },
+  "p1": [
+    { "from": 0, "to": 18, "hold": ["Right", "Attack"] },
+    { "from": 18, "to": 30, "hold": ["Right"] }
+  ],
+  "p2": [],
+  "captures": [
+    { "tick": 25, "name": "a_strike" },
+    { "tick": 27, "name": "b_swing" },
+    { "tick": 29, "name": "c_hit" },
+    { "tick": 40, "name": "d_back" }
+  ]
+}

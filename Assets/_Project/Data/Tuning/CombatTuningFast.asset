@@ -1,0 +1,281 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a10ff22e1d3fcc488aaf3595a48b5f0, type: 3}
+  m_Name: CombatTuningFast
+  m_EditorClassIdentifier: Knockbox.Game::Knockbox.Game.CombatTuning
+  PresetName: fast
+  Combat:
+    MaxHealth: 100
+    HitstopBase: 4
+    HitstopPerDamage: 0.25
+    HitstopMin: 4
+    HitstopMax: 12
+    ClashHitstop: 8
+    ParryHitstop: 10
+    WallSplatHitstop: 6
+    KoHitstop: 20
+    HitstunPerKnockback: 1.1
+    HitstunMin: 8
+    HitstunMax: 45
+    ComboKnockbackDecay: 0.85
+    ComboHitstunDecay: 0.8
+    MaxComboHits: 3
+    WallSplatSpeed: 14
+    WallSplatDamage: 6
+    WallSplatRestitution: 0.45
+    WallSplatHitstun: 18
+    BounceRestitution: 0.35
+    BounceMinSpeed: 2
+    ParryWindowTicks: 6
+    ParryCooldownTicks: 24
+    GuardMaxSpeed: 3
+    GuardDamageMultiplier: 0.2
+    GuardKnockbackMultiplier: 0.35
+    GuardStunTicks: 8
+    GuardHitstopMultiplier: 0.5
+    StaggerTicks: 24
+    StaggerPushSpeed: 8
+    ClashSpeed: 8
+    RecoilTicks: 10
+    AttackAirControlMultiplier: 0.5
+    SpikeDamage: 15
+    SpikeBounceSpeed: 20
+    SpikeHitstun: 20
+    SpikeImmunityTicks: 45
+    TestAttack:
+      StartupTicks: 5
+      ActiveTicks: 4
+      RecoveryTicks: 14
+      Damage: 12
+      KnockbackStrength: 14
+      KnockbackDirection:
+        X: 0.8660254
+        Y: 0.5
+      CircleCount: 2
+      Circle0:
+        Start:
+          X: 0.55
+          Y: 0.05
+        Mid:
+          X: 0.75
+          Y: 0.05
+        End:
+          X: 0.95
+          Y: 0.05
+        Radius: 0.3
+      Circle1:
+        Start:
+          X: 0.35
+          Y: 0.05
+        Mid:
+          X: 0.47500002
+          Y: 0.05
+        End:
+          X: 0.6
+          Y: 0.05
+        Radius: 0.22
+      Circle2:
+        Start:
+          X: 0
+          Y: 0
+        Mid:
+          X: 0
+          Y: 0
+        End:
+          X: 0
+          Y: 0
+        Radius: 0
+      PogoSpeed: 0
+    Charge:
+      ChargeMoveMaxSpeed: 3
+      ChargeFallMaxSpeed: 4
+      MinChargeTicks: 4
+      FullChargeTicks: 24
+      FullChargeHoldTicks: 18
+      LungeMinSpeed: 22
+      LungeMaxSpeed: 38
+      LungeGravityMultiplier: 0.3
+      LungeEndSpeed: 12
+      LungeMaxTicks: 24
+      LungeBounceRestitution: 0.6
+      LungeMaxBounces: 2
+      LungeAggression: 1
+      DashAggression: 0
+      PowerThreshold: 6
+      ClashPowerMargin: 4
+      ContactCooldownTicks: 8
+      ContactSlop: 0.05
+      DamagePerPower: 0.6
+      MinDamage: 4
+      MaxDamage: 24
+      KnockbackPerPower: 0.9
+      MinKnockback: 10
+      WinnerVelocityScale: -0.25
+      ParryReflectScale: 0.8
+      ClashSpeedPerPower: 0.35
+    Swing:
+      Forward:
+        StartupTicks: 4
+        ActiveTicks: 3
+        RecoveryTicks: 11
+        Damage: 12
+        KnockbackStrength: 14
+        KnockbackDirection:
+          X: 0.8660254
+          Y: 0.5
+        CircleCount: 3
+        Circle0:
+          Start:
+            X: 0.504
+            Y: 0.673
+          Mid:
+            X: 0.773
+            Y: 0.404
+          End:
+            X: 0.758
+            Y: 0.06
+          Radius: 0.22
+        Circle1:
+          Start:
+            X: 0.624
+            Y: 1.002
+          Mid:
+            X: 1.102
+            Y: 0.524
+          End:
+            X: 1.075
+            Y: -0.088
+          Radius: 0.24
+        Circle2:
+          Start:
+            X: 0.743
+            Y: 1.331
+          Mid:
+            X: 1.431
+            Y: 0.643
+          End:
+            X: 1.392
+            Y: -0.236
+          Radius: 0.26
+        PogoSpeed: 0
+      Up:
+        StartupTicks: 4
+        ActiveTicks: 3
+        RecoveryTicks: 12
+        Damage: 10
+        KnockbackStrength: 16
+        KnockbackDirection:
+          X: 0.1736482
+          Y: 0.9848078
+        CircleCount: 3
+        Circle0:
+          Start:
+            X: 0.573
+            Y: 0.454
+          Mid:
+            X: 0.15
+            Y: 0.75
+          End:
+            X: -0.273
+            Y: 0.454
+          Radius: 0.22
+        Circle1:
+          Start:
+            X: 0.902
+            Y: 0.574
+          Mid:
+            X: 0.15
+            Y: 1.1
+          End:
+            X: -0.602
+            Y: 0.574
+          Radius: 0.24
+        Circle2:
+          Start:
+            X: 1.231
+            Y: 0.693
+          Mid:
+            X: 0.15
+            Y: 1.45
+          End:
+            X: -0.931
+            Y: 0.693
+          Radius: 0.26
+        PogoSpeed: 0
+      Down:
+        StartupTicks: 5
+        ActiveTicks: 4
+        RecoveryTicks: 12
+        Damage: 10
+        KnockbackStrength: 12
+        KnockbackDirection:
+          X: 0.3420201
+          Y: -0.9396926
+        CircleCount: 3
+        Circle0:
+          Start:
+            X: 0.645
+            Y: 0.389
+          Mid:
+            X: 0.69
+            Y: -0.125
+          End:
+            X: 0.3
+            Y: -0.35
+          Radius: 0.22
+        Circle1:
+          Start:
+            X: 0.913
+            Y: 0.614
+          Mid:
+            X: 0.993
+            Y: -0.3
+          End:
+            X: 0.3
+            Y: -0.7
+          Radius: 0.24
+        Circle2:
+          Start:
+            X: 1.181
+            Y: 0.839
+          Mid:
+            X: 1.296
+            Y: -0.475
+          End:
+            X: 0.3
+            Y: -1.05
+          Radius: 0.26
+        PogoSpeed: 18
+      DashAttackCancelEnabled: 1
+      DashAttackCancelMinTicks: 3
+      LandingLagTicks: 4
+    Grab:
+      StartupTicks: 5
+      ActiveTicks: 3
+      WhiffRecoveryTicks: 18
+      BoxOffset: 0.65
+      BoxWidth: 0.7
+      BoxHeight: 0.9
+      HoldOffset: 0.8
+      MaxHoldTicks: 20
+      ThrowSpeed: 28
+      ThrowDamage: 6
+      ThrownTicks: 24
+      NeutralThrowDirection:
+        X: 0.8660254
+        Y: 0.5
+      BackThrowOffset: 0.95
+      ThrownSplatSpeed: 12
+      ThrownSplatDamage: 10
+      TechSpeed: 10
+      TechRecoilTicks: 12
+      TechHitstop: 6

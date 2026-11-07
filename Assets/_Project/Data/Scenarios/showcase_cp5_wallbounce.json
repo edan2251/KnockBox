@@ -1,0 +1,24 @@
+{
+  "name": "showcase_cp5_wallbounce",
+  "arena": "Box",
+  "mode": "Charge",
+  "ticks": 70,
+  "spawn": { "p1": [-11.5, -7.55], "p2": [10, -7.55] },
+  "p1": [
+    { "from": 5, "to": 44, "hold": ["Attack"] },
+    { "at": 45, "press": ["Left", "Up"] }
+  ],
+  "p2": [],
+  "captures": [
+    { "tick": 50, "name": "lunge_up" },
+    { "tick": 54, "name": "wall_bounce" },
+    { "tick": 60, "name": "after_bounce" }
+  ],
+  "expect": [
+    { "tick": 46, "fighter": 0, "field": "action", "equals": "Lunge" },
+    { "tick": 52, "fighter": 0, "field": "bounces", "equals": 0 },
+    { "tick": 53, "fighter": 0, "field": "bounces", "equals": 1 },
+    { "tick": 53, "fighter": 0, "field": "vel.x", "min": 12 },
+    { "tick": 54, "fighter": 0, "field": "action", "equals": "Lunge" }
+  ]
+}

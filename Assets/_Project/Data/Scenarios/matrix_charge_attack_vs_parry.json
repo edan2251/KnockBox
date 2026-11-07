@@ -1,0 +1,60 @@
+{
+  "name": "matrix_charge_attack_vs_parry",
+  "arena": "Box",
+  "mode": "Charge",
+  "ticks": 40,
+  "spawn": {
+    "p1": [
+      -8.0,
+      -7.55
+    ],
+    "p2": [
+      -6.0,
+      -7.55
+    ]
+  },
+  "p1": [
+    {
+      "from": 5,
+      "to": 14,
+      "hold": [
+        "Attack"
+      ]
+    }
+  ],
+  "p2": [
+    {
+      "at": 17,
+      "press": [
+        "Guard"
+      ],
+      "holdFor": 20
+    }
+  ],
+  "expect": [
+    {
+      "tick": 18,
+      "fighter": 0,
+      "field": "action",
+      "equals": "Stagger"
+    },
+    {
+      "tick": 18,
+      "fighter": 1,
+      "field": "action",
+      "equals": "Guard"
+    },
+    {
+      "tick": 18,
+      "fighter": 0,
+      "field": "hitstop",
+      "equals": 10
+    },
+    {
+      "tick": 18,
+      "fighter": 1,
+      "field": "hp",
+      "equals": 100
+    }
+  ]
+}

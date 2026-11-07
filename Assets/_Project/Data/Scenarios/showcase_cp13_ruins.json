@@ -1,0 +1,16 @@
+{
+  "name": "showcase_cp13_ruins",
+  "arena": "Ruins",
+  "mode": "Charge",
+  "ticks": 50,
+  "p1": [
+    { "from": 0, "to": 20, "hold": ["Right"] },
+    { "at": 6, "press": ["Jump"], "holdFor": 12 }
+  ],
+  "p2": [
+    { "from": 0, "to": 20, "hold": ["Left"] }
+  ],
+  "captures": [
+    { "tick": 45, "name": "overview" }
+  ]
+}

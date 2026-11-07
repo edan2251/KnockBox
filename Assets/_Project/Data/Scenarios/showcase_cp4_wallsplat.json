@@ -1,0 +1,28 @@
+{
+  "name": "showcase_cp4_wallsplat",
+  "arena": "Box",
+  "ticks": 80,
+  "tuning": {
+    "Combat.TestAttack.KnockbackStrength": 22,
+    "Combat.TestAttack.KnockbackDirection.X": 1,
+    "Combat.TestAttack.KnockbackDirection.Y": 0.25
+  },
+  "spawn": { "p1": [-12.4, -7.55], "p2": [-13.6, -7.55] },
+  "p1": [
+    { "at": 10, "press": ["Attack"] }
+  ],
+  "p2": [],
+  "captures": [
+    { "tick": 16, "name": "hit" },
+    { "tick": 27, "name": "wallsplat" },
+    { "tick": 40, "name": "crack" }
+  ],
+  "expect": [
+    { "tick": 16, "fighter": 1, "field": "hp", "equals": 88 },
+    { "tick": 25, "fighter": 1, "field": "hp", "equals": 88 },
+    { "tick": 26, "fighter": 1, "field": "hp", "equals": 82 },
+    { "tick": 26, "fighter": 1, "field": "hitstop", "equals": 6 },
+    { "tick": 26, "fighter": 1, "field": "vel.x", "min": 8 },
+    { "tick": 26, "fighter": 0, "field": "hitstop", "equals": 0 }
+  ]
+}

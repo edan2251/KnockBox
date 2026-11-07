@@ -1,0 +1,113 @@
+{
+  "name": "showcase_cp11_c_ko",
+  "theme": "C",
+  "arena": "Box",
+  "mode": "Swing",
+  "ticks": 160,
+  "tuning": {
+    "Combat.MaxHealth": 12
+  },
+  "spawn": {
+    "p1": [
+      -8,
+      -7.55
+    ],
+    "p2": [
+      -6,
+      -7.55
+    ]
+  },
+  "p1": [
+    {
+      "at": 10,
+      "press": [
+        "Attack"
+      ]
+    }
+  ],
+  "p2": [],
+  "captures": [
+    {
+      "tick": 18,
+      "name": "ko_hit"
+    },
+    {
+      "tick": 28,
+      "name": "ko_freeze"
+    },
+    {
+      "tick": 39,
+      "name": "shatter1"
+    },
+    {
+      "tick": 46,
+      "name": "shatter2"
+    },
+    {
+      "tick": 60,
+      "name": "shatter3"
+    },
+    {
+      "tick": 75,
+      "name": "shatter4"
+    },
+    {
+      "tick": 100,
+      "name": "next_ready"
+    },
+    {
+      "tick": 150,
+      "name": "next_go"
+    }
+  ],
+  "expect": [
+    {
+      "tick": 18,
+      "fighter": 0,
+      "field": "phase",
+      "equals": "KO"
+    },
+    {
+      "tick": 18,
+      "fighter": 1,
+      "field": "action",
+      "equals": "KO"
+    },
+    {
+      "tick": 78,
+      "fighter": 0,
+      "field": "phase",
+      "equals": "RoundEnd"
+    },
+    {
+      "tick": 80,
+      "fighter": 0,
+      "field": "phase",
+      "equals": "Countdown"
+    },
+    {
+      "tick": 80,
+      "fighter": 0,
+      "field": "round",
+      "equals": 2
+    },
+    {
+      "tick": 139,
+      "fighter": 0,
+      "field": "phase",
+      "equals": "Countdown"
+    },
+    {
+      "tick": 150,
+      "fighter": 0,
+      "field": "phase",
+      "equals": "Countdown"
+    },
+    {
+      "tick": 80,
+      "fighter": 0,
+      "field": "score",
+      "equals": 1
+    }
+  ]
+}

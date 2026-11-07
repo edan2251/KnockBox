@@ -1,0 +1,61 @@
+{
+  "name": "showcase_cp16_collapse",
+  "arena": "PropLab",
+  "mode": "Charge",
+  "ticks": 150,
+  "spawn": {
+    "p1": [
+      -2.6,
+      1.8
+    ],
+    "p2": [
+      8.5,
+      -4.55
+    ]
+  },
+  "p1": [
+    {
+      "from": 0,
+      "to": 20,
+      "hold": [
+        "Left",
+        "Attack"
+      ]
+    }
+  ],
+  "p2": [],
+  "captures": [
+    {
+      "tick": 22,
+      "name": "a_approach"
+    },
+    {
+      "tick": 24,
+      "name": "b_strike"
+    },
+    {
+      "tick": 26,
+      "name": "c_out"
+    },
+    {
+      "tick": 30,
+      "name": "d_drop"
+    },
+    {
+      "tick": 36,
+      "name": "e_fall"
+    },
+    {
+      "tick": 46,
+      "name": "f_land"
+    },
+    {
+      "tick": 80,
+      "name": "g_settle"
+    },
+    {
+      "tick": 149,
+      "name": "h_rest"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "name": "showcase_cp5_overlay",
+  "arena": "Box",
+  "mode": "Charge",
+  "ticks": 40,
+  "spawn": {
+    "p1": [
+      -12,
+      -7.55
+    ],
+    "p2": [
+      -5,
+      -7.55
+    ]
+  },
+  "p1": [
+    {
+      "from": 5,
+      "to": 24,
+      "hold": [
+        "Attack"
+      ]
+    }
+  ],
+  "p2": [
+    {
+      "from": 5,
+      "to": 24,
+      "hold": [
+        "Attack"
+      ]
+    }
+  ],
+  "captures": [
+    {
+      "tick": 32,
+      "name": "power_numbers"
+    }
+  ],
+  "overlay": true
+}

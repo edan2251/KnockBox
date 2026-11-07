@@ -1,0 +1,30 @@
+{
+  "name": "showcase_cp5_charge",
+  "arena": "Box",
+  "mode": "Charge",
+  "ticks": 100,
+  "spawn": { "p1": [-10, -7.55], "p2": [-4, -7.55] },
+  "p1": [
+    { "from": 10, "to": 55, "hold": ["Attack"] }
+  ],
+  "p2": [],
+  "captures": [
+    { "tick": 16, "name": "charge_stage1" },
+    { "tick": 35, "name": "charge_stage2" },
+    { "tick": 52, "name": "charge_stage3" },
+    { "tick": 62, "name": "lunge_trail" },
+    { "tick": 66, "name": "lunge_hit" },
+    { "tick": 81, "name": "wallsplat" }
+  ],
+  "expect": [
+    { "tick": 30, "fighter": 0, "field": "action", "equals": "Charge" },
+    { "tick": 56, "fighter": 0, "field": "action", "equals": "Charge" },
+    { "tick": 57, "fighter": 0, "field": "action", "equals": "Lunge" },
+    { "tick": 57, "fighter": 0, "field": "speed", "equals": 34 },
+    { "tick": 64, "fighter": 1, "field": "hp", "equals": 100 },
+    { "tick": 65, "fighter": 1, "field": "hp", "equals": 80 },
+    { "tick": 65, "fighter": 1, "field": "action", "equals": "Hitstun" },
+    { "tick": 65, "fighter": 0, "field": "vel.x", "equals": -8.5 },
+    { "tick": 80, "fighter": 1, "field": "hp", "equals": 74 }
+  ]
+}

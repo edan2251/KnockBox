@@ -1,0 +1,26 @@
+{
+  "name": "showcase_cp4_clash",
+  "arena": "Box",
+  "ticks": 50,
+  "spawn": { "p1": [-6.6, -7.55], "p2": [-5.4, -7.55] },
+  "p1": [
+    { "at": 10, "press": ["Attack"] }
+  ],
+  "p2": [
+    { "at": 10, "press": ["Attack"] }
+  ],
+  "captures": [
+    { "tick": 16, "name": "clash" },
+    { "tick": 18, "name": "clash_sparks" },
+    { "tick": 27, "name": "recoil" }
+  ],
+  "expect": [
+    { "tick": 16, "fighter": 0, "field": "action", "equals": "Recoil" },
+    { "tick": 16, "fighter": 1, "field": "action", "equals": "Recoil" },
+    { "tick": 16, "fighter": 0, "field": "hp", "equals": 100 },
+    { "tick": 16, "fighter": 1, "field": "hp", "equals": 100 },
+    { "tick": 16, "fighter": 0, "field": "vel.x", "equals": -8 },
+    { "tick": 16, "fighter": 1, "field": "vel.x", "equals": 8 },
+    { "tick": 16, "fighter": 0, "field": "hitstop", "equals": 8 }
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "name": "showcase_cp6_clash",
+  "arena": "Box",
+  "mode": "Swing",
+  "ticks": 45,
+  "spawn": {
+    "p1": [
+      -9,
+      -7.55
+    ],
+    "p2": [
+      -6.2,
+      -7.55
+    ]
+  },
+  "p1": [
+    {
+      "at": 10,
+      "press": [
+        "Attack"
+      ]
+    }
+  ],
+  "p2": [
+    {
+      "at": 10,
+      "press": [
+        "Attack"
+      ]
+    }
+  ],
+  "captures": [
+    {
+      "tick": 15,
+      "name": "swings"
+    },
+    {
+      "tick": 17,
+      "name": "clash"
+    },
+    {
+      "tick": 19,
+      "name": "clash_sparks"
+    },
+    {
+      "tick": 28,
+      "name": "recoil"
+    }
+  ],
+  "expect": [
+    {
+      "tick": 17,
+      "fighter": 0,
+      "field": "action",
+      "equals": "Recoil"
+    },
+    {
+      "tick": 17,
+      "fighter": 1,
+      "field": "action",
+      "equals": "Recoil"
+    },
+    {
+      "tick": 17,
+      "fighter": 0,
+      "field": "hp",
+      "equals": 100
+    },
+    {
+      "tick": 17,
+      "fighter": 1,
+      "field": "hp",
+      "equals": 100
+    }
+  ]
+}

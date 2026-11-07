@@ -1,0 +1,31 @@
+{
+  "name": "showcase_cp1_mirror_run_jump",
+  "arena": "Box",
+  "ticks": 150,
+  "p1": [
+    { "from": 0, "to": 39, "hold": ["Right"] },
+    { "at": 20, "press": ["Jump"], "holdFor": 30 },
+    { "from": 80, "to": 119, "hold": ["Left"] }
+  ],
+  "p2": [
+    { "from": 0, "to": 39, "hold": ["Left"] },
+    { "at": 20, "press": ["Jump"], "holdFor": 30 },
+    { "from": 80, "to": 119, "hold": ["Right"] }
+  ],
+  "captures": [
+    { "tick": 0, "name": "start" },
+    { "tick": 41, "name": "apex" },
+    { "tick": 150, "name": "end" }
+  ],
+  "expect": [
+    { "tick": 41, "fighter": 0, "field": "pos.y", "min": -3.8, "max": -3.6 },
+    { "tick": 41, "fighter": 1, "field": "pos.y", "min": -3.8, "max": -3.6 },
+    { "tick": 41, "fighter": 0, "field": "pos.x", "min": -5.6, "max": -5.3 },
+    { "tick": 41, "fighter": 1, "field": "pos.x", "min": 5.3, "max": 5.6 },
+    { "tick": 100, "fighter": 0, "field": "facing", "equals": -1 },
+    { "tick": 100, "fighter": 1, "field": "facing", "equals": 1 },
+    { "tick": 150, "fighter": 0, "field": "grounded", "equals": true },
+    { "tick": 150, "fighter": 1, "field": "grounded", "equals": true },
+    { "tick": 150, "fighter": 0, "field": "phase", "equals": "Fighting" }
+  ]
+}

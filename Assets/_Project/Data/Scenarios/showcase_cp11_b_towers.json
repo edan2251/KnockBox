@@ -1,0 +1,52 @@
+{
+  "name": "showcase_cp11_b_towers",
+  "theme": "B",
+  "arena": "Towers",
+  "mode": "Charge",
+  "ticks": 40,
+  "p1": [
+    {
+      "from": 0,
+      "to": 22,
+      "hold": [
+        "Right"
+      ]
+    },
+    {
+      "at": 6,
+      "press": [
+        "Jump"
+      ],
+      "holdFor": 14
+    },
+    {
+      "from": 24,
+      "to": 60,
+      "hold": [
+        "Attack"
+      ]
+    }
+  ],
+  "p2": [
+    {
+      "from": 0,
+      "to": 18,
+      "hold": [
+        "Left"
+      ]
+    },
+    {
+      "from": 26,
+      "to": 60,
+      "hold": [
+        "Guard"
+      ]
+    }
+  ],
+  "captures": [
+    {
+      "tick": 36,
+      "name": "overview"
+    }
+  ]
+}

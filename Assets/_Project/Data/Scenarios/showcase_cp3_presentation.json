@@ -1,0 +1,173 @@
+{
+  "name": "showcase_cp3_presentation",
+  "arena": "Box",
+  "ticks": 270,
+  "spawn": {
+    "p1": [
+      -12.5,
+      4
+    ],
+    "p2": [
+      12.5,
+      4
+    ]
+  },
+  "p1": [
+    {
+      "from": 55,
+      "to": 85,
+      "hold": [
+        "Right"
+      ]
+    },
+    {
+      "at": 75,
+      "press": [
+        "Jump"
+      ],
+      "holdFor": 25
+    },
+    {
+      "from": 120,
+      "to": 225,
+      "hold": [
+        "Left"
+      ]
+    },
+    {
+      "at": 150,
+      "press": [
+        "Jump"
+      ],
+      "holdFor": 20
+    },
+    {
+      "at": 240,
+      "press": [
+        "Dash",
+        "Right"
+      ],
+      "holdFor": 1
+    }
+  ],
+  "p2": [
+    {
+      "from": 55,
+      "to": 85,
+      "hold": [
+        "Left"
+      ]
+    },
+    {
+      "at": 75,
+      "press": [
+        "Jump"
+      ],
+      "holdFor": 25
+    },
+    {
+      "from": 120,
+      "to": 225,
+      "hold": [
+        "Right"
+      ]
+    },
+    {
+      "at": 150,
+      "press": [
+        "Jump"
+      ],
+      "holdFor": 20
+    },
+    {
+      "at": 240,
+      "press": [
+        "Dash",
+        "Left"
+      ],
+      "holdFor": 1
+    }
+  ],
+  "captures": [
+    {
+      "tick": 32,
+      "name": "land"
+    },
+    {
+      "tick": 50,
+      "name": "idle"
+    },
+    {
+      "tick": 70,
+      "name": "run"
+    },
+    {
+      "tick": 98,
+      "name": "apex"
+    },
+    {
+      "tick": 180,
+      "name": "wallslide"
+    },
+    {
+      "tick": 245,
+      "name": "dash"
+    }
+  ],
+  "expect": [
+    {
+      "tick": 32,
+      "fighter": 0,
+      "field": "grounded",
+      "equals": true
+    },
+    {
+      "tick": 50,
+      "fighter": 0,
+      "field": "action",
+      "equals": "Idle"
+    },
+    {
+      "tick": 70,
+      "fighter": 0,
+      "field": "action",
+      "equals": "Run"
+    },
+    {
+      "tick": 98,
+      "fighter": 0,
+      "field": "action",
+      "equals": "Airborne"
+    },
+    {
+      "tick": 180,
+      "fighter": 0,
+      "field": "action",
+      "equals": "WallSlide"
+    },
+    {
+      "tick": 180,
+      "fighter": 1,
+      "field": "action",
+      "equals": "WallSlide"
+    },
+    {
+      "tick": 245,
+      "fighter": 0,
+      "field": "action",
+      "equals": "Dash"
+    },
+    {
+      "tick": 245,
+      "fighter": 0,
+      "field": "facing",
+      "equals": 1
+    },
+    {
+      "tick": 270,
+      "fighter": 0,
+      "field": "grounded",
+      "equals": true
+    }
+  ]
+}

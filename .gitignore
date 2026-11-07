@@ -107,3 +107,35 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# KnockBox local data and generated verification outputs
+/Assets/_Project/LocalOnly/
+/Assets/_Project/LocalOnly.meta
+/Assets/Screenshots/
+/Assets/Screenshots.meta
+/Assets/_Recovery/
+/Assets/_Recovery.meta
+/Captures/
+/ProfilerCaptures/
+/References/
+/Replays/
+/TestResults/
+/Tools/out/
+/Tools/ReplayCheck/results/
+/incoming/
+/UI-Previews/
+/*_BackUpThisFolder_ButDontShipItWithYourGame/
+/*_BurstDebugInformation_DoNotShip/
+.idea/
+.vscode/
+.codex/
+.claude/settings.local.json
+CLAUDE.local.md
+.env
+.env.*
+!.env.example
+Thumbs.db
+Desktop.ini
+.DS_Store
+.dirstamp
+tmpinst-dir.stamp

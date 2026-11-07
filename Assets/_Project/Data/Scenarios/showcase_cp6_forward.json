@@ -1,0 +1,81 @@
+{
+  "name": "showcase_cp6_forward",
+  "arena": "Box",
+  "mode": "Swing",
+  "ticks": 60,
+  "spawn": {
+    "p1": [
+      -8,
+      -7.55
+    ],
+    "p2": [
+      -6,
+      -7.55
+    ]
+  },
+  "p1": [
+    {
+      "at": 10,
+      "press": [
+        "Attack"
+      ]
+    }
+  ],
+  "p2": [],
+  "captures": [
+    {
+      "tick": 13,
+      "name": "windup"
+    },
+    {
+      "tick": 18,
+      "name": "hit"
+    },
+    {
+      "tick": 26,
+      "name": "follow"
+    },
+    {
+      "tick": 34,
+      "name": "flight"
+    }
+  ],
+  "expect": [
+    {
+      "tick": 11,
+      "fighter": 0,
+      "field": "action",
+      "equals": "Attack"
+    },
+    {
+      "tick": 17,
+      "fighter": 1,
+      "field": "hp",
+      "equals": 100
+    },
+    {
+      "tick": 18,
+      "fighter": 1,
+      "field": "hp",
+      "equals": 88
+    },
+    {
+      "tick": 18,
+      "fighter": 1,
+      "field": "action",
+      "equals": "Hitstun"
+    },
+    {
+      "tick": 40,
+      "fighter": 0,
+      "field": "action",
+      "equals": "Attack"
+    },
+    {
+      "tick": 41,
+      "fighter": 0,
+      "field": "action",
+      "equals": "Idle"
+    }
+  ]
+}

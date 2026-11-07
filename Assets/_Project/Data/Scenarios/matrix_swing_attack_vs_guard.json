@@ -1,0 +1,48 @@
+{
+  "name": "matrix_swing_attack_vs_guard",
+  "arena": "Box",
+  "mode": "Swing",
+  "ticks": 40,
+  "spawn": {
+    "p1": [
+      -8.0,
+      -7.55
+    ],
+    "p2": [
+      -6.4,
+      -7.55
+    ]
+  },
+  "p1": [
+    {
+      "at": 10,
+      "press": [
+        "Attack"
+      ],
+      "holdFor": 1
+    }
+  ],
+  "p2": [
+    {
+      "from": 0,
+      "to": 60,
+      "hold": [
+        "Guard"
+      ]
+    }
+  ],
+  "expect": [
+    {
+      "tick": 18,
+      "fighter": 1,
+      "field": "action",
+      "equals": "GuardStun"
+    },
+    {
+      "tick": 17,
+      "fighter": 1,
+      "field": "action",
+      "equals": "Guard"
+    }
+  ]
+}

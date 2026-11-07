@@ -1,0 +1,72 @@
+{
+  "name": "showcase_cp7_wallthrow",
+  "arena": "Box",
+  "mode": "Charge",
+  "ticks": 60,
+  "spawn": {
+    "p1": [
+      12.4,
+      -7.55
+    ],
+    "p2": [
+      13.6,
+      -7.55
+    ]
+  },
+  "p1": [
+    {
+      "from": 10,
+      "to": 18,
+      "hold": [
+        "Grab"
+      ]
+    },
+    {
+      "at": 19,
+      "press": [
+        "Right"
+      ]
+    }
+  ],
+  "p2": [],
+  "captures": [
+    {
+      "tick": 18,
+      "name": "hold_at_wall"
+    },
+    {
+      "tick": 24,
+      "name": "wallsplat"
+    },
+    {
+      "tick": 32,
+      "name": "after"
+    }
+  ],
+  "expect": [
+    {
+      "tick": 20,
+      "fighter": 1,
+      "field": "action",
+      "equals": "Thrown"
+    },
+    {
+      "tick": 23,
+      "fighter": 1,
+      "field": "hp",
+      "equals": 94
+    },
+    {
+      "tick": 24,
+      "fighter": 1,
+      "field": "hp",
+      "equals": 84
+    },
+    {
+      "tick": 24,
+      "fighter": 1,
+      "field": "hitstop",
+      "equals": 6
+    }
+  ]
+}

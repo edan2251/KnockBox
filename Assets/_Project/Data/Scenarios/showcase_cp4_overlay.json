@@ -1,0 +1,14 @@
+{
+  "name": "showcase_cp4_overlay",
+  "arena": "Box",
+  "ticks": 30,
+  "overlay": true,
+  "spawn": { "p1": [-6.6, -7.55], "p2": [-5.4, -7.55] },
+  "p1": [
+    { "at": 10, "press": ["Attack"] }
+  ],
+  "p2": [],
+  "captures": [
+    { "tick": 16, "name": "hit_circles" }
+  ]
+}

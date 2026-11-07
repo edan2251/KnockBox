@@ -1,0 +1,26 @@
+{
+  "name": "showcase_cp21_forms",
+  "arena": "Box",
+  "form": "Rock",
+  "form2": "Paper",
+  "owned": 7,
+  "ticks": 150,
+  "spawn": { "p1": [-5, -7.5], "p2": [5, -7.5] },
+  "p1": [
+    { "at": 0, "press": ["Attack"] },
+    { "at": 40, "press": ["Switch"] },
+    { "at": 60, "press": ["Attack"] },
+    { "at": 90, "press": ["Switch"] },
+    { "at": 100, "press": ["Attack"], "holdFor": 12 }
+  ],
+  "p2": [
+    { "at": 10, "press": ["Attack"] },
+    { "at": 50, "press": ["Switch"] },
+    { "at": 75, "press": ["Left", "Attack"] }
+  ],
+  "captures": [
+    { "tick": 6, "name": "rock_windup_icons" },
+    { "tick": 64, "name": "after_switch_swing" }
+  ],
+  "expect": []
+}

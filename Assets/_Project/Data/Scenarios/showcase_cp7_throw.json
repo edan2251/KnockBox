@@ -1,0 +1,99 @@
+{
+  "name": "showcase_cp7_throw",
+  "arena": "Box",
+  "mode": "Swing",
+  "ticks": 60,
+  "spawn": {
+    "p1": [
+      -8,
+      -7.55
+    ],
+    "p2": [
+      -6.8,
+      -7.55
+    ]
+  },
+  "p1": [
+    {
+      "from": 10,
+      "to": 22,
+      "hold": [
+        "Grab"
+      ]
+    },
+    {
+      "at": 23,
+      "press": [
+        "Right",
+        "Up"
+      ]
+    }
+  ],
+  "p2": [],
+  "captures": [
+    {
+      "tick": 13,
+      "name": "reach"
+    },
+    {
+      "tick": 18,
+      "name": "hold"
+    },
+    {
+      "tick": 24,
+      "name": "throw"
+    },
+    {
+      "tick": 28,
+      "name": "thrown_trail"
+    },
+    {
+      "tick": 43,
+      "name": "wallsplat"
+    }
+  ],
+  "expect": [
+    {
+      "tick": 16,
+      "fighter": 0,
+      "field": "action",
+      "equals": "Holding"
+    },
+    {
+      "tick": 16,
+      "fighter": 1,
+      "field": "action",
+      "equals": "Held"
+    },
+    {
+      "tick": 23,
+      "fighter": 1,
+      "field": "action",
+      "equals": "Held"
+    },
+    {
+      "tick": 24,
+      "fighter": 1,
+      "field": "action",
+      "equals": "Thrown"
+    },
+    {
+      "tick": 24,
+      "fighter": 1,
+      "field": "hp",
+      "equals": 94
+    },
+    {
+      "tick": 24,
+      "fighter": 1,
+      "field": "vel.y",
+      "min": 19
+    },
+    {
+      "tick": 42,
+      "fighter": 1,
+      "field": "hp",
+      "equals": 84
+    }
+  ]
+}

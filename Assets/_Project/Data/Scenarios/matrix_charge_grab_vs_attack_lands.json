@@ -1,0 +1,54 @@
+{
+  "name": "matrix_charge_grab_vs_attack_lands",
+  "arena": "Box",
+  "mode": "Charge",
+  "ticks": 40,
+  "spawn": {
+    "p1": [
+      -8.0,
+      -7.55
+    ],
+    "p2": [
+      -5.8,
+      -7.55
+    ]
+  },
+  "p1": [
+    {
+      "at": 10,
+      "press": [
+        "Grab"
+      ],
+      "holdFor": 1
+    }
+  ],
+  "p2": [
+    {
+      "from": 1,
+      "to": 10,
+      "hold": [
+        "Attack"
+      ]
+    }
+  ],
+  "expect": [
+    {
+      "tick": 14,
+      "fighter": 0,
+      "field": "hp",
+      "equals": 100
+    },
+    {
+      "tick": 15,
+      "fighter": 0,
+      "field": "action",
+      "equals": "Hitstun"
+    },
+    {
+      "tick": 15,
+      "fighter": 1,
+      "field": "hp",
+      "equals": 100
+    }
+  ]
+}

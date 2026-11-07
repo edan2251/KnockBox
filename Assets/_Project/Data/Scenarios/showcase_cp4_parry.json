@@ -1,0 +1,28 @@
+{
+  "name": "showcase_cp4_parry",
+  "arena": "Box",
+  "ticks": 80,
+  "spawn": { "p1": [-6.6, -7.55], "p2": [-5.4, -7.55] },
+  "p1": [
+    { "at": 10, "press": ["Attack"] }
+  ],
+  "p2": [
+    { "at": 13, "press": ["Guard"], "holdFor": 6 },
+    { "at": 20, "press": ["Attack"] }
+  ],
+  "captures": [
+    { "tick": 16, "name": "parry_invert" },
+    { "tick": 19, "name": "parry_ring" },
+    { "tick": 30, "name": "stagger" },
+    { "tick": 34, "name": "punish" }
+  ],
+  "expect": [
+    { "tick": 16, "fighter": 0, "field": "action", "equals": "Stagger" },
+    { "tick": 16, "fighter": 0, "field": "hitstop", "equals": 10 },
+    { "tick": 16, "fighter": 1, "field": "hp", "equals": 100 },
+    { "tick": 16, "fighter": 0, "field": "vel.x", "equals": -8 },
+    { "tick": 27, "fighter": 1, "field": "action", "equals": "Attack" },
+    { "tick": 27, "fighter": 1, "field": "actionTick", "equals": 0 },
+    { "tick": 40, "fighter": 0, "field": "hp", "equals": 88 }
+  ]
+}

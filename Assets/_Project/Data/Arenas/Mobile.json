@@ -1,0 +1,14 @@
+{
+  "theme": "B",
+  "light": [0, 25],
+  "rotation": true,
+  "props": [
+    {"kind": "spinner", "pos": [0, 2.2], "size": [7.6, 1.0]},
+    {"kind": "hinged", "pos": [-5.4, 0.7], "size": [3.2, 0.6], "anchor": [-7.0, 0.7], "mirror": true},
+    {"kind": "hanging", "pos": [-4.0, 6.8], "size": [1.8, 1.8], "anchor": [-4.0, 10], "mirror": true},
+    {"kind": "hanging", "pos": [-11.0, 5.6], "size": [2.2, 1.0], "anchor": [-11.0, 10], "mirror": true, "break": 10},
+    {"kind": "hinged", "pos": [-13.0, -1.6], "size": [3.2, 0.6], "anchor": [-14.5, -1.6], "mirror": true},
+    {"kind": "box", "pos": [-13.2, -4.4], "size": [1.6, 1.2], "mirror": true},
+    {"kind": "box", "pos": [-12.5, 1.6], "size": [1.2, 1.2], "mirror": true}
+  ]
+}

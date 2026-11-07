@@ -1,0 +1,70 @@
+{
+  "name": "showcase_cp8_matchend",
+  "arena": "Box",
+  "mode": "Charge",
+  "ticks": 195,
+  "tuning": {
+    "Combat.MaxHealth": 12,
+    "Match.RoundsToWin": 1
+  },
+  "spawn": {
+    "p1": [
+      -10,
+      -7.55
+    ],
+    "p2": [
+      -4,
+      -7.55
+    ]
+  },
+  "p1": [
+    {
+      "from": 10,
+      "to": 55,
+      "hold": [
+        "Attack"
+      ]
+    }
+  ],
+  "p2": [],
+  "captures": [
+    {
+      "tick": 90,
+      "name": "ko"
+    },
+    {
+      "tick": 132,
+      "name": "matchend"
+    },
+    {
+      "tick": 190,
+      "name": "matchend_prompt"
+    }
+  ],
+  "expect": [
+    {
+      "tick": 65,
+      "fighter": 0,
+      "field": "phase",
+      "equals": "KO"
+    },
+    {
+      "tick": 125,
+      "fighter": 0,
+      "field": "phase",
+      "equals": "RoundEnd"
+    },
+    {
+      "tick": 126,
+      "fighter": 0,
+      "field": "phase",
+      "equals": "MatchEnd"
+    },
+    {
+      "tick": 126,
+      "fighter": 0,
+      "field": "score",
+      "equals": 1
+    }
+  ]
+}

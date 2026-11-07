@@ -1,0 +1,30 @@
+{
+  "name": "showcase_cp4_ko",
+  "arena": "Box",
+  "ticks": 85,
+  "tuning": { "Combat.MaxHealth": 12 },
+  "spawn": { "p1": [-6.6, -7.55], "p2": [-5.4, -7.55] },
+  "p1": [
+    { "at": 10, "press": ["Attack"] }
+  ],
+  "p2": [],
+  "captures": [
+    { "tick": 16, "name": "ko_hit" },
+    { "tick": 22, "name": "ko_after" },
+    { "tick": 80, "name": "next_round" }
+  ],
+  "expect": [
+    { "tick": 16, "fighter": 0, "field": "phase", "equals": "KO" },
+    { "tick": 16, "fighter": 1, "field": "action", "equals": "KO" },
+    { "tick": 16, "fighter": 0, "field": "roundWinner", "equals": 0 },
+    { "tick": 16, "fighter": 1, "field": "hitstop", "equals": 20 },
+    { "tick": 75, "fighter": 0, "field": "phase", "equals": "KO" },
+    { "tick": 76, "fighter": 0, "field": "phase", "equals": "RoundEnd" },
+    { "tick": 76, "fighter": 0, "field": "score", "equals": 1 },
+    { "tick": 77, "fighter": 0, "field": "phase", "equals": "RoundTransition" },
+    { "tick": 78, "fighter": 0, "field": "phase", "equals": "Countdown" },
+    { "tick": 78, "fighter": 0, "field": "round", "equals": 2 },
+    { "tick": 78, "fighter": 1, "field": "hp", "equals": 12 },
+    { "tick": 78, "fighter": 1, "field": "score", "equals": 0 }
+  ]
+}

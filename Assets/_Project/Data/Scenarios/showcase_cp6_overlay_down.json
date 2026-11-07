@@ -1,0 +1,49 @@
+{
+  "name": "showcase_cp6_overlay_down",
+  "arena": "Box",
+  "mode": "Swing",
+  "ticks": 20,
+  "overlay": true,
+  "spawn": {
+    "p1": [
+      -2,
+      2
+    ],
+    "p2": [
+      10,
+      -7.55
+    ]
+  },
+  "p1": [
+    {
+      "at": 2,
+      "press": [
+        "Down",
+        "Attack"
+      ]
+    }
+  ],
+  "p2": [],
+  "captures": [
+    {
+      "tick": 9,
+      "name": "active0"
+    },
+    {
+      "tick": 10,
+      "name": "active1"
+    },
+    {
+      "tick": 11,
+      "name": "active2"
+    },
+    {
+      "tick": 12,
+      "name": "active3"
+    },
+    {
+      "tick": 13,
+      "name": "active4"
+    }
+  ]
+}

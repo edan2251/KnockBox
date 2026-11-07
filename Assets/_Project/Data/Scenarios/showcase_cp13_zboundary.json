@@ -1,0 +1,18 @@
+{
+  "name": "showcase_cp13_zboundary",
+  "arena": "Scales",
+  "mode": "Charge",
+  "ticks": 40,
+  "spawn": { "p1": [-15.4, 1.5], "p2": [3.0, -3.95] },
+  "p1": [
+    { "from": 0, "to": 30, "hold": ["Left"] },
+    { "at": 5, "press": ["Dash"], "holdFor": 2 }
+  ],
+  "p2": [],
+  "captures": [
+    { "tick": 3, "name": "warning" },
+    { "tick": 9, "name": "hit_a" },
+    { "tick": 12, "name": "hit_b" },
+    { "tick": 16, "name": "hit_c" }
+  ]
+}

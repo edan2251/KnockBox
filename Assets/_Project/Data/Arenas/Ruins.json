@@ -1,0 +1,15 @@
+{
+  "theme": "C",
+  "light": [0, 25],
+  "rotation": true,
+  "props": [
+    {"kind": "linked", "parts": [{"pos": [0, 6.4], "size": [2.0, 1.2], "anchor": [0, 10]}, {"pos": [0, 3.6], "size": [7.0, 0.7], "anchorPart": 0}, {"pos": [-2.6, 2.0], "size": [0.8, 0.8], "anchorPart": 1, "break": 6}, {"pos": [2.6, 2.0], "size": [0.8, 0.8], "anchorPart": 1, "break": 6}]},
+    {"kind": "pillar", "base": [-8, -2], "boxes": [[1.8, 1.8], [1.4, 2.4], [2.2, 1.2]], "mirror": true},
+    {"kind": "hinged", "pos": [-12.5, -1.0], "size": [3.0, 0.5], "anchor": [-14.0, -1.0], "mirror": true},
+    {"kind": "hinged", "pos": [-4.5, -3.2], "size": [2.6, 0.5], "anchor": [-3.2, -3.2], "mirror": true},
+    {"kind": "hanging", "pos": [-11.0, 6.0], "size": [1.6, 1.6], "anchor": [-11.0, 10], "mirror": true},
+    {"kind": "box", "pos": [0, -6.3], "size": [1.6, 1.4]},
+    {"kind": "box", "pos": [-14.0, 2.6], "size": [1.2, 1.2], "mirror": true},
+    {"kind": "box", "pos": [-13.2, -4.3], "size": [1.4, 1.4], "mirror": true}
+  ]
+}

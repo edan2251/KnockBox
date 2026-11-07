@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 58ccdbdb773a27a4d9dee71d3635fb1e, type: 3}
+  m_Name: SfxLibrary
+  m_EditorClassIdentifier: Knockbox.Presentation::Knockbox.Presentation.SfxLibrary
+  jump: {fileID: 8300000, guid: e6b5d96df9b26fe4db2585ec86778d66, type: 3}
+  land: {fileID: 8300000, guid: 83180b3ada707ba49814e625f11b1ecf, type: 3}
+  dash: {fileID: 8300000, guid: e158438219f0c0740a214a37b4d4788a, type: 3}
+  hitWeak: {fileID: 8300000, guid: 06dabb3927480da4ab4a3165bb605885, type: 3}
+  hitStrong: {fileID: 8300000, guid: 5edd5573b5463ff409f93866792d0b09, type: 3}
+  clash: {fileID: 8300000, guid: 5f7be8fef22c9284bbd4b20e8ea31f02, type: 3}
+  parry: {fileID: 8300000, guid: dbdb8acc69678ea4b8d1bd626236996f, type: 3}
+  guard: {fileID: 8300000, guid: 261d8e53112cc3e4c85412c2518d2e38, type: 3}
+  wallSplat: {fileID: 8300000, guid: af4258bbd70b7a2458ff34d61fc60fc4, type: 3}
+  grab: {fileID: 8300000, guid: 3d897321d448b5744a2559198e513a9a, type: 3}
+  throw: {fileID: 8300000, guid: 8c4d7188c7eb28c44a5e55e24d857900, type: 3}
+  spike: {fileID: 8300000, guid: 7af682dc2908dc549ae550d3e4770492, type: 3}
+  pad: {fileID: 8300000, guid: 8d39a7e9bde8998449ebba6cb85f711e, type: 3}
+  countdown: {fileID: 8300000, guid: 517743af97f52f847989091a49ff0913, type: 3}
+  ko: {fileID: 8300000, guid: e4c12c3c391ccdb45b9a4026a8a43ea6, type: 3}
+  boundary: {fileID: 8300000, guid: 59a8b38091f0a2a429205c4df149235a, type: 3}
+  snap: {fileID: 8300000, guid: 38141821c08e44b4aa782a57723fe4f1, type: 3}

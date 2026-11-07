@@ -1,0 +1,44 @@
+{
+  "name": "showcase_cp6_overlay_forward",
+  "arena": "Box",
+  "mode": "Swing",
+  "ticks": 30,
+  "overlay": true,
+  "spawn": {
+    "p1": [
+      -8,
+      -7.55
+    ],
+    "p2": [
+      10,
+      -7.55
+    ]
+  },
+  "p1": [
+    {
+      "at": 10,
+      "press": [
+        "Attack"
+      ]
+    }
+  ],
+  "p2": [],
+  "captures": [
+    {
+      "tick": 16,
+      "name": "active0"
+    },
+    {
+      "tick": 17,
+      "name": "active1"
+    },
+    {
+      "tick": 18,
+      "name": "active2"
+    },
+    {
+      "tick": 19,
+      "name": "active3"
+    }
+  ]
+}

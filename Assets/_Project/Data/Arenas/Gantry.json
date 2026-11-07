@@ -1,0 +1,14 @@
+{
+  "theme": "C",
+  "light": [0, 25],
+  "rotation": true,
+  "props": [
+    {"kind": "seesaw", "pos": [0, 2.3], "size": [8.0, 0.6]},
+    {"kind": "spinner", "pos": [-6.5, 6.0], "size": [3.0, 0.6], "mirror": true},
+    {"kind": "spinner", "pos": [-12.5, 2.5], "size": [2.4, 2.4], "mirror": true},
+    {"kind": "hanging", "pos": [-14.8, 6.9], "size": [1.8, 1.4], "anchor": [-14.8, 10], "mirror": true},
+    {"kind": "box", "pos": [0, -6.3], "size": [1.8, 1.4]},
+    {"kind": "box", "pos": [-5.0, -2.3], "size": [1.4, 1.4], "mirror": true},
+    {"kind": "box", "pos": [-13.2, -4.3], "size": [1.4, 1.4], "mirror": true}
+  ]
+}

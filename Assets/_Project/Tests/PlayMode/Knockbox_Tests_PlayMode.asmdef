@@ -1,0 +1,29 @@
+{
+  "name": "Knockbox.Tests.PlayMode",
+  "rootNamespace": "Knockbox.Tests.PlayMode",
+  "references": [
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner",
+    "Knockbox.Simulation",
+    "Knockbox.Presentation",
+    "Knockbox.Game",
+    "Unity.2D.Animation.Runtime",
+    "Unity.ugui",
+    "Unity.InputSystem",
+    "Unity.RenderPipelines.Core.Runtime",
+    "Unity.RenderPipelines.Universal.Runtime"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

@@ -1,0 +1,78 @@
+{
+  "name": "showcase_cp6_dashcancel",
+  "arena": "Box",
+  "mode": "Swing",
+  "ticks": 45,
+  "spawn": {
+    "p1": [
+      -12,
+      -7.55
+    ],
+    "p2": [
+      -6.2,
+      -7.55
+    ]
+  },
+  "p1": [
+    {
+      "from": 5,
+      "to": 12,
+      "hold": [
+        "Right"
+      ]
+    },
+    {
+      "at": 5,
+      "press": [
+        "Dash"
+      ]
+    },
+    {
+      "at": 9,
+      "press": [
+        "Attack"
+      ]
+    }
+  ],
+  "p2": [],
+  "captures": [
+    {
+      "tick": 8,
+      "name": "dash"
+    },
+    {
+      "tick": 13,
+      "name": "cancel_windup"
+    },
+    {
+      "tick": 17,
+      "name": "hit"
+    }
+  ],
+  "expect": [
+    {
+      "tick": 9,
+      "fighter": 0,
+      "field": "action",
+      "equals": "Dash"
+    },
+    {
+      "tick": 10,
+      "fighter": 0,
+      "field": "action",
+      "equals": "Attack"
+    },
+    {
+      "tick": 10,
+      "fighter": 0,
+      "field": "vel.x",
+      "min": 20
+    },
+    {
+      "tick": 17,
+      "fighter": 1,
+      "field": "hp",
+      "equals": 88
+    }
+  ]
+}

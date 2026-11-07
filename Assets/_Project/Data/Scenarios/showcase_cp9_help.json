@@ -1,0 +1,23 @@
+{
+  "name": "showcase_cp9_help",
+  "arena": "Box",
+  "mode": "Charge",
+  "help": true,
+  "ticks": 30,
+  "p1": [
+    {
+      "from": 0,
+      "to": 12,
+      "hold": [
+        "Right"
+      ]
+    }
+  ],
+  "p2": [],
+  "captures": [
+    {
+      "tick": 24,
+      "name": "help"
+    }
+  ]
+}

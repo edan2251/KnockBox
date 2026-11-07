@@ -1,0 +1,60 @@
+{
+  "name": "matrix_swing_grab_vs_grabbing",
+  "arena": "Box",
+  "mode": "Swing",
+  "ticks": 40,
+  "spawn": {
+    "p1": [
+      -8.0,
+      -7.55
+    ],
+    "p2": [
+      -6.8,
+      -7.55
+    ]
+  },
+  "p1": [
+    {
+      "at": 10,
+      "press": [
+        "Grab"
+      ],
+      "holdFor": 1
+    }
+  ],
+  "p2": [
+    {
+      "at": 12,
+      "press": [
+        "Grab"
+      ],
+      "holdFor": 1
+    }
+  ],
+  "expect": [
+    {
+      "tick": 16,
+      "fighter": 0,
+      "field": "action",
+      "equals": "Recoil"
+    },
+    {
+      "tick": 16,
+      "fighter": 1,
+      "field": "action",
+      "equals": "Recoil"
+    },
+    {
+      "tick": 16,
+      "fighter": 0,
+      "field": "hitstop",
+      "equals": 6
+    },
+    {
+      "tick": 16,
+      "fighter": 1,
+      "field": "hitstop",
+      "equals": 6
+    }
+  ]
+}

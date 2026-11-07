@@ -1,0 +1,82 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a10ff22e1d3fcc488aaf3595a48b5f0, type: 3}
+  m_Name: CombatTuning
+  m_EditorClassIdentifier: Knockbox.Game::Knockbox.Game.CombatTuning
+  Combat:
+    MaxHealth: 100
+    HitstopBase: 4
+    HitstopPerDamage: 0.25
+    HitstopMin: 4
+    HitstopMax: 12
+    ClashHitstop: 8
+    ParryHitstop: 10
+    WallSplatHitstop: 6
+    KoHitstop: 20
+    HitstunPerKnockback: 1.1
+    HitstunMin: 8
+    HitstunMax: 45
+    ComboKnockbackDecay: 0.85
+    ComboHitstunDecay: 0.8
+    MaxComboHits: 3
+    WallSplatSpeed: 14
+    WallSplatDamage: 6
+    WallSplatRestitution: 0.45
+    WallSplatHitstun: 18
+    BounceRestitution: 0.35
+    BounceMinSpeed: 2
+    ParryWindowTicks: 6
+    ParryCooldownTicks: 24
+    GuardMaxSpeed: 3
+    GuardDamageMultiplier: 0.2
+    GuardKnockbackMultiplier: 0.35
+    GuardStunTicks: 10
+    GuardHitstopMultiplier: 0.5
+    StaggerTicks: 28
+    StaggerPushSpeed: 8
+    ClashSpeed: 8
+    RecoilTicks: 12
+    AttackAirControlMultiplier: 0.5
+    TestAttack:
+      StartupTicks: 5
+      ActiveTicks: 4
+      RecoveryTicks: 14
+      Damage: 12
+      KnockbackStrength: 14
+      KnockbackDirection:
+        X: 0.8660254
+        Y: 0.5
+      CircleCount: 2
+      Circle0:
+        Start:
+          X: 0.55
+          Y: 0.05
+        End:
+          X: 0.95
+          Y: 0.05
+        Radius: 0.3
+      Circle1:
+        Start:
+          X: 0.35
+          Y: 0.05
+        End:
+          X: 0.6
+          Y: 0.05
+        Radius: 0.22
+      Circle2:
+        Start:
+          X: 0
+          Y: 0
+        End:
+          X: 0
+          Y: 0
+        Radius: 0

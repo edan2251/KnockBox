@@ -1,0 +1,40 @@
+{
+  "name": "showcase_cp6_up",
+  "arena": "Box",
+  "mode": "Swing",
+  "ticks": 45,
+  "spawn": {
+    "p1": [
+      -8,
+      -7.55
+    ],
+    "p2": [
+      10,
+      -7.55
+    ]
+  },
+  "p1": [
+    {
+      "at": 10,
+      "press": [
+        "Up",
+        "Attack"
+      ]
+    }
+  ],
+  "p2": [],
+  "captures": [
+    {
+      "tick": 13,
+      "name": "windup"
+    },
+    {
+      "tick": 17,
+      "name": "overhead"
+    },
+    {
+      "tick": 27,
+      "name": "follow"
+    }
+  ]
+}

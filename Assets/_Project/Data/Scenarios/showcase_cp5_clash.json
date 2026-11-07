@@ -1,0 +1,28 @@
+{
+  "name": "showcase_cp5_clash",
+  "arena": "Box",
+  "mode": "Charge",
+  "ticks": 70,
+  "spawn": { "p1": [-12, -7.55], "p2": [-5, -7.55] },
+  "p1": [
+    { "from": 5, "to": 24, "hold": ["Attack"] }
+  ],
+  "p2": [
+    { "from": 5, "to": 24, "hold": ["Attack"] }
+  ],
+  "captures": [
+    { "tick": 29, "name": "lunges" },
+    { "tick": 32, "name": "clash" },
+    { "tick": 34, "name": "clash_sparks" },
+    { "tick": 45, "name": "recoil" }
+  ],
+  "expect": [
+    { "tick": 26, "fighter": 0, "field": "speed", "min": 26.88, "max": 26.9 },
+    { "tick": 32, "fighter": 0, "field": "action", "equals": "Recoil" },
+    { "tick": 32, "fighter": 1, "field": "action", "equals": "Recoil" },
+    { "tick": 32, "fighter": 0, "field": "hp", "equals": 100 },
+    { "tick": 32, "fighter": 1, "field": "hp", "equals": 100 },
+    { "tick": 32, "fighter": 0, "field": "vel.x", "max": -9.4 },
+    { "tick": 32, "fighter": 1, "field": "vel.x", "min": 9.4 }
+  ]
+}

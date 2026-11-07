@@ -1,0 +1,66 @@
+{
+  "name": "matrix_charge_attack_vs_attacking",
+  "arena": "Box",
+  "mode": "Charge",
+  "ticks": 40,
+  "spawn": {
+    "p1": [
+      -8.0,
+      -7.55
+    ],
+    "p2": [
+      -5.0,
+      -7.55
+    ]
+  },
+  "p1": [
+    {
+      "from": 5,
+      "to": 14,
+      "hold": [
+        "Attack"
+      ]
+    }
+  ],
+  "p2": [
+    {
+      "from": 5,
+      "to": 14,
+      "hold": [
+        "Attack"
+      ]
+    }
+  ],
+  "expect": [
+    {
+      "tick": 18,
+      "fighter": 0,
+      "field": "action",
+      "equals": "Recoil"
+    },
+    {
+      "tick": 18,
+      "fighter": 1,
+      "field": "action",
+      "equals": "Recoil"
+    },
+    {
+      "tick": 18,
+      "fighter": 0,
+      "field": "hitstop",
+      "equals": 8
+    },
+    {
+      "tick": 18,
+      "fighter": 0,
+      "field": "hp",
+      "equals": 100
+    },
+    {
+      "tick": 18,
+      "fighter": 1,
+      "field": "hp",
+      "equals": 100
+    }
+  ]
+}

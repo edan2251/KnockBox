@@ -1,0 +1,20 @@
+{
+  "name": "showcase_cp15_chain",
+  "arena": "PropLab",
+  "mode": "Charge",
+  "ticks": 90,
+  "spawn": { "p1": [2.2, -4.55], "p2": [-9.0, -4.55] },
+  "p1": [
+    { "from": 0, "to": 18, "hold": ["Right", "Attack"] }
+  ],
+  "p2": [],
+  "captures": [
+    { "tick": 20, "name": "a_approach" },
+    { "tick": 22, "name": "b_strike" },
+    { "tick": 23, "name": "c_break" },
+    { "tick": 25, "name": "d_swing" },
+    { "tick": 30, "name": "e_fly" },
+    { "tick": 45, "name": "f_fall" },
+    { "tick": 89, "name": "g_rest" }
+  ]
+}

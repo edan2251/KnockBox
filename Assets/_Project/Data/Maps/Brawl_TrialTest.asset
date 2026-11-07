@@ -1,0 +1,151 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2c402aa8ef1cbe048a3fc3c608dfafa5, type: 3}
+  m_Name: Brawl_TrialTest
+  m_EditorClassIdentifier: Knockbox.Game::Knockbox.Game.Maps.MapDefinition
+  stableId: f61c91dad40342459efd9ac73f22c98e
+  displayName: Brawl_TrialTest
+  preservedBaseline: 0
+  revision: 7
+  columns: 36
+  rows: 20
+  boundary: 0
+  spawn0: {x: -9.5, y: -0.5}
+  spawn1: {x: 9.5, y: -0.5}
+  boxes:
+  - id: box_67fa98ad43bf467f85f8b265d35aa52d
+    kind: 0
+    minX: -1
+    minY: -6
+    maxX: 1
+    maxY: -5
+  - id: box_4f735d8969644ef1bd81def16005bc39
+    kind: 0
+    minX: 1
+    minY: -6
+    maxX: 3
+    maxY: -5
+  - id: box_e0412501868341bd8742b5d1584e9a6f
+    kind: 0
+    minX: -3
+    minY: -6
+    maxX: -1
+    maxY: -5
+  - id: box_6fe360ccae314738aa0bc4f9a982512b
+    kind: 0
+    minX: 3
+    minY: -6
+    maxX: 5
+    maxY: -5
+  - id: box_f9987b9eda0348e59b5f6c1a3eb34a17
+    kind: 0
+    minX: -5
+    minY: -6
+    maxX: -3
+    maxY: -5
+  - id: box_229f0f222f47490c981e33691abfa93f
+    kind: 0
+    minX: -11
+    minY: -1.5
+    maxX: -9
+    maxY: -0.5
+  - id: box_fefde02857a34abf901735cc6c161043
+    kind: 0
+    minX: -9
+    minY: -1.5
+    maxX: -7
+    maxY: -0.5
+  - id: box_5865a62048dd4559a94afb4b52d86e1e
+    kind: 0
+    minX: -7
+    minY: -1.5
+    maxX: -5
+    maxY: -0.5
+  - id: box_368d2d9fdf044c3db6801ba19297ebb5
+    kind: 0
+    minX: -5
+    minY: -1.5
+    maxX: -3
+    maxY: -0.5
+  - id: box_313f2d3723334380bdbe1668828412be
+    kind: 0
+    minX: 3
+    minY: -1.5
+    maxX: 5
+    maxY: -0.5
+  - id: box_fcfe0b20d3fe4746810901816e89fb2c
+    kind: 0
+    minX: 5
+    minY: -1.5
+    maxX: 7
+    maxY: -0.5
+  - id: box_0b51cb91fe45419aac67e34a595000d2
+    kind: 0
+    minX: 7
+    minY: -1.5
+    maxX: 9
+    maxY: -0.5
+  - id: box_225cc74108d646039512df7208eca8aa
+    kind: 0
+    minX: 9
+    minY: -1.5
+    maxX: 11
+    maxY: -0.5
+  - id: box-000
+    kind: 0
+    minX: -18
+    minY: 9
+    maxX: 18
+    maxY: 10
+  - id: box-007
+    kind: 0
+    minX: -18
+    minY: -9
+    maxX: -17
+    maxY: 9
+  - id: box-008
+    kind: 0
+    minX: 17
+    minY: -9
+    maxX: 18
+    maxY: 9
+  - id: box-009
+    kind: 0
+    minX: -18
+    minY: -10
+    maxX: 18
+    maxY: -9
+  - id: box_5c8dad490a604303b5973a4e512ace9b
+    kind: 0
+    minX: -13.5
+    minY: 3.5
+    maxX: -11.5
+    maxY: 4.5
+  - id: box_2bd174a30f0f4c37b863ab1333502192
+    kind: 0
+    minX: 11.5
+    minY: 3.5
+    maxX: 13.5
+    maxY: 4.5
+  theme: 2
+  mapTheme:
+    mode: 1
+    preset: 2
+    gradientTop: {r: 0.043137256, g: 0.20392157, b: 0.25882354, a: 1}
+    gradientBottom: {r: 0.019607844, g: 0.050980393, b: 0.10980392, a: 1}
+    terrain: {r: 0.4862745, g: 0.84705883, b: 0.8, a: 1}
+    prop: {r: 0.14117648, g: 0.29411766, b: 0.3372549, a: 1}
+    highlight: {r: 0.7294118, g: 0.9607843, b: 0.9098039, a: 1}
+    gradientCurve: 1
+  light: {x: 0, y: 25}
+  ceiling: 1
+  shadow: 0.65

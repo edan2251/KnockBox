@@ -1,0 +1,88 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2c402aa8ef1cbe048a3fc3c608dfafa5, type: 3}
+  m_Name: BrawlTrial
+  m_EditorClassIdentifier: Knockbox.Game::Knockbox.Game.Maps.MapDefinition
+  stableId: brawl-authoring-trial
+  displayName: Brawl authoring trial
+  preservedBaseline: 0
+  revision: 1
+  columns: 36
+  rows: 20
+  boundary: 0
+  spawn0: {x: -13.5, y: -9}
+  spawn1: {x: 13.5, y: -9}
+  boxes:
+  - id: box-000
+    kind: 0
+    minX: -18
+    minY: 9
+    maxX: 18
+    maxY: 10
+  - id: box-001
+    kind: 0
+    minX: -5
+    minY: 3
+    maxX: 5
+    maxY: 4
+  - id: box-002
+    kind: 0
+    minX: -1
+    minY: -1
+    maxX: 1
+    maxY: 3
+  - id: box-003
+    kind: 0
+    minX: -12
+    minY: -5
+    maxX: -11
+    maxY: -1
+  - id: box-004
+    kind: 0
+    minX: 11
+    minY: -5
+    maxX: 12
+    maxY: -1
+  - id: box-005
+    kind: 0
+    minX: -12
+    minY: -6
+    maxX: -5
+    maxY: -5
+  - id: box-006
+    kind: 0
+    minX: 5
+    minY: -6
+    maxX: 12
+    maxY: -5
+  - id: box-007
+    kind: 0
+    minX: -18
+    minY: -9
+    maxX: -17
+    maxY: 9
+  - id: box-008
+    kind: 0
+    minX: 17
+    minY: -9
+    maxX: 18
+    maxY: 9
+  - id: box-009
+    kind: 0
+    minX: -18
+    minY: -10
+    maxX: 18
+    maxY: -9
+  theme: 2
+  light: {x: 0, y: 25}
+  ceiling: 1
+  shadow: 0.65
