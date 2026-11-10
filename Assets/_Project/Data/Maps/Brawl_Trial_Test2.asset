@@ -1,0 +1,305 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2c402aa8ef1cbe048a3fc3c608dfafa5, type: 3}
+  m_Name: Brawl_Trial_Test2
+  m_EditorClassIdentifier: Knockbox.Game::Knockbox.Game.Maps.MapDefinition
+  stableId: 647ac31442b34ec3838f78de9d747c4d
+  displayName: Brawl_Trial_Test2
+  preservedBaseline: 0
+  revision: 16
+  columns: 36
+  rows: 20
+  boundary: 0
+  spawn0: {x: -9.5, y: -0.5}
+  spawn1: {x: 12.5, y: -9}
+  boxes:
+  - id: box_229f0f222f47490c981e33691abfa93f
+    kind: 0
+    minX: -10
+    minY: -1.5
+    maxX: -9
+    maxY: -0.5
+    vertices:
+    - {x: -10, y: -1.5}
+    - {x: -9, y: -1.5}
+    - {x: -9, y: -0.5}
+  - id: box_fefde02857a34abf901735cc6c161043
+    kind: 0
+    minX: -9
+    minY: -1.5
+    maxX: -7
+    maxY: -0.5
+    vertices: []
+  - id: box_5865a62048dd4559a94afb4b52d86e1e
+    kind: 0
+    minX: -7
+    minY: -1.5
+    maxX: -5
+    maxY: -0.5
+    vertices: []
+  - id: box_368d2d9fdf044c3db6801ba19297ebb5
+    kind: 0
+    minX: -5
+    minY: -1.5
+    maxX: -4
+    maxY: -0.5
+    vertices:
+    - {x: -5, y: -1.5}
+    - {x: -4, y: -1.5}
+    - {x: -4, y: -1}
+    - {x: -5, y: -0.5}
+  - id: box-000
+    kind: 0
+    minX: -18
+    minY: 9
+    maxX: 18
+    maxY: 10
+    vertices: []
+  - id: box-007
+    kind: 0
+    minX: -18
+    minY: -9
+    maxX: -17
+    maxY: 9
+    vertices: []
+  - id: box-008
+    kind: 0
+    minX: 17
+    minY: -9
+    maxX: 18
+    maxY: 9
+    vertices: []
+  - id: box-009
+    kind: 0
+    minX: -18
+    minY: -10
+    maxX: 18
+    maxY: -9
+    vertices: []
+  physicalBoxes:
+  - id: prop_7ea19c0655a44466aaf431b53669630c
+    center: {x: -6, y: 0.25}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+  - id: prop_b24fa21e488546248220ba33065b5d0b
+    center: {x: -6, y: 1.75}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+  - id: prop_ac27437c21da4bd4ad5c54bd8f2e5615
+    center: {x: -6, y: 3.25}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+  - id: prop_1527d25da50145cd815b6b0c17195fde
+    center: {x: -13, y: -8.25}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+  - id: prop_20b30b928c7f4948a2db21602c3cae96
+    center: {x: -13, y: -6.75}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+  - id: prop_f39a3a4210e04632b693922dbf9f5ddf
+    center: {x: 6.5, y: -4.25}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+  - id: prop_c5dd181a70fc4706b7c9bc800c82b4dc
+    center: {x: -9.25, y: -8.25}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+  - id: prop_ec990d19f4b447e0b5e2548c24eb87f3
+    center: {x: -9.25, y: -6.75}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+  - id: prop_29c0c9e1797b467496ccaf17b76ff515
+    center: {x: 3.5, y: -4.25}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+  - id: prop_645dda44a2924457b46ab4be55f3cf12
+    center: {x: 3.5, y: -7}
+    size: {x: 1.5, y: 4}
+    mass: 4
+    playerPassThrough: 1
+    connector: 0
+    connectorSpeedLoss: 0
+  - id: prop_91e96dca0ffc4a799b1ab0688a794413
+    center: {x: 6.5, y: -7}
+    size: {x: 1.5, y: 4}
+    mass: 4
+    playerPassThrough: 1
+    connector: 0
+    connectorSpeedLoss: 0
+  - id: prop_fc9ac6a2920e4f86b67d07f5fa58c695
+    center: {x: 6.5, y: -1.5}
+    size: {x: 1.5, y: 4}
+    mass: 4
+    playerPassThrough: 1
+    connector: 0
+    connectorSpeedLoss: 0
+  - id: prop_2bb700f5e47b43e091a0bfb35a38c8a2
+    center: {x: 6.5, y: 1.25}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+  - id: prop_fe41bebfa7c14a1eb0695ef803279ac2
+    center: {x: -1.25, y: 0}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+  - id: prop_bca882cd536b4397ba6d5ce176afdb94
+    center: {x: -1.25, y: 4}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+  - id: prop_e5ef84bdf1b942d9bca3b12e5aa74628
+    center: {x: 10.25, y: 0}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+  - id: prop_6d86617407764fe99af315d098883853
+    center: {x: 14.25, y: 0}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+  - id: prop_bcaaae691f3541ba8da70f6805d4fc06
+    center: {x: 2.75, y: 0}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+  - id: prop_034b8e7aaa9b479c8410a2cfacb0801b
+    center: {x: -5.25, y: -6.25}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+  ropes:
+  - id: rope_250bf4aa2a2243d4838eb383cc93f3ab
+    boxId: prop_fe41bebfa7c14a1eb0695ef803279ac2
+    graph: 0
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: -1.25, y: 3.25}
+    localAnchor: {x: 0, y: 0.75}
+    length: 2.5
+    breakable: 1
+    breakForce: 600
+    mode: 0
+    connectorPosition: 0.5
+    connectorSize: 0.55
+    connectorSpeedLoss: 0.15
+  - id: rope_f94aa45f86be405d8b8fa955154d2177
+    boxId: prop_bca882cd536b4397ba6d5ce176afdb94
+    graph: 0
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: -1.25, y: 9}
+    localAnchor: {x: 0, y: 0.75}
+    length: 4.25
+    breakable: 1
+    breakForce: 600
+    mode: 0
+    connectorPosition: 0.5
+    connectorSize: 0.55
+    connectorSpeedLoss: 0.15
+  - id: rope_0c13e276cdf847b2acbf2f4e0066cf80
+    boxId: prop_bcaaae691f3541ba8da70f6805d4fc06
+    graph: 0
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: 2.75, y: 4.75}
+    localAnchor: {x: 0, y: 0.75}
+    length: 4
+    breakable: 0
+    breakForce: 600
+    mode: 1
+    connectorPosition: 0.5
+    connectorSize: 0.55
+    connectorSpeedLoss: 0.15
+  - id: rope_77f7dbb206904b1d8f6e605e33cc7432
+    boxId: prop_034b8e7aaa9b479c8410a2cfacb0801b
+    graph: 0
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: -5.25, y: -1.5}
+    localAnchor: {x: 0, y: 0.75}
+    length: 4
+    breakable: 0
+    breakForce: 600
+    mode: 1
+    connectorPosition: 0.5
+    connectorSize: 0.55
+    connectorSpeedLoss: 0.15
+  - id: rope_44f71ae3195d41979aba19d91b3c2f9a
+    boxId: prop_e5ef84bdf1b942d9bca3b12e5aa74628
+    graph: 0
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: 10.25, y: 9}
+    localAnchor: {x: 0, y: 0.75}
+    length: 8.25
+    breakable: 0
+    breakForce: 600
+    mode: 1
+    connectorPosition: 0.5
+    connectorSize: 0.55
+    connectorSpeedLoss: 0.15
+  theme: 2
+  mapTheme:
+    mode: 1
+    preset: 3
+    gradientTop: {r: 0.043137256, g: 0.20392157, b: 0.25882354, a: 1}
+    gradientBottom: {r: 0.019607844, g: 0.050980393, b: 0.10980392, a: 1}
+    terrain: {r: 0.4862745, g: 0.84705883, b: 0.8, a: 1}
+    prop: {r: 0.14117648, g: 0.29411766, b: 0.3372549, a: 1}
+    highlight: {r: 0.7294118, g: 0.9607843, b: 0.9098039, a: 1}
+    gradientCurve: 1
+  light: {x: 0, y: 25}
+  ceiling: 1
+  shadow: 0.65
