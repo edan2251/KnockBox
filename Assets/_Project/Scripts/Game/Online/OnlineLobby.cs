@@ -73,6 +73,7 @@ namespace Knockbox.Game.Online
 
         public async void CreateRoom()
         {
+            if (Runner.IsAuthoringPreview) { status="제작기 시험은 로컬 전용입니다. 시험 종료 후 Main에서 연결해주세요."; return; }
             if (busy || online.Active) return;
             int request=++requestVersion;
             busy = true;
@@ -97,6 +98,7 @@ namespace Knockbox.Game.Online
 
         public async void Join()
         {
+            if (Runner.IsAuthoringPreview) { status="제작기 시험은 로컬 전용입니다. 시험 종료 후 Main에서 연결해주세요."; return; }
             if (busy || online.Active) return;
             if (string.IsNullOrWhiteSpace(joinCode))
             {

@@ -75,8 +75,8 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(config.ComputeChecksum(), found.ComputeChecksum());
             Assert.IsFalse(runner.CreateConfig().Combat.Body.SeparateChargeInput, "새 경기는 좌클릭 통합 규칙");
             Assert.IsTrue(runner.CreateConfig().Combat.Body.CombinedAttackInput);
-            Assert.IsTrue(runner.CreateConfig().Combat.Weapons.Enabled, "새 경기는 무기 규칙");
-            Assert.IsTrue(runner.CreateConfig().Combat.Weapons.ThrowEnabled, "새 경기는 무기 투척 규칙");
+            Assert.IsFalse(runner.CreateConfig().Combat.Weapons.Enabled, "새 경기는 무기 보류, 위 검사는 구 기록 설정 보존");
+            Assert.IsFalse(runner.CreateConfig().Combat.Weapons.ThrowEnabled, "새 경기에는 무기 투척도 비활성");
         }
 
         [TestCase(false, false)]
@@ -113,7 +113,7 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(revisedBalance ? 22f : 16f, found.Combat.Weapons.ThrowSpeed);
             Assert.AreNotEqual(config.ComputeChecksum(), Config(false, online, true, true, true, !revisedBalance).ComputeChecksum());
             Assert.AreEqual(12, runner.CreateConfig().Combat.Body.MinLungeChargeTicks);
-            Assert.AreEqual(22f, runner.CreateConfig().Combat.Weapons.ThrowSpeed);
+            Assert.AreEqual(0f, runner.CreateConfig().Combat.Weapons.ThrowSpeed, "현재 경기는 무기 보류. 위에서 구 투척 수치를 별도 검증");
             Assert.AreEqual(8, InputRecording.FormatVersion);
             Assert.AreEqual(9, LockstepSession.ProtocolVersion, "맵 목록/지형 검증 규격이 다른 이전 실행 파일과 접속을 분리한다");
         }
@@ -145,11 +145,11 @@ namespace Knockbox.Tests.EditMode
         [TestCase(FighterForm.Body, FighterForm.Body, true)]
         [TestCase(FighterForm.Body, FighterForm.Scissors, false)]
         [TestCase(FighterForm.Scissors, FighterForm.Body, false)]
-        public void CurrentConfig_EnablesWeaponsOnlyWhenBothPlayersUseBody(FighterForm p0, FighterForm p1, bool expected)
+        public void CurrentConfig_DisablesWeaponsAndPreservesBodyControlScheme(FighterForm p0, FighterForm p1, bool expected)
         {
             runner.Rules = RuleSet.Brawl.WithForms(p0, p1);
-            Assert.AreEqual(expected, runner.CreateConfig().Combat.Weapons.Enabled);
-            Assert.AreEqual(expected, runner.CreateConfig().Combat.Weapons.ThrowEnabled);
+            Assert.IsFalse(runner.CreateConfig().Combat.Weapons.Enabled);
+            Assert.IsFalse(runner.CreateConfig().Combat.Weapons.ThrowEnabled);
             Assert.AreEqual(expected, runner.CreateConfig().Combat.Body.CombinedAttackInput);
             runner.Rules = RuleSet.Legacy(CombatMode.Charge, true);
             Assert.IsFalse(runner.CreateConfig().Combat.Weapons.Enabled, "F1의 기존 폼에서는 무기를 생성하지 않는다");

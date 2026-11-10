@@ -1,0 +1,168 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2c402aa8ef1cbe048a3fc3c608dfafa5, type: 3}
+  m_Name: CP5_Integrated_Trial
+  m_EditorClassIdentifier: Knockbox.Game::Knockbox.Game.Maps.MapDefinition
+  stableId: cp5_integrated_trial
+  displayName: CP5_Integrated_Trial
+  preservedBaseline: 0
+  revision: 2
+  columns: 36
+  rows: 20
+  boundary: 0
+  spawn0: {x: -15, y: -8}
+  spawn1: {x: 16, y: -8}
+  boxes:
+  - id: floor
+    kind: 0
+    minX: -18
+    minY: -10
+    maxX: 18
+    maxY: -8
+    vertices: []
+  - id: ramp
+    kind: 0
+    minX: -12
+    minY: -8
+    maxX: -6
+    maxY: -2
+    vertices:
+    - {x: -12, y: -8}
+    - {x: -6, y: -8}
+    - {x: -6, y: -2}
+  - id: cut_this_rectangle
+    kind: 0
+    minX: -2
+    minY: -6
+    maxX: 2
+    maxY: -2
+    vertices: []
+  physicalBoxes:
+  - id: stack_bottom
+    center: {x: 4, y: -7.25}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0.15
+  - id: stack_middle
+    center: {x: 4, y: -5.75}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0.15
+  - id: stack_top
+    center: {x: 4, y: -4.25}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0.15
+  - id: pass_through_pillar
+    center: {x: 6, y: -6}
+    size: {x: 1.5, y: 4}
+    mass: 4
+    playerPassThrough: 1
+    connector: 0
+    connectorSpeedLoss: 0.15
+  - id: connector
+    center: {x: 11, y: -3.4}
+    size: {x: 0.65, y: 0.65}
+    mass: 0.65
+    playerPassThrough: 0
+    connector: 1
+    connectorSpeedLoss: 0.15
+  - id: suspended_beam
+    center: {x: 11, y: -6}
+    size: {x: 4, y: 0.6}
+    mass: 2.4
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0.15
+  - id: lower_box
+    center: {x: 11, y: -7.3}
+    size: {x: 0.8, y: 0.8}
+    mass: 0.64
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0.15
+  ropes:
+  - id: ceiling
+    boxId: connector
+    graph: 1
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: 11, y: 2}
+    localAnchor: {x: 0, y: 0.325}
+    length: 5.075
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: beam_left
+    boxId: suspended_beam
+    graph: 1
+    sourceBoxId: connector
+    sourceLocalAnchor: {x: 0, y: -0.325}
+    anchor: {x: 11, y: -3.7250001}
+    localAnchor: {x: -1.1, y: 0.3}
+    length: 2.260669
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: beam_right
+    boxId: suspended_beam
+    graph: 1
+    sourceBoxId: connector
+    sourceLocalAnchor: {x: 0, y: -0.325}
+    anchor: {x: 11, y: -3.7250001}
+    localAnchor: {x: 1.1, y: 0.3}
+    length: 2.260669
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: lower
+    boxId: lower_box
+    graph: 1
+    sourceBoxId: suspended_beam
+    sourceLocalAnchor: {x: 0, y: -0.3}
+    anchor: {x: 11, y: -6.3}
+    localAnchor: {x: 0, y: 0.4}
+    length: 0.5999999
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  theme: 0
+  mapTheme:
+    mode: 0
+    preset: 0
+    gradientTop: {r: 0.043137256, g: 0.20392157, b: 0.25882354, a: 1}
+    gradientBottom: {r: 0.019607844, g: 0.050980393, b: 0.10980392, a: 1}
+    terrain: {r: 0.4862745, g: 0.84705883, b: 0.8, a: 1}
+    prop: {r: 0.14117648, g: 0.29411766, b: 0.3372549, a: 1}
+    highlight: {r: 0.7294118, g: 0.9607843, b: 0.9098039, a: 1}
+    gradientCurve: 1
+  light: {x: 0, y: 0}
+  ceiling: 0
+  shadow: 0.65

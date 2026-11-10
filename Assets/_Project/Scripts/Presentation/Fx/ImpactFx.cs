@@ -21,6 +21,7 @@ namespace Knockbox.Presentation
         const float CrackFade = 0.6f;
         const float CrackThickness = 0.05f;
         const float FlashFrame = 1f / 60f;
+        const float ConnectorFlashTime = .05f;
 
         struct Shard
         {
@@ -33,6 +34,9 @@ namespace Knockbox.Presentation
             public float Size;
             public float Gravity;
             public bool Streak;
+            public bool FramePiece;
+            public bool FrameShown;
+            public Vector2 Dimensions;
             public Color Color;
         }
 
@@ -174,6 +178,7 @@ namespace Knockbox.Presentation
                 s.Size = size * random.Range(0.6f, 1.2f);
                 s.Gravity = ShardGravity;
                 s.Streak = false;
+                s.FramePiece = false;
                 s.Color = color;
                 Activate(nextShard);
                 nextShard = (nextShard + 1) % ShardCapacity;
@@ -196,9 +201,32 @@ namespace Knockbox.Presentation
                 s.Size = random.Range(0.05f, 0.08f);
                 s.Gravity = 6f;
                 s.Streak = true;
+                s.FramePiece = false;
                 s.Color = palette.energy;
                 Activate(nextShard);
                 nextShard = (nextShard + 1) % ShardCapacity;
+            }
+        }
+
+        /// <summary>사각 테두리 자체를 8조각으로. 짧은 섬광 뒤 충격 방향으로 갈라지고 아래로 사라진다.</summary>
+        public void ConnectorShatter(Vector2 center, Vector2 size, float angle, Vector2 velocity, Vector2 direction, Color color)
+        {
+            float radians = angle * Mathf.Deg2Rad;
+            var u = new Vector2(Mathf.Cos(radians), Mathf.Sin(radians)); var v = new Vector2(-u.y, u.x);
+            float thickness = Mathf.Min(.08f, Mathf.Min(size.x,size.y) * .18f);
+            for (int edge=0; edge<4; edge++) for(int part=0; part<2; part++)
+            {
+                bool horizontal=edge<2; float sign=(edge&1)==0?-1:1;
+                var local = horizontal ? new Vector2((part==0?-.25f:.25f)*size.x,sign*(size.y-thickness)*.5f)
+                    : new Vector2(sign*(size.x-thickness)*.5f,(part==0?-.25f:.25f)*size.y);
+                var radial = u*local.x+v*local.y;
+                ref var shard=ref shards[nextShard];
+                shard.Position=center+radial; shard.Velocity=Vector2.ClampMagnitude(velocity,5)*.35f+direction*random.Range(2,4)
+                    +radial.normalized*random.Range(4f,6f)+Vector2.up*2f;
+                shard.Angle=angle;shard.Spin=random.Range(-340,340);shard.Age=0;shard.Life=random.Range(.45f,.6f);
+                shard.Size=thickness;shard.Gravity=16;shard.Streak=true;shard.FramePiece=true;shard.FrameShown=false;shard.Color=color;
+                shard.Dimensions=horizontal?new Vector2(size.x*.5f,thickness):new Vector2(thickness,size.y*.5f);
+                Activate(nextShard);nextShard=(nextShard+1)%ShardCapacity;
             }
         }
 
@@ -296,20 +324,31 @@ namespace Knockbox.Presentation
                 ref var s = ref shards[i];
                 if (s.Age >= s.Life)
                     continue;
-                s.Age += dt;
+                // Even on a long first frame, show the impact outline once before advancing the fragments.
+                bool firstFrame = s.FramePiece && !s.FrameShown;
+                s.FrameShown = true;
+                if (!firstFrame) s.Age += dt;
                 var sr = s.Streak ? streakRenderers[i] : shardRenderers[i];
                 if (s.Age >= s.Life)
                 {
                     sr.enabled = false;
                     continue;
                 }
-                s.Velocity.y -= s.Gravity * dt;
-                s.Velocity *= Mathf.Exp(-2.5f * dt);
-                s.Position += s.Velocity * dt;
-                s.Angle += s.Spin * dt;
+                // The impact outline holds briefly; collision removal is already authoritative.
+                float motionDt = s.FramePiece ? Mathf.Clamp(s.Age - ConnectorFlashTime, 0, dt) : dt;
+                s.Velocity.y -= s.Gravity * motionDt;
+                s.Velocity *= Mathf.Exp(-2.5f * motionDt);
+                s.Position += s.Velocity * motionDt;
+                s.Angle += s.Spin * motionDt;
                 float t = s.Age / s.Life;
                 sr.transform.localPosition = s.Position;
-                if (s.Streak)
+                if (s.FramePiece)
+                {
+                    sr.transform.localRotation = Quaternion.Euler(0,0,s.Angle);
+                    var size = s.Dimensions * (1 - .35f*t*t);
+                    ShapeLibrary.SetSize(sr,size.x,size.y);
+                }
+                else if (s.Streak)
                 {
                     float length = Mathf.Clamp(s.Velocity.magnitude * 0.035f, 0.08f, 0.5f) * (1f - t);
                     sr.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(s.Velocity.y, s.Velocity.x) * Mathf.Rad2Deg);
@@ -321,7 +360,7 @@ namespace Knockbox.Presentation
                     float size = s.Size * (1f - t * 0.5f);
                     ShapeLibrary.SetSize(sr, size, size);
                 }
-                var color = s.Color;
+                var color = s.FramePiece && s.Age < ConnectorFlashTime ? palette.flash : s.Color;
                 color.a = t < 0.6f ? 1f : 1f - (t - 0.6f) / 0.4f;
                 sr.color = color;
                 active++;

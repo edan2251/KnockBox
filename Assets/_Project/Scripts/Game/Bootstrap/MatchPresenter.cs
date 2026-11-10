@@ -47,6 +47,9 @@ namespace Knockbox.Game
         [SerializeField] HudView hud;
         [SerializeField] SfxPlayer sfxPlayer;
         [SerializeField] CameraRig cameraRig;
+        [SerializeField, Range(.5f, 2f), InspectorName("연결 상자 타격 강조")]
+        [Tooltip("연결 상자가 깨질 때 화면 반동과 확대의 강도입니다. 충돌·피해·관통 감속에는 영향이 없습니다.")]
+        float connectorImpact = 1f;
         [SerializeField] DebugStateLabels labels;
         /// <summary>디버그 글자(상태, 틱, 설정 줄). 빌드에서는 기본으로 숨기고 F12로 켠다(08 6절). 에디터는 켠 채 시작.</summary>
         bool debugText;
@@ -302,6 +305,7 @@ namespace Knockbox.Game
             fighter1.ResetPose();
             dust.Clear();
             fx.Clear();
+            propView.ResetFeedback();
             brawlWeaponView.Clear();
             overlay.ClearPower();
             if (cameraRig != null)
@@ -370,6 +374,7 @@ namespace Knockbox.Game
                 // 새 라운드(또는 새 경기): 시작 위치로 순간 이동했으므로 보간하지 않고 발을 새로 디딘다.
                 // 맵 순환(CP12)이면 맵도 바뀌었다.
                 renderedRound = current.Match.Round;
+                propView.ResetFeedback();
                 if (world.Arena != builtArena)
                 {
                     BuildArena(world.Arena);
@@ -383,6 +388,7 @@ namespace Knockbox.Game
                 shattered[0] = shattered[1] = false;
                 alpha = 1f;
             }
+            propView.TickFeedback(dt);
             propView.Render(previous.Props, current.Props, alpha);
             projectileView.Render(previous.Projectiles, current.Projectiles, alpha, world.Config.Combat.Rock.Radius);
             fighter0.Render(previous.Fighter0, current.Fighter0, alpha, dt, world.Arena, world.Config);
@@ -730,6 +736,37 @@ namespace Knockbox.Game
                     sfxPlayer.Play(damage >= 15f ? Sfx.HitStrong : Sfx.HitWeak);
                     break;
                 }
+                case SimEventType.ConnectorContact:
+                    if (propView.OnConnectorEvent(e, runner.World.State.Props, palette.flash))
+                    {
+                        float touch = Mathf.InverseLerp(1.5f,12,e.Strength);
+                        dust.Burst(V(e.Position),2,1.1f+touch,0);
+                        fx.RingBurst(V(e.Position),palette.energySoft,.12f,.45f+touch*.3f,.12f);
+                        AddTrauma(.025f+touch*.055f,e.Direction.X);
+                        sfxPlayer.Play(Sfx.Land,.3f+touch*.3f);
+                    }
+                    break;
+                case SimEventType.ConnectorBreak:
+                    if (propView.OnConnectorEvent(e, runner.World.State.Props, palette.flash))
+                    {
+                        var body = PropState.At(runner.World.State.Props,e.PropIndex);
+                        var size = V(runner.World.Arena.GetProp(runner.World.Arena.DynamicProp(e.PropIndex)).HalfSize)*2;
+                        float strength = Mathf.InverseLerp(8,38,e.Strength);
+                        fx.ConnectorShatter(V(e.Position),size,Mathf.Atan2(body.Rotation.Y,body.Rotation.X)*Mathf.Rad2Deg,
+                            V(body.Velocity),V(e.Direction),PropView.ConnectorColor);
+                        fx.RingBurst(V(e.Position),palette.flash,.18f,2.2f+strength*.5f,.18f);
+                        fx.Glow(V(e.Position),palette.flash,2.4f,.5f,.12f);
+                        fx.Star(V(e.Position),6,1.3f+strength*.45f);
+                        fx.Sparks(V(e.Position),6,8+strength*3);
+                        float emphasis = Mathf.Clamp(connectorImpact, .5f, 2f);
+                        AddTrauma((.48f+strength*.12f)*emphasis,e.Direction.X);
+                        if (cameraRig != null)
+                            cameraRig.Kick(V(e.Direction),(.1f+strength*.05f)*emphasis,
+                                (.018f+strength*.008f)*emphasis,.18f);
+                        sfxPlayer.Play(Sfx.Snap,.9f);
+                        sfxPlayer.Play(strength>.5f?Sfx.HitStrong:Sfx.HitWeak,.45f+strength*.2f);
+                    }
+                    break;
                 case SimEventType.JointBreak:
                     // 줄·경첩이 끊어짐(CP15): 연결점에서 작은 섬광과 먼지, 짧은 끊어지는 소리.
                     fx.Glow(V(e.Position), palette.flash, 1.6f, 0.4f, 0.15f);

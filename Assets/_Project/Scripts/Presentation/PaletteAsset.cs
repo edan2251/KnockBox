@@ -125,6 +125,12 @@ namespace Knockbox.Presentation
 
         public ArenaTheme Theme(int index) => themes[Mathf.Clamp(index, 0, themes.Length - 1)];
 
+        // Fixed role colors shared by authoring and runtime, independent of the map theme.
+        public static Color ConnectorBoxColor => new Color(1f, .82f, .46f, 1f);
+        public static Color PassThroughPropColor => new Color32(34, 34, 34, 130);
+        public static Color ConnectorFillColor => new Color32(34, 34, 34, 130);
+        public static Color RopeColor => new Color32(85, 85, 85, 255);
+
         public Color FighterBody(int fighter) => fighter == 0 ? p1Body : p2Body;
         public Color FighterShade(int fighter) => fighter == 0 ? p1Shade : p2Shade;
 

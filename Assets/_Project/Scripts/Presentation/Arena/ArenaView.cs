@@ -80,6 +80,13 @@ namespace Knockbox.Presentation
                 buildParent = new GameObject("Terrain_box_" + i + "_" + b.Kind).transform;
                 buildParent.SetParent(boundary ? borderRoot : transform, false);
                 if (!boundary) groups.Add(buildParent);
+                if(b.IsPolygon)
+                {
+                    var sr=ShapeLibrary.Create(buildParent,"Convex_Terrain",shapes.Square,SortingLayers.Terrain,0,theme.terrain);
+                    sr.transform.localPosition=new Vector3((b.MinX+b.MaxX)*.5f,(b.MinY+b.MaxY)*.5f,0);
+                    sr.transform.localScale=new Vector3(b.MaxX-b.MinX,b.MaxY-b.MinY,1);
+                    sr.gameObject.AddComponent<ConvexTerrainSprite>().SetPolygon(b.Polygon);continue;
+                }
                 switch (b.Kind)
                 {
                     case TerrainKind.Solid:

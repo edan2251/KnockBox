@@ -36,6 +36,9 @@ namespace Knockbox.Simulation
         Seesaw,
     }
 
+    /// <summary>0은 필드가 없는 기존 맵의 당김 설정을 보존한다. 새 로프는 Unbreakable로 만든다.</summary>
+    public enum RopeBreakMode : byte { LegacyTension = 0, Unbreakable = 1, Connector = 2 }
+
     /// <summary>강체 구조물 하나의 고정 정보(맵에서 정해짐, 상태 아님).</summary>
     public struct PropJoint
     {
@@ -52,7 +55,28 @@ namespace Knockbox.Simulation
         /// <summary>이 충격(한 틱 합) 이상을 받으면 끊어진다. 0이면 끊어지지 않는다.</summary>
         public float BreakImpulse;
 
+        /// <summary>독립 로프의 당김 제약 경로. LegacyTension만 BreakForce를 쓰고 새 종류는 공격 연결부 또는 파단 불가다.</summary>
+        public bool UsesTension;
+        public float BreakForce;
+        public RopeBreakMode RopeMode;
+        public float ConnectorPosition, ConnectorSize, ConnectorSpeedLoss;
+
+
         public bool Pinned => Kind == PropJointKind.Axis || Kind == PropJointKind.Hinge || Kind == PropJointKind.Seesaw;
+    }
+
+    /// <summary>정의의 별도 로프를 대상 몸체에 연결한 불변 판정 데이터.</summary>
+    public struct AuthoredRope
+    {
+        public bool Enabled;
+        public string Id;
+        public Vec2 WorldAnchor, LocalAnchor;
+        public float Length;
+        public bool Breakable;
+        public float BreakForce;
+        public RopeBreakMode RopeMode;
+        public float ConnectorPosition, ConnectorSize, ConnectorSpeedLoss;
+
     }
 
     /// <summary>구조물 하나(강체 하나). 맵의 처음 각도는 모두 0(축 정렬). 회전 상태는 CP14부터 SimState.Props에 둔다.</summary>
@@ -61,6 +85,18 @@ namespace Knockbox.Simulation
         public const int KindCount = 7;
 
         public PropKind Kind;
+        /// <summary>제작기 ID. 구 맵은 null이며 기존 해시/계산 경로를 유지한다.</summary>
+        public string Id;
+        /// <summary>제작기에서 지정한 질량. 0은 구 맵의 밀도 × 면적 계산을 뜻한다.</summary>
+        public float Mass;
+        /// <summary>제작기 상자는 라운드 시작부터 중력을 받는다. 구 맵의 잠든 시작은 보존한다.</summary>
+        public bool StartAwake;
+        /// <summary>플레이어 몸·돌진·접촉 피해·발판 판정만 제외한다. 구조물끼리와 지형의 물리는 그대로다.</summary>
+        public bool PlayerPassThrough;
+        public AuthoredRope Rope;
+        public bool IsConnector;
+        public float ConnectorSpeedLoss;
+        public bool HasAuthoringData => !string.IsNullOrEmpty(Id) || Mass != 0f || StartAwake || PlayerPassThrough || Rope.Enabled || IsConnector;
         /// <summary>떨어진 물체 묶음 번호(04-arena.md 6절 원칙 3). 기둥·연결 구조는 여러 강체가 한 묶음.</summary>
         public int Group;
         public Vec2 Center;

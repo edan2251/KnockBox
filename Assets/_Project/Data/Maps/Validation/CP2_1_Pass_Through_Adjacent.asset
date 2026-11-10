@@ -1,0 +1,69 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2c402aa8ef1cbe048a3fc3c608dfafa5, type: 3}
+  m_Name: CP2_1_Pass_Through_Adjacent
+  m_EditorClassIdentifier: Knockbox.Game::Knockbox.Game.Maps.MapDefinition
+  stableId: cp21_pass_adjacent
+  displayName: "\uAE30\uB465_\uD1B5\uACFC_\uC778\uC811_\uC2DC\uD5D8"
+  preservedBaseline: 0
+  revision: 1
+  columns: 36
+  rows: 20
+  boundary: 0
+  spawn0: {x: -1.5, y: -8}
+  spawn1: {x: 12, y: -8}
+  boxes:
+  - id: box-000
+    kind: 0
+    minX: -18
+    minY: -10
+    maxX: 18
+    maxY: -8
+  physicalBoxes:
+  - id: cp21_body_0
+    center: {x: 0, y: -7.25}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+  - id: cp21_body_1
+    center: {x: 0, y: -4.5}
+    size: {x: 1.5, y: 4}
+    mass: 4
+    playerPassThrough: 1
+  - id: cp21_body_2
+    center: {x: 0, y: -1.75}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+  - id: cp21_body_3
+    center: {x: 0, y: 1}
+    size: {x: 1.5, y: 4}
+    mass: 4
+    playerPassThrough: 1
+  - id: cp21_neighbor
+    center: {x: -2.25, y: -6}
+    size: {x: 1.5, y: 4}
+    mass: 4
+    playerPassThrough: 1
+  theme: 0
+  mapTheme:
+    mode: 0
+    preset: 0
+    gradientTop: {r: 0.043137256, g: 0.20392157, b: 0.25882354, a: 1}
+    gradientBottom: {r: 0.019607844, g: 0.050980393, b: 0.10980392, a: 1}
+    terrain: {r: 0.4862745, g: 0.84705883, b: 0.8, a: 1}
+    prop: {r: 0.14117648, g: 0.29411766, b: 0.3372549, a: 1}
+    highlight: {r: 0.7294118, g: 0.9607843, b: 0.9098039, a: 1}
+    gradientCurve: 1
+  light: {x: 0, y: 0}
+  ceiling: 0
+  shadow: 0.65

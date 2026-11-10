@@ -71,7 +71,7 @@ namespace Knockbox.Tests.EditMode
             var copy=result.Created[0];var mirrored=copy.Read();
             Assert.AreEqual(-before.maxX,mirrored.minX);Assert.AreEqual(-before.minX,mirrored.maxX);
             Assert.AreEqual(before.minY,mirrored.minY);Assert.AreEqual(before.maxY,mirrored.maxY);Assert.AreEqual(before.kind,mirrored.kind);
-            Assert.AreNotEqual(before.id,copy.Id);Assert.That(copy.Id,Does.StartWith("box_"));Assert.AreEqual(1,copy.Order);Assert.AreEqual("1",copy.name);
+            Assert.AreNotEqual(before.id,copy.Id);Assert.That(copy.Id,Does.StartWith("box_"));Assert.AreEqual(1,copy.Order);Assert.AreEqual("Terrain_Box_1",copy.name);
             Assert.AreEqual(position,source.transform.localPosition);Assert.AreEqual(scale,source.transform.localScale);Assert.AreEqual(before.id,source.Id);
             Assert.That(copy.transform.localScale.x,Is.GreaterThan(0));Assert.AreEqual(Quaternion.identity,copy.transform.localRotation);
             Assert.AreEqual(source.GetComponent<SpriteRenderer>().color,copy.GetComponent<SpriteRenderer>().color);

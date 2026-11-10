@@ -26,6 +26,7 @@ namespace Knockbox.Presentation
         ProjectedShadowMesh terrainShadows;
         GameObject shadowObject;
         Rect[] occluders;
+        ConvexPolygon[] polygonOccluders;
         PaletteAsset palette;
         Color moteColor;
         FxRandom random;
@@ -83,7 +84,7 @@ namespace Knockbox.Presentation
             moteColor = theme.Mote(palette);
             if (motes[0] == null)
                 for (int i = 0; i < MoteCount; i++) motes[i] = ShapeLibrary.Create(transform, "Mote", shapes.Circle, SortingLayers.Background, 3, palette.mote);
-            string key = $"{arena.Name}#{arena.ComputeChecksum():X8}|{theme.name}|{lightPosition.x:F2},{lightPosition.y:F2}|{shadowStrength:F2}";
+            string key = $"{arena.Name}#{arena.ComputeGeometryChecksum():X8}|{theme.name}|{lightPosition.x:F2},{lightPosition.y:F2}|{shadowStrength:F2}";
             if (key == currentKey) { SetLight(lightPosition); return; }
             currentKey = key;
             BaseLightPosition = lightPoint = lightPosition;
@@ -92,15 +93,16 @@ namespace Knockbox.Presentation
             coverWidth = arena.Columns + CoverMarginX; coverHeight = arena.Rows + CoverMarginY;
             width = Mathf.RoundToInt(coverWidth * TexelsPerUnit); height = Mathf.RoundToInt(coverHeight * TexelsPerUnit);
             reach = (coverWidth + coverHeight + lightPosition.magnitude) * 4;
-            var boxes = new List<Rect>();
+            var boxes = new List<Rect>();var polygons=new List<ConvexPolygon>();
             for (int i = 0; i < arena.BoxCount; i++)
             {
                 var b = arena.GetBox(i);
                 if (b.Kind == TerrainKind.Spike || b.MaxY >= halfHeight - .001f) continue;
+                if(b.IsPolygon){polygons.Add(b.Polygon);continue;}
                 float minY = b.Kind == TerrainKind.OneWay ? b.MaxY - ArenaView.OneWayThickness : b.MinY;
                 boxes.Add(Rect.MinMaxRect(b.MinX, minY, b.MaxX, b.MaxY));
             }
-            occluders = boxes.ToArray();
+            occluders = boxes.ToArray();polygonOccluders=polygons.ToArray();
             Texture2D texture;
             if (ownedThemeTexture != null)
             {
@@ -135,7 +137,7 @@ namespace Knockbox.Presentation
                 shadowObject.transform.SetParent(transform, false);
             }
             terrainShadows?.Dispose();
-            terrainShadows = new ProjectedShadowMesh(shadowObject, Mathf.Max(1, occluders.Length), ShadowMaterial, 0);
+            terrainShadows = new ProjectedShadowMesh(shadowObject, Mathf.Max(1, occluders.Length+polygonOccluders.Length), ShadowMaterial, 0);
             Reproject();
             SetTransitionOpacity(transitionOpacity); SetShadowVisibility(ShadowVisibility); ResetMotes();
         }
@@ -165,6 +167,7 @@ namespace Knockbox.Presentation
         {
             terrainShadows.Begin();
             foreach (var rect in occluders) terrainShadows.Box(rect.center, rect.size * .5f, 0, lightPoint, reach);
+            foreach(var polygon in polygonOccluders)terrainShadows.Polygon(polygon,lightPoint,reach);
             terrainShadows.Commit();
         }
 
@@ -178,8 +181,11 @@ namespace Knockbox.Presentation
         public float ShadowAmount(Vector2 point)
         {
             if (occluders == null) return 0;
+            var p=new Vec2(point.x,point.y);var light=new Vec2(lightPoint.x,lightPoint.y);
+            foreach(var polygon in polygonOccluders)if(polygon.Contains(p))return 0;
             foreach (var rect in occluders) if (rect.Contains(point)) return 0;
             foreach (var rect in occluders) if (SegmentHitsRect(point, lightPoint, rect)) return 1;
+            foreach(var polygon in polygonOccluders)if(polygon.SegmentHits(p,light))return 1;
             return 0;
         }
         static bool SegmentHitsRect(Vector2 a, Vector2 b, Rect r)

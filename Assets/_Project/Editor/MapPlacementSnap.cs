@@ -24,23 +24,52 @@ namespace Knockbox.EditorTools
         {
             snapped=position;float best=authoring.spawnSnapDistance;bool found=false;
             const float halfBody=.36f;
-            var handles=authoring.terrainRoot.GetComponentsInChildren<MapBoxHandle>();
-            foreach(var handle in handles)
+            var bounds=PlacementBounds(authoring,null,true);
+            foreach(var box in bounds)
             {
-                var box=handle.Read();
                 if(box.kind==TerrainKind.Spike || box.maxX-box.minX<halfBody*2)continue;
-                var candidate=new Vector3(Mathf.Clamp(position.x,box.minX+halfBody,box.maxX-halfBody),box.maxY,0);
+                float x=Mathf.Clamp(position.x,box.minX+halfBody,box.maxX-halfBody);
+                if(!SupportTop(box,x,halfBody,.72f,out float top))continue;
+                var candidate=new Vector3(x,top,0);
                 float distance=Vector3.Distance(position,candidate);
                 if(distance>best)continue;
                 bool blocked=false;
-                foreach(var other in handles)
+                foreach(var b in bounds)
                 {
-                    var b=other.Read();
                     if(b.kind==TerrainKind.OneWay)continue;
-                    if(candidate.x+halfBody>b.minX+.0001f && candidate.x-halfBody<b.maxX-.0001f && candidate.y+.72f>b.minY+.0001f && candidate.y<b.maxY-.0001f){blocked=true;break;}
+                    if(MapDefinition.Overlaps(new MapBox{minX=candidate.x-halfBody,maxX=candidate.x+halfBody,minY=candidate.y,maxY=candidate.y+.72f},b)){blocked=true;break;}
                 }
                 if(blocked)continue;
                 best=distance;snapped=candidate;found=true;
+            }
+            return found;
+        }
+        static bool SupportTop(MapBox box,float x,float halfWidth,float height,out float top)
+        {
+            top=box.maxY;if(!box.IsPolygon)return true;
+            if(!box.ToBox().Polygon.Slice(new Vec2(x,0),new Vec2(halfWidth,height*.5f),true,out _,out float high,out _,out var n)||n.Y<TerrainCollision.WalkableNormalY)return false;
+            top=high-height*.5f;return true;
+        }
+        static List<MapBox> PlacementBounds(MapAuthoring a,MapPhysicalBoxHandle except,bool forPlayer=false)
+        {
+            var bounds=new List<MapBox>();
+            foreach(var h in a.terrainRoot.GetComponentsInChildren<MapBoxHandle>())bounds.Add(h.Read());
+            if(a.physicsRoot!=null)foreach(var h in a.physicsRoot.GetComponentsInChildren<MapPhysicalBoxHandle>())
+                if(h!=except && (!forPlayer || !h.PlayerPassThrough))bounds.Add(h.Read().Bounds);
+            return bounds;
+        }
+        public static bool TrySnapBoxTop(MapAuthoring a,MapPhysicalBoxHandle selected,Vector3 p,Vector3 size,out Vector3 snapped)
+        {
+            snapped=p;float best=a.boxTopSnapDistance;bool found=false;var bounds=PlacementBounds(a,selected);
+            if(size.x<=0||size.y<=0)return false;
+            foreach(var support in bounds)
+            {
+                if(support.kind==TerrainKind.Spike||p.x+size.x*.5f<=support.minX+.0001f||p.x-size.x*.5f>=support.maxX-.0001f)continue;
+                if(!SupportTop(support,p.x,size.x*.5f,size.y,out float top))continue;
+                float distance=Mathf.Abs(p.y-size.y*.5f-top);if(distance>best)continue;
+                var candidate=new MapBox{minX=p.x-size.x*.5f,maxX=p.x+size.x*.5f,minY=top,maxY=top+size.y};
+                bool blocked=false;foreach(var other in bounds)if(other.kind!=TerrainKind.OneWay && MapDefinition.Overlaps(candidate,other)){blocked=true;break;}
+                if(blocked)continue;best=distance;snapped=new Vector3(p.x,top+size.y*.5f,p.z);found=true;
             }
             return found;
         }
@@ -48,13 +77,16 @@ namespace Knockbox.EditorTools
         {
             bool spawn=t==a.spawn0||t==a.spawn1;
             var box=t.GetComponent<MapBoxHandle>();
-            if(!spawn && (box==null||t.parent!=a.terrainRoot))return;
+            var physical=t.GetComponent<MapPhysicalBoxHandle>();
+            var rope=t.GetComponent<MapRopeHandle>();
+            if(!spawn && (box==null||t.parent!=a.terrainRoot) && (physical==null||t.parent!=a.physicsRoot) && (rope==null||t.parent!=a.ropeRoot))return;
             Vector3 p=t.localPosition,s=t.localScale;
             if(a.gridSnap)
             {
                 p=SnapPosition(p,a.gridStep);
-                if(!spawn){s.x=Mathf.Max(.001f,Grid(s.x,a.gridStep));s.y=Mathf.Max(.001f,Grid(s.y,a.gridStep));}
+                if(!spawn&&rope==null){s.x=Mathf.Max(.001f,Grid(s.x,a.gridStep));s.y=Mathf.Max(.001f,Grid(s.y,a.gridStep));}
             }
+            if(physical!=null && a.boxTopSnap && TrySnapBoxTop(a,physical,p,s,out var boxPosition))p=boxPosition;
             if(spawn && a.spawnEdgeSnap && TrySnapFoot(a,t.parent.TransformPoint(p),out var foot))p=t.parent.InverseTransformPoint(foot);
             if(p.Equals(t.localPosition)&&s.Equals(t.localScale))return;
             Undo.RecordObject(t,"맵 배치 스냅");t.localPosition=p;t.localScale=s;

@@ -40,6 +40,11 @@ namespace Knockbox.Simulation
         public int ContactCount;
         /// <summary>이번 틱에 몸마다 받은 바깥 충격(접촉·캐릭터)의 합. 끊어짐 판정에 쓴다.</summary>
         public readonly float[] TickImpulse = new float[PropState.Capacity];
+        /// <summary>새 로프가 이번 틱 실제로 가한 당김 충격. 매 틱 재계산하므로 스냅샷에 넣지 않는다.</summary>
+        public readonly float[] RopePull = new float[PropState.Capacity];
+        // Rebuilt from fighter support state before each Step, including after restore/rollback.
+        public readonly float[] RiderForce = new float[PropState.Capacity];
+        public readonly float[] RiderTorque = new float[PropState.Capacity];
         /// <summary>이번 틱이 시작할 때의 위치·회전(잠들기 판정은 실제로 움직인 양으로 한다).</summary>
         public readonly Vec2[] StartPosition = new Vec2[PropState.Capacity];
         public readonly Vec2[] StartRotation = new Vec2[PropState.Capacity];
@@ -78,7 +83,7 @@ namespace Knockbox.Simulation
     /// 잠든 몸은 풀이에서 움직이지 않는 몸으로 다루고 움직이는 몸이 닿으면 깬다.
     /// 회전은 (cos, sin)으로 적분해 정규화한다. 몸 번호·쌍 번호 순서대로 처리하고 반복 횟수가 고정이라 결정론적이다.
     /// </summary>
-    public static class PropPhysics
+    public static partial class PropPhysics
     {
         /// <summary>지금 강체로 움직이는 구조물 단계(09 2절 표). 이 단계 이하의 종류만 SimState.Props에 들어간다.</summary>
         public const int ImplementedStage = 3;
@@ -88,13 +93,14 @@ namespace Knockbox.Simulation
         {
             props = default;
             props.Count = arena.DynamicPropCount;
+            props.Graph.Enabled = arena.HasPropGraph;
             for (int i = 0; i < props.Count; i++)
             {
                 ref var b = ref PropState.Get(ref props, i);
                 b.Position = arena.GetProp(arena.DynamicProp(i)).Center;
                 b.Rotation = new Vec2(1f, 0f);
                 b.LastToucher = -1;
-                b.SleepTicks = config.Combat.Props.SleepTicks;
+                b.SleepTicks = arena.GetProp(arena.DynamicProp(i)).StartAwake ? 0 : config.Combat.Props.SleepTicks;
             }
         }
 
@@ -104,7 +110,7 @@ namespace Knockbox.Simulation
         static bool Slow(in PropBody b, in PropParams c) =>
             b.Velocity.LengthSquared < c.SleepSpeed * c.SleepSpeed && b.AngularVelocity * b.AngularVelocity < c.SleepAngularSpeed * c.SleepAngularSpeed;
 
-        public static float Mass(in PropDef p, in PropParams c) => c.Density * 4f * p.HalfSize.X * p.HalfSize.Y;
+        public static float Mass(in PropDef p, in PropParams c) => p.Mass > 0f ? p.Mass : c.Density * 4f * p.HalfSize.X * p.HalfSize.Y;
 
         public static float Inertia(in PropDef p, float mass) =>
             mass * (4f * p.HalfSize.X * p.HalfSize.X + 4f * p.HalfSize.Y * p.HalfSize.Y) / 12f;
@@ -208,6 +214,7 @@ namespace Knockbox.Simulation
             {
                 ref var b = ref PropState.Get(ref props, i);
                 scratch.TickImpulse[i] = 0f;
+                scratch.RopePull[i] = 0f;
                 scratch.StartPosition[i] = b.Position;
                 scratch.StartRotation[i] = b.Rotation;
                 if (b.HitCooldown0 > 0)
@@ -220,20 +227,21 @@ namespace Knockbox.Simulation
                     b.StrikeCooldown1--;
                 if (b.LooseTicks > 0)
                     b.LooseTicks--;
-                anyAwake |= !Asleep(b, c);
+                anyAwake |= !props.IsDestroyed(i) && !Asleep(b, c);
             }
             if (!anyAwake)
                 return;
             CacheBodies(ref props, arena, c, scratch);
             WakeTouched(ref props, arena, c, scratch);
             WakeLinked(ref props, arena);
+            SyncGraphSleep(ref props, arena, true);
             scratch.JointedCount = 0;
             scratch.RopedCount = 0;
             scratch.AwakeCount = 0;
             for (int i = 0; i < props.Count; i++)
             {
                 ref readonly var body = ref PropState.At(in props, i);
-                scratch.Awake[i] = !Asleep(body, c);
+                scratch.Awake[i] = !props.IsDestroyed(i) && !Asleep(body, c);
                 scratch.P[i] = body.Position;
                 scratch.Q[i] = body.Rotation;
                 scratch.V[i] = Vec2.Zero;
@@ -261,9 +269,14 @@ namespace Knockbox.Simulation
                 for (int i = 0; i < props.Count; i++)
                 {
                     ref var b = ref PropState.Get(ref props, i);
-                    if (Asleep(b, c))
+                    if (props.IsDestroyed(i) || Asleep(b, c))
                         continue;
                     b.Velocity.Y -= c.Gravity * h;
+                    if (c.StableConnectorContacts)
+                    {
+                        b.Velocity.Y += scratch.RiderForce[i] * scratch.InvMass[i] * h;
+                        b.AngularVelocity += scratch.RiderTorque[i] * scratch.InvInertia[i] * h;
+                    }
                     b.Velocity *= 1f / (1f + h * c.LinearDamping);
                     b.AngularVelocity *= 1f / (1f + h * c.AngularDamping);
                     ApplyPivotSpring(ref b, arena, c, i, h);
@@ -273,16 +286,17 @@ namespace Knockbox.Simulation
                 {
                     // 연결은 정방향과 역방향으로 한 번씩(무거운 틀에 가벼운 사슬이 이어져도 덜 늘어난다).
                     for (int k = 0; k < scratch.JointedCount; k++)
-                        SolveJoint(ref props, arena, c, scratch.Jointed[k], h);
+                        SolveJoint(ref props, arena, c, scratch.Jointed[k], h, scratch, tick, events);
                     for (int k = scratch.JointedCount - 1; k >= 0; k--)
-                        SolveJoint(ref props, arena, c, scratch.Jointed[k], h);
+                        SolveJoint(ref props, arena, c, scratch.Jointed[k], h, scratch, tick, events);
+                    SolveGraph(ref props,arena,c,h,scratch,tick,events,false,it);
                     if (it >= c.Iterations - c.ContactIterations)
                         SolveContacts(ref props, c, scratch, soft, h, true);
                 }
                 for (int i = 0; i < props.Count; i++)
                 {
                     ref var b = ref PropState.Get(ref props, i);
-                    if (Asleep(b, c))
+                    if (props.IsDestroyed(i) || Asleep(b, c))
                         continue;
                     b.Position += b.Velocity * h;
                     b.Rotation = IntegrateRotation(b.Rotation, b.AngularVelocity * h);
@@ -291,7 +305,8 @@ namespace Knockbox.Simulation
                 for (int it = 0; it < c.Iterations; it++)
                 {
                     for (int k = 0; k < scratch.RopedCount; k++)
-                        ProjectRope(ref props, arena, c, scratch.Roped[(it & 1) == 0 ? k : scratch.RopedCount - 1 - k]);
+                        ProjectRope(ref props, arena, c, scratch.Roped[(it & 1) == 0 ? k : scratch.RopedCount - 1 - k], scratch, tick, events);
+                    SolveGraph(ref props,arena,c,h,scratch,tick,events,true,it);
                 }
                 // 이완: 밀어내기 속도 없이 한 번 더 풀어, 겹침을 밀어낸 속도가 튕김으로 남지 않게 한다.
                 SolveContacts(ref props, c, scratch, soft, h, false);
@@ -309,7 +324,7 @@ namespace Knockbox.Simulation
             for (int i = 0; i < props.Count; i++)
             {
                 ref var b = ref PropState.Get(ref props, i);
-                if (Asleep(b, c))
+                if (props.IsDestroyed(i) || Asleep(b, c))
                     continue;
                 // 속도가 아니라 한 틱 동안 실제로 움직인 양으로 판정한다. 가벼운 고리에 무거운 부품이 매달린 사슬은
                 // 순차 풀이가 다 수렴하지 않아 속도가 조금 남지만, 줄 위치 보정이 제자리에 붙들어 실제로는 멈춰 있다.
@@ -320,10 +335,11 @@ namespace Knockbox.Simulation
             }
             SyncTouchingSleep(ref props, c, scratch);
             SyncLinkedSleep(ref props, arena);
+            SyncGraphSleep(ref props, arena, false);
             for (int i = 0; i < props.Count; i++)
             {
                 ref var b = ref PropState.Get(ref props, i);
-                if (Asleep(b, c))
+                if (props.IsDestroyed(i) || Asleep(b, c))
                 {
                     b.Velocity = Vec2.Zero;
                     b.AngularVelocity = 0f;
@@ -339,7 +355,7 @@ namespace Knockbox.Simulation
             {
                 ref readonly var joint = ref arena.GetJoint(i);
                 ref var b = ref PropState.Get(ref props, i);
-                if (b.Broken != 0 || joint.BreakImpulse <= 0f || scratch.TickImpulse[i] < joint.BreakImpulse)
+                if (joint.UsesTension || b.Broken != 0 || joint.BreakImpulse <= 0f || scratch.TickImpulse[i] < joint.BreakImpulse)
                     continue;
                 b.Broken = 1;
                 b.SleepTicks = 0;
@@ -378,13 +394,16 @@ namespace Knockbox.Simulation
             b.AngularVelocity += torque / Inertia(def, m) * h;
         }
 
-        static void SolveJoint(ref PropState props, ArenaDef arena, in PropParams c, int i, float h)
+        static void SolveJoint(ref PropState props, ArenaDef arena, in PropParams c, int i, float h, PropScratch scratch, int tick, SimEventBuffer events)
         {
-            ref readonly var joint = ref arena.GetJoint(i);
+            SolveJoint(ref props,arena,c,i,arena.GetJoint(i),h,scratch,tick,events,false);
+        }
+        static void SolveJoint(ref PropState props,ArenaDef arena,in PropParams c,int i,in PropJoint joint,float h,PropScratch scratch,int tick,SimEventBuffer events,bool graph)
+        {
             if (joint.Kind == PropJointKind.None)
                 return;
             ref var b = ref PropState.Get(ref props, i);
-            if (b.Broken != 0)
+            if (!graph && b.Broken != 0)
                 return;
             InverseMass(arena, c, i, out float invM, out float invI);
             var r = PropBody.Rotate(b.Rotation, joint.LocalAnchor);
@@ -440,10 +459,13 @@ namespace Knockbox.Simulation
             float kn = invM + invI * rn * rn + invMO + invIO * ro * ro;
             float vn = Vec2.Dot(n, b.Velocity + PropBody.Cross(b.AngularVelocity, r) - vOther);
             float stretch = length - joint.Length;
+            // Authored rope: slack has no force. Catch at actual extension in ProjectRope, not predictive impact while slack.
+            if (joint.UsesTension && stretch < -1e-4f) return;
             float bias = stretch > 0f ? stretch * (c.Correction / h) : stretch / h;
             float lambda = -(vn + bias) / kn;
             if (lambda >= 0f)
                 return;
+            if (joint.UsesTension && AccumulateRopePull(ref b, joint, -lambda, scratch, i, tick, events)) return;
             var pull = n * lambda;
             b.Velocity += pull * invM;
             b.AngularVelocity += invI * PropBody.Cross(r, pull);
@@ -459,13 +481,16 @@ namespace Knockbox.Simulation
         /// 줄이 최대 길이를 넘었으면 두 몸(또는 몸 하나)의 위치·회전을 질량 비율대로 옮겨 길이로 되돌리고,
         /// 팽팽한 줄이면 줄을 더 늘리는 방향의 속도도 없앤다(남겨 두면 매 서브스텝 다시 늘어나 잠들지 못한다).
         /// </summary>
-        static void ProjectRope(ref PropState props, ArenaDef arena, in PropParams c, int i)
+        static void ProjectRope(ref PropState props, ArenaDef arena, in PropParams c, int i, PropScratch scratch, int tick, SimEventBuffer events)
         {
-            ref readonly var joint = ref arena.GetJoint(i);
+            ProjectRope(ref props,arena,c,i,arena.GetJoint(i),scratch,tick,events,false);
+        }
+        static void ProjectRope(ref PropState props,ArenaDef arena,in PropParams c,int i,in PropJoint joint,PropScratch scratch,int tick,SimEventBuffer events,bool graph)
+        {
             if (joint.Kind != PropJointKind.Rope)
                 return;
             ref var b = ref PropState.Get(ref props, i);
-            if (b.Broken != 0 || Asleep(b, c))
+            if ((!graph && b.Broken != 0) || Asleep(b, c))
                 return;
             InverseMass(arena, c, i, out float invM, out float invI);
             var r = PropBody.Rotate(b.Rotation, joint.LocalAnchor);
@@ -492,6 +517,7 @@ namespace Knockbox.Simulation
             float kn = invM + invI * rn * rn + invMO + invIO * ro * ro;
             var vOther = linked ? PropState.At(in props, joint.OtherBody).PointVelocity(anchor) : Vec2.Zero;
             float vn = Vec2.Dot(n, b.Velocity + PropBody.Cross(b.AngularVelocity, r) - vOther);
+            if (joint.UsesTension && vn > 0f && AccumulateRopePull(ref b, joint, vn / kn, scratch, i, tick, events)) return;
             var move = n * (stretch > 0f ? -stretch / kn : 0f);
             var pull = n * (vn > 0f ? -vn / kn : 0f);
             b.Position += move * invM;
@@ -506,6 +532,18 @@ namespace Knockbox.Simulation
                 o.Velocity -= pull * invMO;
                 o.AngularVelocity -= invIO * PropBody.Cross(rOther, pull);
             }
+        }
+
+        static bool AccumulateRopePull(ref PropBody b, in PropJoint joint, float impulse, PropScratch scratch, int body, int tick, SimEventBuffer events)
+        {
+            scratch.RopePull[body] += impulse;
+            float force=scratch.RopePull[body]/SimConfig.Dt;
+            if(joint.BreakForce<=0f || force<joint.BreakForce)return false;
+            // Release before cancelling the outward speed; preserve current linear/angular momentum.
+            b.Broken=1;b.SleepTicks=0;
+            events.Add(new SimEvent(tick,SimEventType.JointBreak,b.LastToucher>=0?b.LastToucher:SimEvent.NoFighter,
+                b.ToWorld(joint.LocalAnchor),Vec2.Zero,force));
+            return true;
         }
 
         /// <summary>두 몸이 줄로 바로 이어졌는지(이어진 부품끼리는 충돌하지 않는다).</summary>
@@ -556,7 +594,7 @@ namespace Knockbox.Simulation
                 ref readonly var b = ref PropState.At(in props, i);
                 var half = arena.GetProp(arena.DynamicProp(i)).HalfSize;
                 Extent(b, half, out float ex, out float ey);
-                scratch.Awake[i] = !Asleep(b, c);
+                scratch.Awake[i] = !props.IsDestroyed(i) && !Asleep(b, c);
                 scratch.Still[i] = Slow(b, c);
                 scratch.Center[i] = b.Position;
                 scratch.Half[i] = half;
@@ -590,7 +628,7 @@ namespace Knockbox.Simulation
                 for (int j = i + 1; j < props.Count; j++)
                 {
                     bool awakeA = scratch.Awake[i], awakeB = scratch.Awake[j];
-                    if (awakeA == awakeB || (awakeA ? scratch.Still[i] : scratch.Still[j]) || !NearCached(scratch, i, j, c)
+                    if (props.IsDestroyed(i) || props.IsDestroyed(j) || awakeA == awakeB || (awakeA ? scratch.Still[i] : scratch.Still[j]) || !NearCached(scratch, i, j, c)
                         || Connected(arena, props, i, j))
                         continue;
                     ref var a = ref PropState.Get(ref props, i);
@@ -632,6 +670,7 @@ namespace Knockbox.Simulation
                     // 단방향 발판은 위에서 내려올 때만 막는다.
                     if (box.Kind == TerrainKind.OneWay && b.Position.Y - ey < box.MaxY - 0.25f)
                         continue;
+                    if(box.IsPolygon){CollidePolygon(i,b,half,k,box.Polygon,speculative,scratch);continue;}
                     var boxBody = new PropBody
                     {
                         Position = new Vec2((box.MinX + box.MaxX) * 0.5f, (box.MinY + box.MaxY) * 0.5f),
@@ -647,7 +686,7 @@ namespace Knockbox.Simulation
             {
                 for (int j = i + 1; j < props.Count; j++)
                 {
-                    if ((!scratch.Awake[i] && !scratch.Awake[j]) || !NearCached(scratch, i, j, c) || Connected(arena, props, i, j))
+                    if (props.IsDestroyed(i) || props.IsDestroyed(j) || (!scratch.Awake[i] && !scratch.Awake[j]) || !NearCached(scratch, i, j, c) || Connected(arena, props, i, j))
                         continue;
                     Collide(i, PropState.At(in props, i), scratch.Half[i], j, j, PropState.At(in props, j), scratch.Half[j], PairSpeculative(scratch, i, j, c), -1f, scratch);
                 }
@@ -885,7 +924,17 @@ namespace Knockbox.Simulation
                 // 기둥에서 빠지는 중인 상자는 다른 상자와 미끄러진다(위 상자를 끌고 가지 않고, 아래 상자를 밀지 않는다).
                 if (contact.Other >= 0 && (b.LooseTicks > 0 || PropState.At(in props, contact.Other).LooseTicks > 0)
                     && IsBox(arena, contact.Body) && IsBox(arena, contact.Other))
-                    contact.Friction = 0f;
+                {
+                    if (c.SmoothBoxRelease)
+                    {
+                        int remaining = SimMath.Max(b.LooseTicks, PropState.At(in props, contact.Other).LooseTicks);
+                        float release = SimMath.Clamp((float)remaining / SimMath.Max(1, c.LooseTicks), 0f, 1f);
+                        release = release * release * (3f - 2f * release);
+                        // 강한 충격에서도 접촉 마찰을 남기고 남은 시간에 따라 회복한다. 바닥 마찰은 유지한다.
+                        contact.Friction *= 1f - (1f - SimMath.Clamp(c.ReleasedBoxFrictionScale, 0.02f, 1f)) * release;
+                    }
+                    else contact.Friction = 0f; // 과거 리플레이의 계산 순서와 값을 보존한다.
+                }
                 if (contact.Restitution < 0f)
                     contact.Restitution = box ? c.BoxRestitution : c.Restitution;
                 contact.Approach = Vec2.Dot(n, RelativeVelocity(scratch, contact));

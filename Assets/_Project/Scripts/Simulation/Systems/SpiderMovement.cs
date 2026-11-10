@@ -93,6 +93,11 @@ namespace Knockbox.Simulation
                 float left = b.MinX - (p.X + half);
                 float above = (p.Y - half) - b.MaxY;
                 float below = b.MinY - (p.Y + half);
+                if(b.IsPolygon)
+                {
+                    var delta=p-b.Polygon.ClosestBoundary(p);
+                    right=delta.X-half;left=-delta.X-half;above=delta.Y-half;below=-delta.Y-half;
+                }
                 // 부호 있는 틈: 양수면 그 축으로 떨어져 있다. 더 크게 떨어진 축이 몸과 지형을 가르는 축이다(면에 닿아 있으면 그 면 쪽).
                 float sx = SimMath.Max(right, left);
                 float sy = SimMath.Max(above, below);

@@ -51,6 +51,11 @@ namespace Knockbox.EditorTools
                     ||box.maxX<=box.minX||box.maxY<=box.minY)
                     throw new InvalidOperationException("위치와 크기가 올바른 지형만 복사할 수 있습니다: "+source.name);
                 float min=box.minX;box.minX=-box.maxX;box.maxX=-min;
+                if(box.IsPolygon)
+                {
+                    var old=box.vertices;box.vertices=new Vector2[old.Length];
+                    for(int i=0;i<old.Length;i++){var p=old[old.Length-1-i];box.vertices[i]=new Vector2(-p.x,p.y);}
+                }
                 if(existing.Any(other=>SameShape(other,box))){result.Skipped++;continue;}
                 box.id="box_"+Guid.NewGuid().ToString("N");
                 existing.Add(box);pending.Add((source,box));
@@ -77,6 +82,11 @@ namespace Knockbox.EditorTools
             catch { Undo.RevertAllDownToGroup(group);throw; }
         }
 
-        static bool SameShape(MapBox a,MapBox b)=>a.kind==b.kind&&a.minX==b.minX&&a.maxX==b.maxX&&a.minY==b.minY&&a.maxY==b.maxY;
+        static bool SameShape(MapBox a,MapBox b)
+        {
+            if(a.kind!=b.kind||a.minX!=b.minX||a.maxX!=b.maxX||a.minY!=b.minY||a.maxY!=b.maxY||a.IsPolygon!=b.IsPolygon)return false;
+            if(!a.IsPolygon)return true;
+            return a.vertices.Length==b.vertices.Length&&a.vertices.All(p=>b.vertices.Contains(p));
+        }
     }
 }

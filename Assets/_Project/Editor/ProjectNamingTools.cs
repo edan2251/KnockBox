@@ -52,7 +52,7 @@ namespace Knockbox.EditorTools
             var paths=AssetDatabase.GetAllAssetPaths().Where(Owned).Where(File.Exists).OrderBy(p=>p,StringComparer.Ordinal).ToArray();
             foreach(string path in paths)
             {
-                string stem=Path.GetFileNameWithoutExtension(path),clean=SceneObjectName.Normalize(stem);
+                string stem=Path.GetFileNameWithoutExtension(path),clean=SceneObjectName.FileStem(stem);
                 if(stem!=clean)
                 {
                     string target=(Path.GetDirectoryName(path)+"/"+clean+Path.GetExtension(path)).Replace('\\','/');

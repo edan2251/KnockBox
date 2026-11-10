@@ -21,15 +21,21 @@ namespace Knockbox.Simulation
         public float MinY;
         public float MaxX;
         public float MaxY;
+        public ConvexPolygon Polygon;
+        public bool IsPolygon=>Polygon!=null;
 
         public ArenaBox(TerrainKind kind, float minX, float minY, float maxX, float maxY)
         {
             Kind = kind;
+            Polygon = null;
             MinX = minX;
             MinY = minY;
             MaxX = maxX;
             MaxY = maxY;
         }
+
+        public ArenaBox(TerrainKind kind,ConvexPolygon polygon)
+        {Kind=kind;Polygon=polygon;MinX=polygon.Min.X;MinY=polygon.Min.Y;MaxX=polygon.Max.X;MaxY=polygon.Max.Y;}
 
         /// <summary>단방향 발판을 제외한 막는 지형(옆과 아래에서도 막는다).</summary>
         public bool BlocksAllSides => Kind != TerrainKind.OneWay;
@@ -50,6 +56,12 @@ namespace Knockbox.Simulation
         public const int ClassicRows = 18;
 
         readonly ArenaBox[] boxes;
+        readonly GraphRope[] graphRopes;
+        public int GraphRopeCount => graphRopes.Length;
+        public ref readonly GraphRope GetGraphRope(int index) => ref graphRopes[index];
+        public bool HasConnectorBodies { get { foreach(var p in props) if(p.IsConnector)return true;return false; } }
+        public bool HasPropGraph => GraphRopeCount>0 || HasConnectorBodies;
+        readonly bool hasConvexTerrain;
         readonly PropDef[] props = new PropDef[0];
         /// <summary>강체로 움직이는 구조물(지금 구현된 단계 이하)의 번호와 연결. 나머지는 임시 물체 상자.</summary>
         readonly int[] dynamicProps = new int[0];
@@ -77,8 +89,9 @@ namespace Knockbox.Simulation
         }
 
         ArenaDef(string name, int columns, int rows, bool hasBoundary, ArenaBox[] boxes, Vec2 spawnFoot0, Vec2 spawnFoot1, PropDef[] props,
-            int[] staticProps, int[] dynamicProps, PropJoint[] joints)
+            int[] staticProps, int[] dynamicProps, PropJoint[] joints, GraphRope[] graphRopes = null)
         {
+            this.graphRopes = graphRopes ?? System.Array.Empty<GraphRope>();
             this.props = props;
             this.staticProps = staticProps;
             this.dynamicProps = dynamicProps;
@@ -87,7 +100,7 @@ namespace Knockbox.Simulation
             Columns = columns;
             Rows = rows;
             HasBoundary = hasBoundary;
-            this.boxes = boxes;
+            this.boxes = boxes;hasConvexTerrain=System.Array.Exists(boxes,b=>b.IsPolygon);
             SpawnFoot0 = spawnFoot0;
             SpawnFoot1 = spawnFoot1;
         }
@@ -111,6 +124,11 @@ namespace Knockbox.Simulation
                 for (int i = 0; i < boxes.Length; i++)
                 {
                     var b = boxes[i];
+                    if(b.IsPolygon)
+                    {
+                        var vertices=b.Polygon.CopyPoints();for(int v=0;v<vertices.Length;v++)vertices[v]=SpiderMovement.ToLocal(vertices[v],g);
+                        list[i]=new ArenaBox(b.Kind,new ConvexPolygon(vertices));continue;
+                    }
                     var p = SpiderMovement.ToLocal(new Vec2(b.MinX, b.MinY), g);
                     var q = SpiderMovement.ToLocal(new Vec2(b.MaxX, b.MaxY), g);
                     list[i] = new ArenaBox(b.Kind, SimMath.Min(p.X, q.X), SimMath.Min(p.Y, q.Y), SimMath.Max(p.X, q.X), SimMath.Max(p.Y, q.Y));
@@ -140,6 +158,7 @@ namespace Knockbox.Simulation
                         var a = boxes[i];
                         var b = boxes[j];
                         bool touch = a.MinX <= b.MaxX + 1e-3f && b.MinX <= a.MaxX + 1e-3f && a.MinY <= b.MaxY + 1e-3f && b.MinY <= a.MaxY + 1e-3f;
+                        if(touch&&(a.IsPolygon||b.IsPolygon))touch=!(a.IsPolygon&&a.Polygon.SeparatedFrom(b,.001f))&&!(b.IsPolygon&&b.Polygon.SeparatedFrom(a,.001f));
                         if (touch)
                         {
                             pieceOfBox[j] = pieceOfBox[i];
@@ -169,10 +188,31 @@ namespace Knockbox.Simulation
         public Vec2 SpawnFoot0 { get; }
         public Vec2 SpawnFoot1 { get; }
         public int BoxCount => boxes.Length;
+        public bool HasConvexTerrain=>hasConvexTerrain;
 
         /// <summary>구조물(짝 파일, 09-props-physics.md 5절). 상자 목록의 PropBoxStart부터 같은 순서로 임시 물체 상자가 있다.</summary>
         public int PropCount => props.Length;
         public ref readonly PropDef GetProp(int index) => ref props[index];
+        public bool RequiresExtendedMapChecksum
+        {
+            get { if(HasPropGraph || HasConvexTerrain)return true;foreach (var p in props) if (p.HasAuthoringData) return true; return false; }
+        }
+        public bool HasPlayerPassThroughProps
+        {
+            get { foreach (var p in props) if (p.PlayerPassThrough) return true; return false; }
+        }
+        public bool HasAuthoredRopes
+        {
+            get { foreach (var p in props) if (p.Rope.Enabled) return true; return false; }
+        }
+        public bool HasRopeConnectors
+        {
+            get { foreach(var p in props) if(p.Rope.Enabled && p.Rope.RopeMode==RopeBreakMode.Connector) return true; return false; }
+        }
+        public bool HasRopeModes
+        {
+            get { foreach(var p in props) if(p.Rope.Enabled && p.Rope.RopeMode!=RopeBreakMode.LegacyTension) return true; return false; }
+        }
         public int PropBoxStart => boxes.Length - staticProps.Length;
 
         /// <summary>임시 물체 상자(PropBoxStart 이후)가 나타내는 구조물 번호.</summary>
@@ -224,6 +264,12 @@ namespace Knockbox.Simulation
         static PropJoint JointOf(PropDef[] all, int index, int[] bodyOf)
         {
             ref readonly var p = ref all[index];
+            if (p.Rope.Enabled)
+                return new PropJoint { Kind=PropJointKind.Rope, WorldAnchor=p.Rope.WorldAnchor,
+                    LocalAnchor=p.Rope.LocalAnchor, Length=p.Rope.Length, OtherBody=-1,
+                    UsesTension=true, BreakForce=p.Rope.RopeMode==RopeBreakMode.LegacyTension && p.Rope.Breakable?p.Rope.BreakForce:0,
+                    RopeMode=p.Rope.RopeMode, ConnectorPosition=p.Rope.ConnectorPosition,
+                    ConnectorSize=p.Rope.ConnectorSize, ConnectorSpeedLoss=p.Rope.ConnectorSpeedLoss };
             if (!p.HasAnchor)
                 return new PropJoint { Kind = PropJointKind.None, OtherBody = -1 };
             if (p.HangsByRope)
@@ -259,16 +305,84 @@ namespace Knockbox.Simulation
             return n;
         }
 
-        /// <summary>Authoring schema 2. Legacy recordings/protocol 8 deliberately continue to use ComputeChecksum.</summary>
+        /// <summary>기존 schema 2~6은 고정한다. 새 로프 종류가 있을 때만 schema 7로 연결부 설정까지 검증한다.</summary>
+        public ArenaDef WithGraphRopes(GraphRope[] connections)
+        {
+            if(connections==null || connections.Length>GraphRope.Capacity)throw new System.ArgumentException("로프는 최대 96개입니다.");
+            var ids=new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal);
+            foreach(var r in connections)
+                if(string.IsNullOrEmpty(r.Id)||!ids.Add(r.Id)||r.Body<0||r.Body>=DynamicPropCount
+                    ||r.Joint.OtherBody < -1 || r.Joint.OtherBody>=DynamicPropCount || r.Body==r.Joint.OtherBody
+                    ||r.Joint.Kind!=PropJointKind.Rope || r.Joint.Length<.05f)
+                    throw new System.ArgumentException("로프 ID·연결점·길이를 확인해주세요.");
+            return new ArenaDef(Name,Columns,Rows,HasBoundary,boxes,SpawnFoot0,SpawnFoot1,props,staticProps,dynamicProps,joints,(GraphRope[])connections.Clone());
+        }
+
         public uint ComputeGeometryChecksum()
         {
+            uint legacy=ComputePreGraphGeometryChecksum();
+            if(!HasPropGraph)return legacy;
+            var h=Hasher.Create();h.AddInt(8);h.AddUInt(legacy);
+            foreach(var p in props){h.AddBool(p.IsConnector);if(p.IsConnector)h.AddFloat(p.ConnectorSpeedLoss);}
+            h.AddInt(GraphRopeCount);
+            foreach(var r in graphRopes)
+            {
+                h.AddInt(r.Id.Length);foreach(char c in r.Id)h.AddInt(c);
+                h.AddInt(r.Body);h.AddInt(r.Joint.OtherBody);
+                h.AddFloat(r.Joint.WorldAnchor.X);h.AddFloat(r.Joint.WorldAnchor.Y);
+                h.AddFloat(r.Joint.OtherLocal.X);h.AddFloat(r.Joint.OtherLocal.Y);
+                h.AddFloat(r.Joint.LocalAnchor.X);h.AddFloat(r.Joint.LocalAnchor.Y);h.AddFloat(r.Joint.Length);
+            }
+            return h.Hash;
+        }
+
+        uint ComputePreGraphGeometryChecksum()
+        {
             var h = Hasher.Create();
-            h.AddInt(2);
+            bool extended = RequiresExtendedMapChecksum;
+            bool passThrough = HasPlayerPassThroughProps;
+            bool authoredRopes = HasAuthoredRopes;
+            bool polygons=HasConvexTerrain;
+            bool ropeModes=HasRopeModes;
+            h.AddInt(ropeModes ? 7 : polygons ? 6 : authoredRopes ? 5 : passThrough ? 4 : extended ? 3 : 2);
             h.AddUInt(ComputeChecksum());
+            if(ropeModes){h.AddBool(extended);h.AddBool(passThrough);h.AddBool(authoredRopes);h.AddBool(polygons);}
+            if(polygons)
+            {
+                if(!ropeModes){h.AddBool(extended);h.AddBool(passThrough);h.AddBool(authoredRopes);}
+                foreach(var box in boxes)
+                {
+                    h.AddInt(box.IsPolygon?box.Polygon.Count:0);
+                    if(box.IsPolygon)for(int v=0;v<box.Polygon.Count;v++){var p=box.Polygon.Point(v);h.AddFloat(p.X);h.AddFloat(p.Y);}
+                }
+            }
             for (int i = 0; i < props.Length; i++)
             {
                 h.AddFloat(props[i].Center.X); h.AddFloat(props[i].Center.Y);
                 h.AddFloat(props[i].HalfSize.X); h.AddFloat(props[i].HalfSize.Y);
+                if (extended)
+                {
+                    string id = props[i].Id ?? "";
+                    h.AddInt(id.Length); foreach (char c in id) h.AddInt(c);
+                    h.AddFloat(props[i].Mass); h.AddBool(props[i].StartAwake);
+                    if (passThrough || authoredRopes) h.AddBool(props[i].PlayerPassThrough);
+                    if (authoredRopes)
+                    {
+                        var rope=props[i].Rope;h.AddBool(rope.Enabled);
+                        if(rope.Enabled)
+                        {
+                            string ropeId=rope.Id??"";h.AddInt(ropeId.Length);foreach(char c in ropeId)h.AddInt(c);
+                            h.AddFloat(rope.WorldAnchor.X);h.AddFloat(rope.WorldAnchor.Y);
+                            h.AddFloat(rope.LocalAnchor.X);h.AddFloat(rope.LocalAnchor.Y);
+                            h.AddFloat(rope.Length);h.AddBool(rope.Breakable);h.AddFloat(rope.BreakForce);
+                            if(ropeModes)
+                            {
+                                h.AddByte((byte)rope.RopeMode);h.AddFloat(rope.ConnectorPosition);
+                                h.AddFloat(rope.ConnectorSize);h.AddFloat(rope.ConnectorSpeedLoss);
+                            }
+                        }
+                    }
+                }
             }
             h.AddInt(dynamicProps.Length);
             for (int i = 0; i < dynamicProps.Length; i++) h.AddInt(dynamicProps[i]);

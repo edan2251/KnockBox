@@ -131,7 +131,9 @@ namespace Knockbox.Tests.EditMode
                 Assert.AreEqual(before.ComputeChecksum(),draft.ToArena().ComputeChecksum());
                 Assert.AreEqual(before.ComputeGeometryChecksum(),draft.ToArena().ComputeGeometryChecksum());
                 Assert.IsFalse(MapAuthoringOperations.HasUnsavedPlacement(a));
-                for(int i=0;i<before.BoxCount;i++)Assert.AreEqual(before.GetBox(i),draft.ToArena().GetBox(i));
+                var after=draft.ToArena();Assert.AreEqual(before.BoxCount,after.BoxCount);
+                // Reopening allocates a new polygon. Compare all ordered vertices and bounds, not object identity.
+                for(int i=0;i<before.BoxCount;i++)Assert.AreEqual(MapBox.From(before.GetBox(i),i),MapBox.From(after.GetBox(i),i),"ordered terrain "+i);
             }
             finally{Object.DestroyImmediate(draft);EditorSceneManager.OpenScene(MapAuthoringOperations.MainPath,OpenSceneMode.Single);}
         }

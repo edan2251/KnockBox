@@ -22,16 +22,23 @@ namespace Knockbox.EditorTools
             if(a.definition==null||a.terrainRoot==null||a.spawn0==null||a.spawn1==null||a.shapes==null||a.palette==null)throw new InvalidOperationException("맵 제작 참조가 비어 있습니다.");
             if(a.definition.Validate().Count>0)throw new InvalidOperationException(string.Join("\n",a.definition.Validate()));
             var terrainColor=a.definition.Metadata().ResolveTheme(a.palette).terrain;
+            if(Selection.gameObjects.Any(go=>go.transform.IsChildOf(a.terrainRoot)
+                ||a.physicsRoot!=null&&go.transform.IsChildOf(a.physicsRoot)||a.ropeRoot!=null&&go.transform.IsChildOf(a.ropeRoot)))
+                Selection.activeGameObject=a.gameObject;
             // Only the explicitly owned authoring draft is replaced; no asset or existing game scene is removed.
+            if(a.ropeRoot!=null)foreach(var h in a.ropeRoot.GetComponentsInChildren<MapRopeHandle>(true))Undo.DestroyObjectImmediate(h.gameObject);
             foreach(var h in a.terrainRoot.GetComponentsInChildren<MapBoxHandle>(true))Undo.DestroyObjectImmediate(h.gameObject);
+            if(a.physicsRoot!=null)foreach(var h in a.physicsRoot.GetComponentsInChildren<MapPhysicalBoxHandle>(true))Undo.DestroyObjectImmediate(h.gameObject);
             a.shapes.Activate();
             for(int i=0;i<a.definition.BoxCount;i++)
             {
                 var b=a.definition.Box(i);
-                var sr=ShapeLibrary.Create(a.terrainRoot,i.ToString(),a.shapes.Square,SortingLayers.Terrain,0,terrainColor);
+                var sr=ShapeLibrary.Create(a.terrainRoot,MapBoxHandle.ObjectName(i),a.shapes.Square,SortingLayers.Terrain,0,terrainColor);
                 var handle=Undo.AddComponent<MapBoxHandle>(sr.gameObject);handle.Initialize(b,i);
                 Undo.RegisterCreatedObjectUndo(sr.gameObject,"맵 배치 불러오기");
             }
+            for(int i=0;i<a.definition.PhysicalBoxCount;i++)MapPhysicalBoxTools.Create(a,a.definition.PhysicalBox(i),i);
+            for(int i=0;i<a.definition.RopeCount;i++)MapRopeTools.Create(a,a.definition.Rope(i),i);
             Undo.RecordObjects(new UnityEngine.Object[]{a,a.spawn0,a.spawn1},"맵 불러오기");
             a.spawn0.position=a.definition.Spawn(0);a.spawn1.position=a.definition.Spawn(1);a.MarkLoaded();
             EditorSceneManager.MarkSceneDirty(a.gameObject.scene);
@@ -43,7 +50,7 @@ namespace Knockbox.EditorTools
             try
             {
                 trial.MakeEditableCopy(a.definition.Id,a.definition.DisplayName);
-                trial.SaveGeometry(ordered,a.spawn0.position,a.spawn1.position);
+                trial.SaveLayout(ordered,a.ReadOrderedPhysicalBoxes(),a.ReadOrderedRopes(),a.spawn0.position,a.spawn1.position);
                 return trial;
             }
             catch { UnityEngine.Object.DestroyImmediate(trial); throw; }
@@ -74,6 +81,13 @@ namespace Knockbox.EditorTools
                 // Derived preview only: do not add undo records or change the geometry/definition.
                 renderer.color=color;changed=true;
             }
+            if(a.physicsRoot!=null)foreach(var h in a.physicsRoot.GetComponentsInChildren<MapPhysicalBoxHandle>(true))
+            {
+                var renderer=h.GetComponent<SpriteRenderer>();var tint=h.Connector?PaletteAsset.ConnectorFillColor:PropView.BoxColor(a.definition.Metadata().ResolveTheme(a.palette).prop,h.Order,h.PlayerPassThrough);
+                if(renderer==null)continue;
+                ConnectorBoxVisual.Apply(renderer,a.shapes,h.Connector,h.Read().size);
+                if(renderer.color==tint)continue;renderer.color=tint;changed=true;
+            }
             return changed;
         }
         public static void RefreshLoadedThemePreviews(MapDefinition definition)
@@ -85,18 +99,23 @@ namespace Knockbox.EditorTools
                     changed|=RefreshPreviewColors(a);
             if(changed)SceneView.RepaintAll();
         }
-        public static bool HasUnsavedPlacement(MapAuthoring a)
+        public static bool HasUnsavedPlacement(MapAuthoring a)=>!string.IsNullOrEmpty(PendingSaveReason(a));
+        public static string PendingSaveReason(MapAuthoring a)
         {
-            if(a.definition==null||string.IsNullOrEmpty(a.LoadedId))return false;
-            if(EditorUtility.IsDirty(a.definition))return true;
+            if(a==null||a.definition==null||string.IsNullOrEmpty(a.LoadedId))return null;
             MapDefinition draft=null;
             try
             {
                 draft=Draft(a);
-                return draft.ToArena().ComputeGeometryChecksum()!=a.LoadedGeometry
-                    ||a.definition.ToArena().ComputeGeometryChecksum()!=a.LoadedGeometry;
+                var errors=draft.Validate();
+                if(errors.Count>0)return "아래 배치 오류를 고친 뒤 맵 저장을 눌러주세요.\n"+string.Join("\n",errors);
+                if(draft.ToArena().ComputeGeometryChecksum()!=a.LoadedGeometry)
+                    return "현재 배치가 아직 맵에 저장되지 않았습니다. 맵 저장을 눌러주세요.";
+                if(a.definition.ToArena().ComputeGeometryChecksum()!=a.LoadedGeometry)
+                    return "원본 맵 설정이 바뀌었습니다. 현재 배치를 유지하려면 맵 저장, 원본을 다시 열려면 맵 불러오기를 사용하세요.";
+                return EditorUtility.IsDirty(a.definition)?"맵 설정 변경이 아직 저장되지 않았습니다. 맵 저장을 눌러주세요.":null;
             }
-            catch{return true;}
+            catch(Exception e){return "저장 상태를 확인할 수 없습니다.\n"+e.Message;}
             finally{if(draft!=null)UnityEngine.Object.DestroyImmediate(draft);}
         }
         public static void Save(MapAuthoring a)
@@ -107,10 +126,12 @@ namespace Knockbox.EditorTools
             {
                 var errors=draft.Validate();if(errors.Count>0)throw new InvalidOperationException(string.Join("\n",errors));
                 Undo.RecordObject(a.definition,"맵 저장");
-                a.definition.SaveGeometry(a.ReadOrderedBoxes(),a.spawn0.position,a.spawn1.position);
+                a.definition.SaveLayout(a.ReadOrderedBoxes(),a.ReadOrderedPhysicalBoxes(),a.ReadOrderedRopes(),a.spawn0.position,a.spawn1.position);
                 EditorUtility.SetDirty(a.definition);AssetDatabase.SaveAssetIfDirty(a.definition);a.MarkLoaded();
                 // Reload exact float baselines for unchanged subsequent saves.
                 foreach(var handle in a.terrainRoot.GetComponentsInChildren<MapBoxHandle>(true))handle.Initialize(a.definition.Box(handle.Order),handle.Order);
+                if(a.physicsRoot!=null)foreach(var handle in a.physicsRoot.GetComponentsInChildren<MapPhysicalBoxHandle>(true))handle.Initialize(a.definition.PhysicalBox(handle.Order),handle.Order);
+                foreach(var handle in MapRopeTools.Handles(a))handle.Initialize(a.definition.Rope(handle.Order),handle.Order,handle.Target,handle.Source);
                 EditorSceneManager.MarkSceneDirty(a.gameObject.scene);
             }
             finally{UnityEngine.Object.DestroyImmediate(draft);}
@@ -126,11 +147,61 @@ namespace Knockbox.EditorTools
             if(a.definition==null||a.terrainRoot==null)throw new InvalidOperationException("먼저 맵을 불러와주세요.");
             int count=a.terrainRoot.GetComponentsInChildren<MapBoxHandle>(true).Length;
             var box=new MapBox{id="box_"+Guid.NewGuid().ToString("N"),kind=Knockbox.Simulation.TerrainKind.Solid,minX=-1,maxX=1,minY=-.5f,maxY=.5f};
-            a.shapes.Activate();var sr=ShapeLibrary.Create(a.terrainRoot,count.ToString(),a.shapes.Square,SortingLayers.Terrain,0,a.definition.Metadata().ResolveTheme(a.palette).terrain);
+            a.shapes.Activate();var sr=ShapeLibrary.Create(a.terrainRoot,MapBoxHandle.ObjectName(count),a.shapes.Square,SortingLayers.Terrain,0,a.definition.Metadata().ResolveTheme(a.palette).terrain);
             sr.gameObject.AddComponent<MapBoxHandle>().Initialize(box,count);
             Undo.RegisterCreatedObjectUndo(sr.gameObject,"사각 지형 추가");Selection.activeGameObject=sr.gameObject;
             EditorSceneManager.MarkSceneDirty(a.gameObject.scene);
         }
+        /// <summary>삭제 후 번호의 빈칸을 메운다. 기존 판정 순서와 ID/배치 원본은 보존한다.</summary>
+        public static int RepairOrder(MapAuthoring a)
+        {
+            if(EditorApplication.isPlayingOrWillChangePlaymode)throw new InvalidOperationException("시험을 끝낸 뒤 순서를 정리해주세요.");
+            if(a==null||a.terrainRoot==null)throw new InvalidOperationException("맵의 지형 묶음 참조가 필요합니다.");
+            if(a.physicsRoot==a.terrainRoot)throw new InvalidOperationException("지형과 물리 상자는 별도 묶음을 사용해주세요.");
+            var ropes=MapRopeTools.Handles(a).OrderBy(h=>h.Order).ThenBy(h=>h.transform.GetSiblingIndex()).ToArray();
+            if(ropes.Any(h=>h.transform.parent!=a.ropeRoot)||a.ropeRoot!=null&&(a.ropeRoot==a.physicsRoot||a.ropeRoot==a.terrainRoot))throw new InvalidOperationException("로프는 별도 묶음 바로 아래에 두세요.");
+            var terrain=a.terrainRoot.GetComponentsInChildren<MapBoxHandle>(true);
+            var physics=a.physicsRoot==null?Array.Empty<MapPhysicalBoxHandle>():a.physicsRoot.GetComponentsInChildren<MapPhysicalBoxHandle>(true);
+            // Do not silently reparent malformed drafts or reset transforms via Initialize.
+            if(terrain.Any(h=>h.transform.parent!=a.terrainRoot)||physics.Any(h=>h.transform.parent!=a.physicsRoot))
+                throw new InvalidOperationException("도형을 각 지형/물리 상자 묶음 바로 아래로 옮긴 뒤 정리해주세요.");
+            terrain=terrain.OrderBy(h=>h.Order).ThenBy(h=>h.transform.GetSiblingIndex()).ToArray();
+            physics=physics.OrderBy(h=>h.Order).ThenBy(h=>h.transform.GetSiblingIndex()).ToArray();
+            int changed=0;
+            for(int i=0;i<terrain.Length;i++)if(terrain[i].Order!=i||terrain[i].name!=MapBoxHandle.ObjectName(i))changed++;
+            for(int i=0;i<physics.Length;i++)if(physics[i].Order!=i||physics[i].name!=MapPhysicalBoxHandle.ObjectName(i))changed++;
+            for(int i=0;i<ropes.Length;i++)if(ropes[i].Order!=i||ropes[i].name!=MapRopeHandle.ObjectName(i))changed++;
+            if(changed==0)return 0;
+            Undo.IncrementCurrentGroup();int group=Undo.GetCurrentGroup();Undo.SetCurrentGroupName("도형 순서 정리");
+            try
+            {
+                for(int i=0;i<terrain.Length;i++)
+                {
+                    var h=terrain[i];if(h.Order==i&&h.name==MapBoxHandle.ObjectName(i))continue;
+                    Undo.RecordObjects(new UnityEngine.Object[]{h,h.gameObject},"도형 순서 정리");
+                    h.SetOrder(i);RecordPrefab(h);
+                }
+                for(int i=0;i<physics.Length;i++)
+                {
+                    var h=physics[i];if(h.Order==i&&h.name==MapPhysicalBoxHandle.ObjectName(i))continue;
+                    Undo.RecordObjects(new UnityEngine.Object[]{h,h.gameObject},"도형 순서 정리");
+                    h.SetOrder(i);RecordPrefab(h);
+                }
+                for(int i=0;i<ropes.Length;i++){var h=ropes[i];if(h.Order==i&&h.name==MapRopeHandle.ObjectName(i))continue;Undo.RecordObjects(new UnityEngine.Object[]{h,h.gameObject},"로프 순서 정리");h.SetOrder(i);RecordPrefab(h);}
+                Undo.FlushUndoRecordObjects();Undo.CollapseUndoOperations(group);
+                MapPlacementSnap.ResetTracking();
+                if(!EditorSceneManager.IsPreviewScene(a.gameObject.scene))EditorSceneManager.MarkSceneDirty(a.gameObject.scene);
+                return changed;
+            }
+            catch{Undo.RevertAllDownToGroup(group);throw;}
+        }
+        static void RecordPrefab(Component handle)
+        {
+            if(!PrefabUtility.IsPartOfPrefabInstance(handle))return;
+            PrefabUtility.RecordPrefabInstancePropertyModifications(handle);
+            PrefabUtility.RecordPrefabInstancePropertyModifications(handle.gameObject);
+        }
+
         public static void SnapSelected(MapAuthoring a)
         {
             foreach(var t in Selection.transforms)
@@ -138,15 +209,25 @@ namespace Knockbox.EditorTools
                 MapPlacementSnap.Apply(a,t);
             }
         }
+        public static string SavedTrialGuid(MapAuthoring a)
+        {
+            if(a==null || a.definition==null || a.LoadedId!=a.definition.Id)
+                throw new InvalidOperationException("시험할 맵 정의를 먼저 불러와주세요.");
+            string pending=PendingSaveReason(a);
+            if(!string.IsNullOrEmpty(pending))throw new InvalidOperationException(pending);
+            var errors=a.definition.Validate();
+            if(errors.Count>0)throw new InvalidOperationException(string.Join("\n",errors));
+            string path=AssetDatabase.GetAssetPath(a.definition);
+            if(string.IsNullOrEmpty(path))throw new InvalidOperationException("맵을 정의 에셋으로 저장한 뒤 시험해주세요.");
+            return AssetDatabase.AssetPathToGUID(path);
+        }
         public static void Test(MapAuthoring a)
         {
-            if(HasUnsavedPlacement(a))throw new InvalidOperationException("시험 전에 맵을 저장해주세요. 미저장 배치는 게임에 반영되지 않습니다.");
-            if(a.catalog.Find(a.definition.MatchName)!=a.definition)throw new InvalidOperationException("먼저 게임 맵 목록에 등록해주세요.");
+            string guid=SavedTrialGuid(a);
             if(!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())return;
-            SessionState.SetString("Knockbox.MapAuthoring.TestMap",AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(a.definition)));
-            SessionState.SetString("Knockbox.MapAuthoring.PreviousStart",AssetDatabase.GetAssetPath(EditorSceneManager.playModeStartScene));
-            EditorSceneManager.playModeStartScene=AssetDatabase.LoadAssetAtPath<SceneAsset>(MainPath);
-            EditorApplication.isPlaying=true;
+            MapTestReturn.Prepare(guid);
+            try { EditorApplication.isPlaying=true; }
+            catch { MapTestReturn.Restore(); throw; }
         }
         public static void Duplicate(MapAuthoring a)
         {
@@ -170,21 +251,45 @@ namespace Knockbox.EditorTools
     }
 
     [InitializeOnLoad]
-    static class MapTestReturn
+    public static class MapTestReturn
     {
+        const string MapKey="Knockbox.MapAuthoring.TestMap", PreviousKey="Knockbox.MapAuthoring.PreviousStart";
+        public static bool Active=>!string.IsNullOrEmpty(SessionState.GetString(MapKey,""));
         static MapTestReturn(){EditorApplication.playModeStateChanged+=Changed;}
+        public static void Prepare(string guid)
+        {
+            if(EditorApplication.isPlayingOrWillChangePlaymode || Active)
+                throw new InvalidOperationException("진행 중인 맵 시험을 먼저 종료해주세요.");
+            var definition=AssetDatabase.LoadAssetAtPath<MapDefinition>(AssetDatabase.GUIDToAssetPath(guid));
+            if(definition==null)throw new InvalidOperationException("저장한 시험 맵을 찾을 수 없습니다.");
+            var main=AssetDatabase.LoadAssetAtPath<SceneAsset>(MapAuthoringOperations.MainPath);
+            if(main==null)throw new InvalidOperationException("Main 씬을 찾을 수 없습니다.");
+            SessionState.SetString(PreviousKey,AssetDatabase.GetAssetPath(EditorSceneManager.playModeStartScene));
+            SessionState.SetString(MapKey,guid);
+            EditorSceneManager.playModeStartScene=main;
+        }
+        public static void Restore()
+        {
+            if(!Active)return;
+            EditorSceneManager.playModeStartScene=AssetDatabase.LoadAssetAtPath<SceneAsset>(SessionState.GetString(PreviousKey,""));
+            SessionState.EraseString(MapKey);SessionState.EraseString(PreviousKey);
+        }
         static void Changed(PlayModeStateChange state)
         {
-            if(state!=PlayModeStateChange.EnteredEditMode||string.IsNullOrEmpty(SessionState.GetString("Knockbox.MapAuthoring.TestMap","")))return;
-            EditorSceneManager.playModeStartScene=AssetDatabase.LoadAssetAtPath<SceneAsset>(SessionState.GetString("Knockbox.MapAuthoring.PreviousStart",""));
-            SessionState.EraseString("Knockbox.MapAuthoring.TestMap");SessionState.EraseString("Knockbox.MapAuthoring.PreviousStart");
+            // Unity가 편집하던 씬 구성을 복원한다. 씬을 별도로 덮어 열지 않는다.
+            if(state==PlayModeStateChange.EnteredEditMode)Restore();
         }
+        [MenuItem("Knockbox/맵/시험 종료 및 편집 복귀")]
+        static void ReturnToEditing()=>EditorApplication.isPlaying=false;
+        [MenuItem("Knockbox/맵/시험 종료 및 편집 복귀",true)]
+        static bool CanReturn()=>EditorApplication.isPlaying && Active;
     }
     [CustomEditor(typeof(MapAuthoring))]
     public sealed class MapAuthoringInspector : Editor
     {
         string message;
-        bool references;
+        MessageType messageType;
+        bool references, theme, registration, snapping=true;
         void OnEnable(){Undo.undoRedoPerformed+=RefreshPreview;RefreshPreview();}
         void OnDisable()=>Undo.undoRedoPerformed-=RefreshPreview;
         void RefreshPreview()
@@ -195,55 +300,78 @@ namespace Knockbox.EditorTools
         }
         public override void OnInspectorGUI()
         {
+            if(target==null)return;
             var a=(MapAuthoring)target;serializedObject.Update();
-            Field("definition","편집할 맵");Field("catalog","등록 목록");
-            EditorGUILayout.Space();Field("gridSnap","격자 스냅");Field("gridStep","격자 간격");
-            Field("spawnEdgeSnap","발 위치를 지형 윗면에 맞춤");Field("spawnSnapDistance","윗면 인식 거리");
-            serializedObject.ApplyModifiedProperties();
-            references=EditorGUILayout.Foldout(references,"연결된 오브젝트");
-            if(references)
+            MapInspectorLayout.Section("1. 맵 파일");
+            Field("definition","편집할 맵");serializedObject.ApplyModifiedProperties();
+            using(new EditorGUI.DisabledScope(a.definition==null))
             {
-                Field("terrainRoot","지형 묶음");Field("spawn0","P1 시작 위치");Field("spawn1","P2 시작 위치");
-                Field("shapes","기본 도형");Field("palette","공통 색상");serializedObject.ApplyModifiedProperties();
+                if(GUILayout.Button("맵 불러오기") && (!MapAuthoringOperations.HasUnsavedPlacement(a)||EditorUtility.DisplayDialog("미저장 배치","씬의 미저장 배치를 버리고 정의를 다시 여시겠어요?","열기","취소")))
+                    Run(()=>MapAuthoringOperations.Open(a),"맵을 불러왔습니다.");
+                if(GUILayout.Button("현재 배치를 새 사본으로 저장"))Run(()=>MapAuthoringOperations.Duplicate(a),"사본 저장 절차를 마쳤습니다. 편집할 맵을 확인하세요.");
             }
-            EditorGUILayout.HelpBox("선택한 도형을 움직이거나 크기를 바꾸면 격자에 맞춥니다. 기본 간격은 0.25입니다. 발 위치는 몸이 지형에 겹치지 않는 가까운 윗면에 붙습니다. 스냅을 끄면 자유롭게 배치합니다.",MessageType.Info);
-            EditorGUILayout.HelpBox("맵 정의가 게임의 원본입니다. 배치 후 아래 저장 버튼을 누르세요. 번호는 판정 순서이며 긴 내부 ID는 이름에 표시하지 않습니다.",MessageType.None);
-            if(MapAuthoringOperations.HasUnsavedPlacement(a))EditorGUILayout.HelpBox("미저장 배치 또는 원본 변경이 있습니다.",MessageType.Warning);
-            foreach(var error in a.ValidatePlacement())EditorGUILayout.HelpBox(error,MessageType.Error);
-            if(GUILayout.Button("맵 불러오기") && (!MapAuthoringOperations.HasUnsavedPlacement(a)||EditorUtility.DisplayDialog("미저장 배치","씬의 미저장 배치를 버리고 정의를 다시 여시겠어요?","열기","취소")))Run(()=>MapAuthoringOperations.Open(a));
-            if(GUILayout.Button("새 사본 만들기"))Run(()=>MapAuthoringOperations.Duplicate(a));
-            if(GUILayout.Button("사각 지형 추가"))Run(()=>MapAuthoringOperations.AddBox(a));
-            using(new EditorGUI.DisabledScope(a.definition==null||a.definition.PreservedBaseline))if(GUILayout.Button("맵 저장"))Run(()=>MapAuthoringOperations.Save(a));
-            if(GUILayout.Button("게임 맵 목록에 등록"))Run(()=>MapAuthoringOperations.Register(a));
-            if(GUILayout.Button("선택한 배치에 스냅 적용"))Run(()=>MapAuthoringOperations.SnapSelected(a));
-            if(GUILayout.Button("선택 지형 좌우 대칭 복사"))
+            if(!string.IsNullOrEmpty(message))EditorGUILayout.HelpBox(message,messageType);
+            bool loaded=a.definition!=null&&a.LoadedId==a.definition.Id;
+            if(!loaded)EditorGUILayout.HelpBox("맵을 선택한 뒤 맵 불러오기를 누르세요.",MessageType.Info);
+            var errors=a.ValidatePlacement();
+            string pending=errors.Count==0?MapAuthoringOperations.PendingSaveReason(a):"배치 오류를 먼저 확인해주세요.";
+            if(errors.Count==0&&!string.IsNullOrEmpty(pending))EditorGUILayout.HelpBox(pending,MessageType.Warning);
+            foreach(var error in errors)EditorGUILayout.HelpBox(error,MessageType.Error);
+            if(GUILayout.Button("도형 순서 정리"))Run(()=>MapAuthoringOperations.RepairOrder(a),"빈 번호·중복 번호를 정리했습니다. 맵 저장으로 반영하세요.");
+            if(MapRopeTools.Handles(a).Any(MapRopeTools.NeedsLengthFit))
+                if(GUILayout.Button("짧은 로프만 길이 맞추기"))Run(()=>MapRopeTools.FitTooShort(a),"부족한 줄 길이를 맞췄습니다. 맵 저장으로 반영하세요.");
+
+            MapInspectorLayout.Section("2. 오브젝트 추가");
+            using(new EditorGUI.DisabledScope(!loaded))
             {
-                try{message=MapMirrorTools.CopySelection(a).Message;}
-                catch(Exception e){message=e.Message;}
+                if(GUILayout.Button("고정 사각 지형 추가"))Run(()=>MapAuthoringOperations.AddBox(a),"고정 지형을 추가했습니다.");
+                if(GUILayout.Button("물리 상자 추가"))Run(()=>MapPhysicalBoxTools.Add(a),"물리 상자를 추가했습니다.");
+                if(GUILayout.Button("긴 기둥 추가 · 플레이어 통과"))Run(()=>MapPhysicalBoxTools.Add(a,MapPhysicalBoxPreset.TallPillar),"긴 기둥을 추가했습니다.");
+                if(GUILayout.Button("연결 상자 추가 · 공격 시 파괴"))Run(()=>MapPhysicalBoxTools.Add(a,MapPhysicalBoxPreset.Connector),"연결 상자를 추가했습니다.");
             }
-            if(GUILayout.Button("저장한 맵으로 시험"))Run(()=>MapAuthoringOperations.Test(a));
-            if(GUILayout.Button("등록된 맵 목록 보기"))Selection.activeObject=a.catalog;
-            if(a.catalog!=null)foreach(var map in a.catalog.Maps)if(map!=null)EditorGUILayout.ObjectField(map.DisplayName,map,typeof(MapDefinition),false);
-            EditorGUILayout.HelpBox("Main의 새 경기는 등록된 맵(최대 8개)을 사용합니다. 2개 이상이면 직전 라운드와 다른 맵을 고릅니다. 저장한 맵 시험은 선택한 맵만 사용합니다.",MessageType.Info);
-            if(a.definition!=null)
+            EditorGUILayout.HelpBox("로프: 상자 하나를 선택해 고정점 연결, 두 개를 선택해 상자끼리 연결합니다. 지형·상자를 선택하면 전용 편집 버튼이 나타납니다.",MessageType.None);
+            MapInspectorLayout.Snapping(a,ref snapping);
+
+            MapInspectorLayout.Section("3. 저장과 로컬 시험");
+            using(new EditorGUI.DisabledScope(!loaded||a.definition.PreservedBaseline))
+                if(GUILayout.Button("맵 저장"))Run(()=>MapAuthoringOperations.Save(a),"맵 정의에 저장했습니다. 등록 없이 시험할 수 있습니다.");
+            using(new EditorGUI.DisabledScope(!loaded||!string.IsNullOrEmpty(pending)))
+                if(GUILayout.Button("저장한 맵으로 시험"))Run(()=>MapAuthoringOperations.Test(a),"Main 연습을 시작합니다. Play를 중지하면 제작기로 돌아옵니다.");
+            EditorGUILayout.HelpBox("씬 저장(Ctrl+S)과 맵 저장은 별개입니다. 시험은 GameMaps 등록 없이 이 맵만 사용합니다. Play 중지로 편집에 복귀합니다.",MessageType.None);
+            registration=EditorGUILayout.Foldout(registration,"정식 경기 목록 · 별도 등록",true);
+            if(registration)
             {
-                EditorGUILayout.Space();EditorGUILayout.LabelField("현재 맵 테마",EditorStyles.boldLabel);
+                serializedObject.Update();Field("catalog","GameMaps 목록");serializedObject.ApplyModifiedProperties();
+                using(new EditorGUI.DisabledScope(!loaded||!string.IsNullOrEmpty(pending)||a.catalog==null))
+                    if(GUILayout.Button("저장한 맵을 GameMaps에 등록"))Run(()=>MapAuthoringOperations.Register(a),"게임 맵 목록에 등록했습니다.");
+                using(new EditorGUI.DisabledScope(a.catalog==null))if(GUILayout.Button("등록 목록 열기"))Selection.activeObject=a.catalog;
+                if(a.catalog!=null)foreach(var map in a.catalog.Maps)if(map!=null)EditorGUILayout.ObjectField(map.DisplayName,map,typeof(MapDefinition),false);
+                EditorGUILayout.HelpBox("최대 8개. 두 맵 이상이면 직전 라운드와 다른 맵을 고릅니다. 목록은 다음 경기부터 적용합니다.",MessageType.None);
+            }
+            theme=EditorGUILayout.Foldout(theme,"맵 테마",true);
+            if(theme&&a.definition!=null)
+            {
                 var settings=new SerializedObject(a.definition);settings.Update();
                 using(new EditorGUI.DisabledScope(a.definition.PreservedBaseline))
                 {
                     EditorGUILayout.PropertyField(settings.FindProperty("mapTheme"),new GUIContent("테마"),true);
                     if(settings.FindProperty("mapTheme").FindPropertyRelative("mode").enumValueIndex==0)
                         EditorGUILayout.PropertyField(settings.FindProperty("theme"),new GUIContent("기존 테마 (0 민트 / 1 사이언 / 2 슬레이트)"));
-                    settings.ApplyModifiedProperties();
-                    MapAuthoringOperations.RefreshPreviewColors(a);
+                    settings.ApplyModifiedProperties();MapAuthoringOperations.RefreshPreviewColors(a);
                 }
-                EditorGUILayout.HelpBox("테마 수정도 맵 저장 버튼으로 저장합니다. 배경 그라데이션은 테마 미리보기와 실제 경기에서 확인하세요.",MessageType.None);
+                EditorGUILayout.HelpBox("테마 변경 후에도 맵 저장을 누르세요. 기둥·연결 상자 속·로프 색은 공통 고정값입니다.",MessageType.None);
             }
-            if(!string.IsNullOrEmpty(message))EditorGUILayout.HelpBox(message,MessageType.Info);
+            references=EditorGUILayout.Foldout(references,"씬 연결 참조 · 고급",true);
+            if(references)
+            {
+                serializedObject.Update();Field("ropeRoot","로프 묶음");Field("physicsRoot","물리 상자 묶음");Field("terrainRoot","지형 묶음");
+                Field("spawn0","P1 시작 위치");Field("spawn1","P2 시작 위치");Field("shapes","기본 도형");Field("palette","공통 색상");serializedObject.ApplyModifiedProperties();
+            }
+            MapInspectorLayout.Guide();
         }
         void Field(string name,string label)=>EditorGUILayout.PropertyField(serializedObject.FindProperty(name),new GUIContent(label));
         void OnSceneGUI()=>MapPlacementSnap.DrawGrid((MapAuthoring)target);
-        void Run(Action action){try{action();message="완료";}catch(Exception e){message=e.Message;}}
+        void Run(Action action,string done){try{action();message=done;messageType=MessageType.Info;}catch(Exception e){message=e.Message;messageType=MessageType.Error;}Repaint();}
     }
     [CustomEditor(typeof(MapDefinition))]
     public sealed class MapDefinitionInspector : Editor
@@ -277,13 +405,18 @@ namespace Knockbox.EditorTools
         string message;
         public override void OnInspectorGUI()
         {
+            if(target==null||targets.Any(item=>item==null))return;
             serializedObject.Update();
-            using(new EditorGUI.DisabledScope(targets.Length>1))
+            using(new EditorGUI.DisabledScope(true))
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("order"),new GUIContent("지형 번호"));
             serializedObject.ApplyModifiedProperties();
             var box=(MapBoxHandle)target;var a=box.GetComponentInParent<MapAuthoring>();
-            EditorGUILayout.HelpBox("Transform 위치는 중심, Scale X/Y는 폭·높이입니다. 번호를 바꾸면 중복이나 빈 번호가 없도록 맞추세요.",MessageType.Info);
-            if(a==null)return;var so=new SerializedObject(a);so.Update();
+            if(targets.Length==1)MapTerrainCut.Inspector(box);
+            EditorGUILayout.HelpBox("Transform 위치는 중심, Scale X/Y는 폭·높이입니다. 직접 삭제한 뒤에는 도형 순서 정리로 빈 번호를 메울 수 있습니다. 번호는 자동 관리합니다.",MessageType.Info);
+            if(a==null)return;
+            if(GUILayout.Button("도형 순서 정리"))
+            {try{MapAuthoringOperations.RepairOrder(a);message="번호를 정리했습니다. 맵 저장으로 반영하세요.";}catch(Exception e){message=e.Message;}}
+            var so=new SerializedObject(a);so.Update();
             EditorGUILayout.PropertyField(so.FindProperty("gridSnap"),new GUIContent("격자 스냅"));
             EditorGUILayout.PropertyField(so.FindProperty("gridStep"),new GUIContent("격자 간격"));so.ApplyModifiedProperties();
             EditorGUILayout.HelpBox("맵 중심(x=0)을 기준으로 반대편에 복사합니다. 원본은 남고 높이·크기는 같습니다. 이미 같은 지형이 있으면 건너뜁니다.",MessageType.None);
@@ -292,10 +425,10 @@ namespace Knockbox.EditorTools
                 try{message=MapMirrorTools.CopySelection(a).Message;}
                 catch(Exception e){message=e.Message;}
             }
-            if(GUILayout.Button("맵 제작 설정 보기"))Selection.activeGameObject=a.gameObject;
+            MapInspectorLayout.Navigation(a);
             if(!string.IsNullOrEmpty(message))EditorGUILayout.HelpBox(message,MessageType.Info);
         }
-        void OnSceneGUI()=>MapPlacementSnap.DrawGrid(((MapBoxHandle)target).GetComponentInParent<MapAuthoring>());
+        void OnSceneGUI(){if(target is MapBoxHandle box&&box!=null){MapPlacementSnap.DrawGrid(box.GetComponentInParent<MapAuthoring>());MapTerrainCut.SceneGUI(box);}}
     }
     [CustomEditor(typeof(MapCatalog))]
     public sealed class MapCatalogInspector : Editor
@@ -307,4 +440,30 @@ namespace Knockbox.EditorTools
             foreach(var error in ((MapCatalog)target).Validate())EditorGUILayout.HelpBox(error,MessageType.Error);
         }
     }
+    internal static class MapInspectorLayout
+    {
+        public static void Section(string text){EditorGUILayout.Space(6);EditorGUILayout.LabelField(text,EditorStyles.boldLabel);}
+        public static void Navigation(MapAuthoring a)
+        {
+            EditorGUILayout.Space(6);
+            if(GUILayout.Button("맵 제작기로 · 저장 / 시험 / 추가"))Selection.activeGameObject=a.gameObject;
+        }
+        public static void Snapping(MapAuthoring a,ref bool open)
+        {
+            open=EditorGUILayout.Foldout(open,"배치 스냅",true);if(!open)return;
+            var so=new SerializedObject(a);so.Update();
+            EditorGUILayout.PropertyField(so.FindProperty("gridSnap"),new GUIContent("격자 맞춤"));
+            if(so.FindProperty("gridSnap").boolValue)EditorGUILayout.PropertyField(so.FindProperty("gridStep"),new GUIContent("격자 간격"));
+            EditorGUILayout.PropertyField(so.FindProperty("boxTopSnap"),new GUIContent("상자 밑면을 가까운 윗면에 맞춤"));
+            if(so.FindProperty("boxTopSnap").boolValue)EditorGUILayout.PropertyField(so.FindProperty("boxTopSnapDistance"),new GUIContent("상자 스냅 거리"));
+            EditorGUILayout.PropertyField(so.FindProperty("spawnEdgeSnap"),new GUIContent("캐릭터 발을 지형 윗면에 맞춤"));
+            if(so.FindProperty("spawnEdgeSnap").boolValue)EditorGUILayout.PropertyField(so.FindProperty("spawnSnapDistance"),new GUIContent("발 스냅 거리"));
+            so.ApplyModifiedProperties();
+        }
+        public static void Guide()
+        {
+            if(GUILayout.Button("맵 제작 사용 안내"))EditorUtility.OpenWithDefaultApp(Path.GetFullPath("docs/team/MAP_AUTHORING.md"));
+        }
+    }
+
 }

@@ -24,6 +24,7 @@ namespace Knockbox.Presentation
             float reach=(arena.Columns+arena.Rows+lightPoint.magnitude)*4;
             for(int b=0;b<count;b++)
             {
+                if(state.IsDestroyed(b))continue;
                 ref readonly var p=ref arena.GetProp(arena.DynamicProp(b));
                 var tr=view.BodyTransform(b);
                 projection.Box(tr.localPosition,new Vector2(p.HalfSize.X,p.HalfSize.Y),tr.localEulerAngles.z*Mathf.Deg2Rad,lightPoint,reach);

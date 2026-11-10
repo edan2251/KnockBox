@@ -56,6 +56,15 @@ namespace Knockbox.Presentation
             vertices[q + 3] = left + (left - light).normalized * reach;
         }
 
+        public void Polygon(Knockbox.Simulation.ConvexPolygon polygon,Vector2 light,float reach)
+        {
+            if(polygon.Contains(new Knockbox.Simulation.Vec2(light.x,light.y)))return;
+            var p=polygon.Point(0);Vector2 left=new Vector2(p.X,p.Y),right=left;
+            for(int i=1;i<polygon.Count;i++){p=polygon.Point(i);Consider(light,new Vector2(p.X,p.Y),ref left,ref right);}
+            int q=Count++*4;vertices[q]=left;vertices[q+1]=right;
+            vertices[q+2]=right+(right-light).normalized*reach;vertices[q+3]=left+(left-light).normalized*reach;
+        }
+
         static void Consider(Vector2 light, Vector2 p, ref Vector2 left, ref Vector2 right)
         {
             var dl = left - light; var dr = right - light; var dp = p - light;
@@ -68,6 +77,11 @@ namespace Knockbox.Presentation
             Array.Clear(vertices, Count * 4, vertices.Length - Count * 4);
             mesh.vertices = vertices;
         }
-        public void Dispose() { if (mesh != null) UnityEngine.Object.Destroy(mesh); }
+        public void Dispose()
+        {
+            if(mesh==null)return;
+            if(Application.isPlaying)UnityEngine.Object.Destroy(mesh);
+            else UnityEngine.Object.DestroyImmediate(mesh);
+        }
     }
 }

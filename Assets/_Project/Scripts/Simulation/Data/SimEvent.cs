@@ -89,6 +89,10 @@ namespace Knockbox.Simulation
         BrawlWeaponEmpty,
         /// <summary>보유 무기 투척. Position은 출발점, Direction은 초기 속도, Strength는 종류.</summary>
         BrawlWeaponThrow,
+        /// <summary>독립 연결 상자에 일반 접촉. PropIndex는 몸체, Strength는 접근 속도, Fighter는 접촉한 선수.</summary>
+        ConnectorContact,
+        /// <summary>독립 연결 상자 파괴. PropIndex는 몸체, Direction은 공격 방향, Strength는 충격 속도/펀치 위력.</summary>
+        ConnectorBreak,
     }
 
     /// <summary>
@@ -108,6 +112,8 @@ namespace Knockbox.Simulation
         public Vec2 Position;
         public Vec2 Direction;
         public float Strength;
+        /// <summary>연출 대상 구조물 번호. -1은 없음. 경기 상태·기록 입력 형식에는 포함하지 않는다.</summary>
+        public int PropIndex;
 
         public SimEvent(int tick, SimEventType type, int fighter, Vec2 position, Vec2 direction, float strength)
         {
@@ -117,6 +123,7 @@ namespace Knockbox.Simulation
             Position = position;
             Direction = direction;
             Strength = strength;
+            PropIndex = -1;
         }
 
         public override string ToString() => $"[{Tick}] {Type} P{Fighter + 1} {Position}";

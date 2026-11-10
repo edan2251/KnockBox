@@ -32,6 +32,7 @@ namespace Knockbox.Simulation
             int count = initial.Match.Rotation.Count;
             if (count > 1 && count != arenas.Length)
                 throw new ArgumentException($"맵 순환 상태({count}개)와 맵 목록({arenas.Length}개)이 다름", nameof(arenas));
+            ValidateTerrainFeatures(config,arenas);
             Config = config;
             this.arenas = arenas;
             for (int i = 0; i < arenas.Length; i++)
@@ -66,11 +67,17 @@ namespace Knockbox.Simulation
         /// RoundTransition 훅(06-match-and-tools.md 1절): 다음 라운드의 설정을 바꾼다.
         /// RoundTransition 이벤트를 받은 직후(다음 Step 전)에만 부를 수 있다.
         /// </summary>
+        static void ValidateTerrainFeatures(SimConfig config,ArenaDef[] maps)
+        {
+            if(config.Combat.Weapons.Enabled&&Array.Exists(maps,a=>a.HasConvexTerrain))
+                throw new InvalidOperationException("절단 지형은 무기 보류 설정에서 사용해주세요. 기존 무기 리플레이는 사각 맵에서 유지됩니다.");
+        }
         public void ReplaceConfig(SimConfig config)
         {
             if (State.Match.Phase != MatchPhase.RoundTransition)
                 throw new InvalidOperationException($"설정은 RoundTransition 단계에서만 바꿀 수 있음(지금 {State.Match.Phase})");
-            Config = config ?? throw new ArgumentNullException(nameof(config));
+            if(config==null)throw new ArgumentNullException(nameof(config));
+            ValidateTerrainFeatures(config,arenas);Config=config;
         }
 
         public void Step(in InputFrame p1, in InputFrame p2)
@@ -83,7 +90,10 @@ namespace Knockbox.Simulation
 
             // 구조물은 카운트다운·싸움·KO 동안 움직인다(히트스탑과 상관없이, 09 4절).
             if (phase == MatchPhase.Countdown || phase == MatchPhase.Fighting || phase == MatchPhase.KO)
+            {
+                PropInteraction.PrepareConnectorLoads(s, Arena, Config, PropScratch, phase == MatchPhase.Fighting);
                 PropPhysics.Step(ref s.Props, Arena, Config, PropScratch, s.Tick, Events);
+            }
 
             switch (phase)
             {
@@ -162,7 +172,10 @@ namespace Knockbox.Simulation
                 StepFighter(ref s.Fighter1, weaponInput1, 1, s.Tick, BrawlWeapons.HeldKind(s.Weapon, 1), out scratch1);
 
             // 구조물과의 상호작용(09 4절): 이동 직후, 캐릭터끼리 밀어내기 전.
+            if(Arena.HasConnectorBodies) ConnectorBodies.Resolve(ref s,Arena,Config,prev0,prev1,frozen0,frozen1,PropScratch,Events);
             PropInteraction.Resolve(ref s, Arena, Config, prev0, prev1, frozen0, frozen1, Events, PropScratch);
+            if(Arena.HasRopeConnectors)
+                RopeConnectors.Resolve(ref s,Arena,Config,prev0,prev1,frozen0,frozen1,PropScratch,Events);
 
             // 몸 충돌 판정은 이동 직후(밀어내기 전) 스냅숏의 접촉과 법선으로 한다.
             var contact = BodyContact.Measure(s.Fighter0, s.Fighter1, Config);

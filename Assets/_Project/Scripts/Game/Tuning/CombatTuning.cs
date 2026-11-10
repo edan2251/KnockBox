@@ -14,6 +14,17 @@ namespace Knockbox.Game
         public string PresetName = "default";
         public CombatParams Combat = CombatParams.Default;
 
+        [Header("현재 경기 상자 반응")]
+        [InspectorName("점진적인 상자 밀림")]
+        [Tooltip("강한 돌진의 밀어내기 보정과 상자 마찰 회복을 점진적으로 적용합니다. 과거 리플레이는 기록의 설정 해시로 구 동작을 선택합니다.")]
+        public bool SmoothBoxRelease = true;
+        [InspectorName("연결 상자 접촉 안정화")]
+        [Tooltip("좁은 연결 상자 위 접촉과 하중 전달을 안정화합니다. 과거 기록은 기록 당시 설정을 사용합니다.")]
+        public bool StableConnectorContacts = true;
+        [InspectorName("강한 충격 후 최소 마찰 비율"), Range(0.02f, 1f)]
+        [Tooltip("상자끼리의 원래 마찰에 곱하는 최소 비율. LooseTicks 동안 원래 마찰로 돌아갑니다. 바닥 마찰에는 적용하지 않습니다.")]
+        public float ReleasedBoxFrictionScale = 0.15f;
+
         void Reset()
         {
             Combat = CombatParams.Default;

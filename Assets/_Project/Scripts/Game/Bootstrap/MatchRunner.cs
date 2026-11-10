@@ -23,7 +23,9 @@ namespace Knockbox.Game
         [Tooltip("등록 목록이 비어 있을 때 사용할 기본 정의. 맵 제작 시험은 지정한 맵 하나만 사용합니다.")]
         [SerializeField] Maps.MapDefinition selectedMap;
         public Maps.MapCatalog MapCatalog => mapCatalog;
-        public bool IsAuthoringPreview { get; private set; }
+        // 시험 정의는 실행 중에만 연결하며 Main과 GameMaps에 저장하지 않는다.
+        Maps.MapDefinition authoringPreview;
+        public bool IsAuthoringPreview => authoringPreview != null;
         [Tooltip("맵 짝 파일(<이름>.json): 테마, 광원, 순환 포함 여부")]
         [SerializeField] TextAsset[] arenaMetaFiles;
         [Tooltip("RegisteredMaps는 등록 맵 순환, Rotation은 옛 검증 맵 순환, 맵 이름은 한 맵 고정(F2)")]
@@ -199,8 +201,20 @@ namespace Knockbox.Game
             var arenas = new ArenaDef[names.Length];
             for (int i = 0; i < names.Length; i++)
                 arenas[i] = ResolveRecordedArena(names[i]);
-            if (InputRecording.ComputeArenaChecksum(arenas) != recording.ArenaChecksum)
+            if (!recording.CanVerifyPlayerCollision(arenas))
+            {
+                Debug.LogWarning("[Knockbox] 기록 재생 거절: 구 기록에는 새 기둥·로프 설정이 없습니다. 기록 당시 맵이 필요합니다.");
+                return false;
+            }
+            if (recording.ExpectedArenaChecksum(arenas) != recording.ArenaChecksum)
+            {
+                if (recording.UsesGeometryChecksum)
+                {
+                    Debug.LogWarning("[Knockbox] 기록 재생 거절: 물리 맵의 지형·상자·질량이 기록과 다릅니다. 기록 당시의 맵 정의가 필요합니다.");
+                    return false;
+                }
                 Debug.LogWarning("[Knockbox] 기록과 맵이 달라 재생 결과가 다를 수 있음");
+            }
             var p1 = new InputFrame[recording.Count];
             var p2 = new InputFrame[recording.Count];
             for (int i = 0; i < recording.Count; i++)
@@ -243,22 +257,27 @@ namespace Knockbox.Game
                                     // 입력 형식이 같은 v8의 조정 전·후 수치도 정확한 설정 해시로 구분한다.
                                     for (int balance = 0; balance < (controls == 0 ? 2 : 1); balance++)
                                     {
-                                        var config = CreateConfig(tuning, candidate, online == 1,
-                                            controls != 2, weapons == 0, controls == 0, weapons == 0 && throwing == 0,
-                                            controls == 0 && balance == 0);
-                                        if (config.ComputeChecksum() == recording.ConfigChecksum)
-                                            return config;
-                                        if (!candidate.LegacyMatch && candidate.StartFormOf(0) == FighterForm.Body
-                                            && candidate.StartFormOf(1) == FighterForm.Body)
+                                        // v8/v9 안에서도 설정 해시로 상자 반응 조정 전·후를 구분한다.
+                                        for (int connectorResponse = 0; connectorResponse < 2; connectorResponse++)
+                                        for (int boxResponse = 0; boxResponse < 2; boxResponse++)
                                         {
-                                            var cards = CardCollectionRules.Apply(config);
-                                            if (cards.ComputeChecksum() == recording.ConfigChecksum) return cards;
-                                            var previousIntro = CardCollectionRules.Apply(config, extendedIntro: false);
-                                            if (previousIntro.ComputeChecksum() == recording.ConfigChecksum) return previousIntro;
-                                            var previousMotion = CardCollectionRules.Apply(config, cinematic: false);
-                                            if (previousMotion.ComputeChecksum() == recording.ConfigChecksum) return previousMotion;
-                                            var originalCards = CardCollectionRules.Apply(config, motion: false);
-                                            if (originalCards.ComputeChecksum() == recording.ConfigChecksum) return originalCards;
+                                            var config = CreateConfig(tuning, candidate, online == 1,
+                                                controls != 2, weapons == 0, controls == 0, weapons == 0 && throwing == 0,
+                                                controls == 0 && balance == 0, smoothBoxes: boxResponse == 0, stableConnectors: connectorResponse == 0);
+                                            if (config.ComputeChecksum() == recording.ConfigChecksum)
+                                                return config;
+                                            if (!candidate.LegacyMatch && candidate.StartFormOf(0) == FighterForm.Body
+                                                && candidate.StartFormOf(1) == FighterForm.Body)
+                                            {
+                                                var cards = CardCollectionRules.Apply(config);
+                                                if (cards.ComputeChecksum() == recording.ConfigChecksum) return cards;
+                                                var previousIntro = CardCollectionRules.Apply(config, extendedIntro: false);
+                                                if (previousIntro.ComputeChecksum() == recording.ConfigChecksum) return previousIntro;
+                                                var previousMotion = CardCollectionRules.Apply(config, cinematic: false);
+                                                if (previousMotion.ComputeChecksum() == recording.ConfigChecksum) return previousMotion;
+                                                var originalCards = CardCollectionRules.Apply(config, motion: false);
+                                                if (originalCards.ComputeChecksum() == recording.ConfigChecksum) return originalCards;
+                                            }
                                         }
                                     }
                                 }
@@ -343,14 +362,24 @@ namespace Knockbox.Game
             if(!string.IsNullOrEmpty(testMapGuid) && gameObject.scene.name=="Main")
             {
                 var trial=UnityEditor.AssetDatabase.LoadAssetAtPath<Maps.MapDefinition>(UnityEditor.AssetDatabase.GUIDToAssetPath(testMapGuid));
-                if(trial==null || mapCatalog==null || mapCatalog.Find(trial.MatchName)!=trial)
-                    throw new InvalidOperationException("Map authoring trial is missing or unregistered.");
-                arenaName=trial.MatchName;IsAuthoringPreview=true;
+                ConfigureAuthoringPreview(trial);
             }
 #endif
             if (startOnAwake && World == null)
                 StartNewMatch();
         }
+
+#if UNITY_EDITOR
+        /// <summary>저장한 정의 하나만 시험한다. 등록 목록과 Main의 저장 참조는 바꾸지 않는다.</summary>
+        public void ConfigureAuthoringPreview(Maps.MapDefinition definition)
+        {
+            if (definition == null) throw new InvalidOperationException("시험할 맵 정의를 찾을 수 없습니다.");
+            if (Lockstep != null || OnlineRematch) throw new InvalidOperationException("맵 시험은 로컬 연습에서만 가능합니다.");
+            var errors = definition.Validate(CreateConfig().Movement.BodySize);
+            if (errors.Count > 0) throw new InvalidOperationException(string.Join("\n", errors));
+            authoringPreview = definition;
+        }
+#endif
 
         /// <summary>튜닝을 다시 읽어 새 경기를 시작한다.</summary>
         public void StartNewMatch()
@@ -366,6 +395,7 @@ namespace Knockbox.Game
         /// <summary>연결 대기 중 맵/튜닝 편집이 실제 경기 목록을 바꾸지 않도록 확정 스냅샷을 사용한다.</summary>
         public void StartPreparedOnlineMatch(SimConfig config, ArenaDef[] arenas, uint sharedSeed)
         {
+            if (IsAuthoringPreview) throw new InvalidOperationException("제작기 시험은 로컬 전용입니다. 시험 종료 후 Main에서 연결해주세요.");
             seed = sharedSeed;
             StartPreparedMatch(config, arenas, sharedSeed, false);
         }
@@ -373,6 +403,12 @@ namespace Knockbox.Game
         /// <summary>로컬 시작과 온라인 핸드셰이크가 같은 검증을 거쳐 경기별 맵 스냅샷을 만든다.</summary>
         public ArenaDef[] PrepareMatchArenas(SimConfig config)
         {
+            if (IsAuthoringPreview)
+            {
+                var errors = authoringPreview.Validate(config.Movement.BodySize);
+                if (errors.Count > 0) throw new InvalidOperationException(string.Join("\n", errors));
+                return new[] { authoringPreview.ToArena() };
+            }
             var arenas = arenaName == RegisteredMapsName && mapCatalog != null
                 ? mapCatalog.CreateRotation(config.Movement.BodySize) : ResolveArenas(arenaName);
             if(mapCatalog!=null)foreach(var arena in arenas)
@@ -463,6 +499,7 @@ namespace Knockbox.Game
         /// <summary>맵 짝 파일. 없으면 ArenaMeta.Default.</summary>
         public ArenaMeta GetMeta(string name)
         {
+            if (IsAuthoringPreview && name == authoringPreview.MatchName) return authoringPreview.Metadata();
             var definition=mapCatalog!=null?mapCatalog.Find(name):null;
             if(definition!=null)return definition.Metadata();
             return GetLegacyMeta(name);
@@ -522,13 +559,16 @@ namespace Knockbox.Game
         /// <summary>Reads the same resolution path without starting a match or consuming randomness.</summary>
         public SimConfig PreviewConfig(bool includeFrontend)
         {
-            var config = CreateConfig(combatTuning, rules, OnlineRematch);
+            // 무기/총알은 현재 경기에서 보류. 호환용 CreateConfig 기본값과 구 기록은 보존한다.
+            var config = CreateConfig(combatTuning, rules, OnlineRematch, weaponsEnabled: false,
+                smoothBoxes: combatTuning == null || combatTuning.SmoothBoxRelease,
+                stableConnectors: combatTuning == null || combatTuning.StableConnectorContacts);
             return includeFrontend && brawlExperiment ? CardCollectionRules.Apply(config) : config;
         }
 
         SimConfig CreateConfig(CombatTuning combat, in RuleSet ruleSet, bool onlineRematch = false,
             bool separateChargeInput = true, bool weaponsEnabled = true, bool combinedAttackInput = true,
-            bool throwEnabled = true, bool revisedBalance = true)
+            bool throwEnabled = true, bool revisedBalance = true, bool smoothBoxes = false, bool stableConnectors = false)
         {
             var match = movementTuning != null ? movementTuning.Match : MatchParams.Default;
             var movement = movementTuning != null ? movementTuning.Movement : MovementParams.Default;
@@ -536,6 +576,9 @@ namespace Knockbox.Game
             var matchParams = brawlExperiment ? BrawlParams.Match(match) : match;
             matchParams.RematchBothHold = onlineRematch;
             bool bothBody = ruleSet.StartFormOf(0) == FighterForm.Body && ruleSet.StartFormOf(1) == FighterForm.Body;
+            combatParams.Props.SmoothBoxRelease = smoothBoxes && brawlExperiment && bothBody;
+            combatParams.Props.StableConnectorContacts = stableConnectors && brawlExperiment && bothBody;
+            combatParams.Props.ReleasedBoxFrictionScale = Mathf.Clamp(combat != null ? combat.ReleasedBoxFrictionScale : 0.15f, 0.02f, 1f);
             return new SimConfig(
                 brawlExperiment ? BrawlParams.Movement(movement) : movement,
                 matchParams,
@@ -548,6 +591,7 @@ namespace Knockbox.Game
         /// <summary>등록된 맵 텍스트에서 찾고, 에디터에서는 없으면 디스크에서 읽는다.</summary>
         public ArenaDef ResolveArena(string name)
         {
+            if (IsAuthoringPreview && name == authoringPreview.MatchName) return authoringPreview.ToArena();
             var definition=mapCatalog!=null?mapCatalog.Find(name):null;
             if(definition!=null)
             {
@@ -562,6 +606,7 @@ namespace Knockbox.Game
         // Existing named replay maps keep their original txt/json resolution. New IDs use the catalog.
         public ArenaDef ResolveRecordedArena(string name)
         {
+            if (IsAuthoringPreview && name == authoringPreview.MatchName) return authoringPreview.ToArena();
             if (arenaFiles != null)
             {
                 foreach (var file in arenaFiles)

@@ -69,8 +69,9 @@ namespace Knockbox.Tests.EditMode
             }
         }
 
-        static bool StateLeafIsActive(string path, bool weaponsEnabled, bool throwEnabled)
+        static bool StateLeafIsActive(string path, bool weaponsEnabled, bool throwEnabled, bool graphEnabled)
         {
+            if(path.StartsWith("Props.Graph.",StringComparison.Ordinal))return graphEnabled;
             if (!path.StartsWith("Weapon.", StringComparison.Ordinal)) return true;
             if (!weaponsEnabled) return false;
             // v7에는 투척 확장이 없었다. v8 사례는 어떤 말단 필드도 제외하지 않는다.
@@ -78,20 +79,23 @@ namespace Knockbox.Tests.EditMode
                 || path == "Weapon.ThrowHit" || path.StartsWith("Weapon.Velocity.", StringComparison.Ordinal));
         }
 
-        static SimState StateForChecksum(bool weaponsEnabled, bool throwEnabled = false)
+        static SimState StateForChecksum(bool weaponsEnabled, bool throwEnabled = false, bool graphEnabled = false)
         {
             var state = TestWorlds.Create().State;
+            state.Props.Graph.Enabled=graphEnabled;
             state.Weapon.Enabled = weaponsEnabled;
             state.Weapon.ThrowEnabled = throwEnabled;
             return state;
         }
 
-        [TestCase(false, false)]
-        [TestCase(true, false)]
-        [TestCase(true, true)]
-        public void Checksum_ChangesWhenAnyStateFieldChanges(bool weaponsEnabled, bool throwEnabled)
+        [TestCase(false, false, false)]
+        [TestCase(true, false, false)]
+        [TestCase(true, true, false)]
+        [TestCase(false, false, true)]
+        [TestCase(true, true, true)]
+        public void Checksum_ChangesWhenAnyStateFieldChanges(bool weaponsEnabled, bool throwEnabled, bool graphEnabled)
         {
-            var baseState = StateForChecksum(weaponsEnabled, throwEnabled);
+            var baseState = StateForChecksum(weaponsEnabled, throwEnabled, graphEnabled);
             uint baseChecksum = baseState.ComputeChecksum();
             var missing = new StringBuilder();
             int count = 0;
@@ -99,7 +103,7 @@ namespace Knockbox.Tests.EditMode
             foreach (var (path, mutate) in Leaves(typeof(SimState), ""))
             {
                 // 구기록에는 무기 블록 자체가 없다. 활성 사례에서는 새 필드를 하나도 제외하지 않는다.
-                if (!StateLeafIsActive(path, weaponsEnabled, throwEnabled))
+                if (!StateLeafIsActive(path, weaponsEnabled, throwEnabled, graphEnabled))
                     continue;
                 count++;
                 object boxed = baseState;
@@ -112,24 +116,29 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(string.Empty, missing.ToString(), "체크섬에 빠진 필드");
         }
 
-        [TestCase(false, false)]
-        [TestCase(true, false)]
-        [TestCase(true, true)]
-        public void Visit_ListsEveryLeafFieldOnce(bool weaponsEnabled, bool throwEnabled)
+        [TestCase(false, false, false)]
+        [TestCase(true, false, false)]
+        [TestCase(true, true, false)]
+        [TestCase(false, false, true)]
+        [TestCase(true, true, true)]
+        public void Visit_ListsEveryLeafFieldOnce(bool weaponsEnabled, bool throwEnabled, bool graphEnabled)
         {
             int leafCount = 0;
             foreach (var (path, _) in Leaves(typeof(SimState), ""))
-                if (StateLeafIsActive(path, weaponsEnabled, throwEnabled))
+                if (StateLeafIsActive(path, weaponsEnabled, throwEnabled, graphEnabled))
                     leafCount++;
-            var recorded = StateDiff.Record(StateForChecksum(weaponsEnabled, throwEnabled));
+            var recorded = StateDiff.Record(StateForChecksum(weaponsEnabled, throwEnabled, graphEnabled));
             Assert.AreEqual(leafCount, recorded.Names.Count, string.Join(", ", recorded.Names));
             Assert.AreEqual(recorded.Names.Count, new HashSet<string>(recorded.Names).Count, "이름이 겹치는 필드가 있음");
         }
 
-        [TestCase(false, false)]
-        [TestCase(true, false)]
-        [TestCase(true, true)]
-        public void ConfigChecksum_ChangesWhenAnyParamChanges(bool weaponsEnabled, bool throwEnabled)
+        [TestCase(false, false, false)]
+        [TestCase(true, false, false)]
+        [TestCase(true, true, false)]
+        [TestCase(false, false, true)]
+        [TestCase(true, false, true)]
+        [TestCase(true, true, true)]
+        public void ConfigChecksum_ChangesWhenAnyParamChanges(bool weaponsEnabled, bool throwEnabled, bool smoothBoxes)
         {
             uint baseChecksum = SimConfig.CreateDefault().ComputeChecksum();
             var missing = new StringBuilder();
@@ -148,6 +157,8 @@ namespace Knockbox.Tests.EditMode
             // 레거시 생성자는 일부 값(Swing.ForwardOnly)을 고정하므로 규칙 생성자로 확인한다(CP20).
             var rules = RuleSet.Legacy(CombatMode.Test, true);
             var combat = CombatParams.Default;
+            combat.Props.SmoothBoxRelease = smoothBoxes;
+            combat.Props.ReleasedBoxFrictionScale = .15f;
             combat.Weapons = weaponsEnabled ? BrawlWeaponParams.Default : default;
             if (throwEnabled)
                 combat.Weapons = BrawlWeaponParams.WithThrowing(combat.Weapons);
@@ -162,6 +173,14 @@ namespace Knockbox.Tests.EditMode
                 if (!throwEnabled && path.StartsWith("Combat.Weapons.Throw", StringComparison.Ordinal) && path != "Combat.Weapons.ThrowEnabled")
                     continue;
                 var c = (CombatParams)mutate(combat);
+                if(!smoothBoxes && path=="Combat.Props.ReleasedBoxFrictionScale")
+                {
+                    // The old replay path has no release ratio. Assert that contract;
+                    // the three enabled cases above still require this field in the hash.
+                    Assert.AreEqual(combatBase,new SimConfig(MovementParams.Default,MatchParams.Default,c,rules).ComputeChecksum(),
+                        "Inactive release ratio must preserve the legacy config hash");
+                    continue;
+                }
                 if (new SimConfig(MovementParams.Default, MatchParams.Default, c, rules).ComputeChecksum() == combatBase)
                     missing.AppendLine(path);
             }

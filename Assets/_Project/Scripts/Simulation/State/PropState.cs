@@ -93,6 +93,8 @@ namespace Knockbox.Simulation
         public const int Capacity = 48;
 
         public int Count;
+        public PropGraphState Graph;
+        public readonly bool IsDestroyed(int index) => Graph.IsDestroyed(index);
 
         public PropBody B00;
         public PropBody B01;
@@ -313,6 +315,7 @@ namespace Knockbox.Simulation
 
         public readonly void Visit<T>(ref T v) where T : struct, IStateVisitor
         {
+            if(Graph.Enabled) { v.Begin(nameof(Graph)); Graph.Visit(ref v); v.End(); }
             // 용량 전부를 방문한다(쓰지 않는 칸은 0이지만, 상태의 모든 필드가 체크섬·StateDiff에 들어가야 한다).
             v.Value(nameof(Count), Count);
             for (int i = 0; i < Capacity; i++)

@@ -240,6 +240,11 @@ namespace Knockbox.Presentation
                     shake = Mathf.Max(shake, Mathf.Min(0.035f + e.Strength * 0.004f, 0.12f));
                     Impulse(e.Direction, 0.25f);
                     break;
+                case SimEventType.ConnectorBreak:
+                    // 연결 상자를 깬 쪽이 충격 방향으로 짧게 눌렸다 복귀한다. 위치·공격 틱은 그대로다.
+                    Impulse(e.Direction, -.18f);
+                    FlashOutline(4f / 60f);
+                    break;
                 case SimEventType.GuardHit:
                     shake = Mathf.Max(shake, 0.03f);
                     Impulse(e.Direction, 0.12f);

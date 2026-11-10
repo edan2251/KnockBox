@@ -111,6 +111,12 @@ namespace Knockbox.Presentation
                 var go = new GameObject($"Box{i}");
                 go.transform.SetParent(arenaRoot.transform, false);
                 go.transform.position = new Vector3((b.MinX + b.MaxX) * 0.5f, (b.MinY + b.MaxY) * 0.5f, 0f);
+                if(b.IsPolygon)
+                {
+                    var polygon=go.AddComponent<PolygonCollider2D>();var points=new Vector2[b.Polygon.Count];
+                    for(int v=0;v<points.Length;v++){var p=b.Polygon.Point(v);points[v]=new Vector2(p.X-go.transform.position.x,p.Y-go.transform.position.y);}
+                    polygon.points=points;continue;
+                }
                 var box = go.AddComponent<BoxCollider2D>();
                 box.size = new Vector2(b.MaxX - b.MinX, b.MaxY - b.MinY);
             }

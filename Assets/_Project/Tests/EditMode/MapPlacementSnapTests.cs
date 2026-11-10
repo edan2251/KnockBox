@@ -25,7 +25,7 @@ namespace Knockbox.Tests.EditMode
         }
         [Test] public void GridToggleSnapsMovementAndSize_OffPreservesExactValues()
         {
-            var b=Box(11,-1,-1,1,1);Assert.AreEqual("11",b.name);Assert.AreEqual("private_abc_11",b.Id);
+            var b=Box(11,-1,-1,1,1);Assert.AreEqual("Terrain_Box_11",b.name);Assert.AreEqual("private_abc_11",b.Id);
             b.transform.localPosition=new Vector3(.38f,-.38f,0);b.transform.localScale=new Vector3(2.12f,1.89f,1);
             MapPlacementSnap.Apply(authoring,b.transform);
             Assert.AreEqual(new Vector3(.5f,-.5f,0),b.transform.localPosition);Assert.AreEqual(new Vector3(2,2,1),b.transform.localScale);

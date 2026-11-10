@@ -48,6 +48,7 @@ namespace Knockbox.Game.UI
             View.Rematch+=ReadyForRematch;
             presenter.SetDebugLabels(false);
             if(presenter.Help!=null)presenter.Help.Visible=false;
+            if(runner.IsAuthoringPreview)lobby.StartPractice();
         }
 
         void Join() {lobby.JoinCode=View.CodeInput.text;lobby.Join();}

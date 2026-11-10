@@ -7,10 +7,20 @@ namespace Knockbox.Tests.EditMode
     {
         [TestCase("Terrain box 1 Solid", "Terrain_box_1_Solid")]
         [TestCase("P1 spawn FOOT", "P1_spawn_FOOT")]
-        [TestCase("선택-플레이어", "선택_플레이어")]
+        [TestCase("선택-플레이어", "Object")]
+        [TestCase("Physics Box-2", "Physics_Box_2")]
+        [TestCase("P1 캐릭터", "P1____")]
+        [TestCase(null, "Object")]
         [TestCase("Set 0:1", "Set_0_1")]
-        public void ObjectNamesKeepLettersNumbersAndUnderscores(string input,string expected)
+        public void ObjectNamesKeepEnglishLettersNumbersAndUnderscores(string input,string expected)
         { Assert.AreEqual(expected,SceneObjectName.Normalize(input)); }
+
+        [Test]
+        public void FontAndSourceFileNamesRetainTheirSeparateExistingPolicy()
+        {
+            Assert.AreEqual("집토끼_폰트",SceneObjectName.FileStem("집토끼-폰트"));
+            Assert.AreEqual("Paperlogy_4Regular",SceneObjectName.FileStem("Paperlogy-4Regular"));
+        }
 
         [Test]
         public void HierarchyPathsKeepSeparatorsAndDynamicPlayerSuffixes()

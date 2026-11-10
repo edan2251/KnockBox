@@ -32,6 +32,25 @@ namespace Knockbox.Simulation
     public static class TerrainCollision
     {
         public const float Epsilon = 1e-4f;
+        // New convex terrain only. Existing rectangle motion is unchanged.
+        public const float WalkableNormalY=.7070f;
+        static bool Slice(in ArenaBox b,Vec2 p,float half,bool vertical,out float low,out float high,out Vec2 lower,out Vec2 upper)
+            =>b.Polygon.Slice(p,new Vec2(half,half),vertical,out low,out high,out lower,out upper);
+        static void FollowSlope(ref Vec2 p,Vec2 previous,float half,ArenaDef arena,float step,int ignore)
+        {
+            if(!arena.HasConvexTerrain||ProbeGround(previous,half,arena,.06f,ignore)<0)return;
+            float best=float.NegativeInfinity;
+            for(int k=0;k<arena.BoxCount;k++)
+            {
+                var b=arena.GetBox(k);
+                if(!b.IsPolygon||!Slice(b,p,half,true,out _,out float top,out _,out var n)||n.Y<WalkableNormalY)continue;
+                if(SimMath.Abs(top-previous.Y)>SimMath.Abs(step)+.06f)continue;
+                if(top>best)best=top;
+            }
+            if(float.IsNegativeInfinity(best))return;
+            var candidate=new Vec2(p.X,best);
+            if(!OverlapsSolid(candidate,half,arena))p=candidate;
+        }
 
         public static void Move(ref Vec2 position, ref Vec2 velocity, float half, ArenaDef arena, float substepMax, int ignoreOneWayBox, ref MoveContacts contacts)
         {
@@ -51,7 +70,9 @@ namespace Knockbox.Simulation
                 if (sx != 0f)
                 {
                     float fromX = position.X;
+                    var previous=position;
                     position.X += sx;
+                    if(sy<=0)FollowSlope(ref position,previous,half,arena,sx,ignoreOneWayBox);
                     if (ResolveX(ref position, sx > 0f ? 1 : -1, half, arena, fromX))
                     {
                         contacts.HitWall = sx > 0f ? 1 : -1;
@@ -65,6 +86,13 @@ namespace Knockbox.Simulation
                     position.Y += sy;
                     if (ResolveDown(ref position, half, arena, startBottom, ignoreOneWayBox, out int box))
                     {
+                        var terrain=arena.GetBox(box);
+                        if(terrain.IsPolygon&&Slice(terrain,position,half,true,out _,out _,out _,out var n)&&n.Y<WalkableNormalY)
+                        {
+                            float into=Vec2.Dot(velocity,n);if(into<0)velocity-=n*into;
+                            sx=velocity.X*SimConfig.Dt/steps;sy=velocity.Y*SimConfig.Dt/steps;
+                            continue;
+                        }
                         contacts.Landed = true;
                         contacts.LandedBox = box;
                         contacts.LandedKind = arena.GetBox(box).Kind;
@@ -115,6 +143,7 @@ namespace Knockbox.Simulation
         }
 
         static bool Overlaps(in Vec2 p, float half, in ArenaBox b) =>
+            b.IsPolygon ? b.Polygon.OverlapsBox(p,new Vec2(half,half),Epsilon) :
             p.X + half > b.MinX + Epsilon && p.X - half < b.MaxX - Epsilon &&
             p.Y + half > b.MinY + Epsilon && p.Y - half < b.MaxY - Epsilon;
 
@@ -132,10 +161,13 @@ namespace Knockbox.Simulation
                 ref readonly var b = ref arena.GetBox(i);
                 if (!b.BlocksAllSides || !Overlaps(position, half, b))
                     continue;
-                bool enteredSideways = direction > 0 ? fromX + half <= b.MinX + Epsilon : fromX - half >= b.MaxX - Epsilon;
+                float left=b.MinX-half,right=b.MaxX+half;
+                if(b.IsPolygon&&!Slice(b,position,half,false,out left,out right,out _,out _))continue;
+                bool enteredSideways = b.IsPolygon ? (direction > 0 ? fromX <= left + Epsilon : fromX >= right - Epsilon)
+                    : (direction > 0 ? fromX + half <= b.MinX + Epsilon : fromX - half >= b.MaxX - Epsilon);
                 if (!enteredSideways)
                     continue;
-                float candidate = direction > 0 ? b.MinX - half : b.MaxX + half;
+                float candidate = direction > 0 ? left : right;
                 if (!hit || (direction > 0 ? candidate < limit : candidate > limit))
                     limit = candidate;
                 hit = true;
@@ -160,9 +192,11 @@ namespace Knockbox.Simulation
                     continue;
                 if (b.Kind == TerrainKind.OneWay && (i == ignoreOneWayBox || startBottom < b.MaxY - Epsilon))
                     continue;
-                if (landedBox == FighterState.NoBox || b.MaxY > top)
+                float surface=b.MaxY;
+                if(b.IsPolygon){if(!Slice(b,position,half,true,out _,out float ceiling,out _,out _))continue;surface=ceiling-half;}
+                if (landedBox == FighterState.NoBox || surface > top)
                 {
-                    top = b.MaxY;
+                    top = surface;
                     landedBox = i;
                 }
             }
@@ -195,10 +229,11 @@ namespace Knockbox.Simulation
             for (int i = 0; i < arena.BoxCount; i++)
             {
                 ref readonly var b = ref arena.GetBox(i);
-                if (!b.BlocksAllSides || b.MinY <= aboveY || !Overlaps(position, half, b))
-                    continue;
-                if (!hit || b.MinY < bottom)
-                    bottom = b.MinY;
+                if (!b.BlocksAllSides || !Overlaps(position, half, b))continue;
+                float surface=b.MinY;
+                if(b.IsPolygon){if(!Slice(b,position,half,true,out float low,out _,out _,out _))continue;surface=low+half;}
+                if(surface<=aboveY)continue;
+                if (!hit || surface < bottom)bottom=surface;
                 hit = true;
             }
             // 경계 튕김 맵에서는 위쪽 경계도 천장이다.
@@ -234,8 +269,9 @@ namespace Knockbox.Simulation
                 ref readonly var b = ref arena.GetBox(i);
                 if (!b.BlocksAllSides || !Overlaps(position, half, b))
                     continue;
-                if (!hit || b.MinY < bottom)
-                    bottom = b.MinY;
+                float surface=b.MinY;
+                if(b.IsPolygon){if(!Slice(b,position,half,true,out float low,out _,out _,out _))continue;surface=low+half;}
+                if (!hit || surface < bottom)bottom=surface;
                 hit = true;
             }
             if (hit)
@@ -254,14 +290,17 @@ namespace Knockbox.Simulation
                 ref readonly var b = ref arena.GetBox(i);
                 if (position.X + half <= b.MinX + Epsilon || position.X - half >= b.MaxX - Epsilon)
                     continue;
-                float gap = bottom - b.MaxY;
+                float surface=b.MaxY;
+                if(b.IsPolygon)
+                {if(!Slice(b,position,half,true,out _,out float high,out _,out var n)||n.Y<WalkableNormalY)continue;surface=high-half;}
+                float gap = bottom - surface;
                 if (gap < -Epsilon || gap > probe)
                     continue;
                 if (b.Kind == TerrainKind.OneWay && i == ignoreOneWayBox)
                     continue;
-                if (found == FighterState.NoBox || b.MaxY > top)
+                if (found == FighterState.NoBox || surface > top)
                 {
-                    top = b.MaxY;
+                    top = surface;
                     found = i;
                 }
             }
@@ -279,7 +318,9 @@ namespace Knockbox.Simulation
                     continue;
                 if (position.X + half <= b.MinX + Epsilon || position.X - half >= b.MaxX - Epsilon)
                     continue;
-                float gap = b.MinY - top;
+                float surface=b.MinY;
+                if(b.IsPolygon){if(!Slice(b,position,half,true,out float low,out _,out var n,out _)||n.Y> -WalkableNormalY)continue;surface=low+half;}
+                float gap = surface - top;
                 if (gap >= -Epsilon && gap <= probe)
                     return true;
             }
@@ -297,11 +338,14 @@ namespace Knockbox.Simulation
                     continue;
                 if (position.Y + half <= b.MinY + Epsilon || position.Y - half >= b.MaxY - Epsilon)
                     continue;
-                float rightGap = b.MinX - (position.X + half);
-                if (rightGap >= -Epsilon && rightGap <= probe)
+                float leftFace=b.MinX-half,rightFace=b.MaxX+half;
+                Vec2 leftNormal=new Vec2(-1,0),rightNormal=new Vec2(1,0);
+                if(b.IsPolygon&&!Slice(b,position,half,false,out leftFace,out rightFace,out leftNormal,out rightNormal))continue;
+                float rightGap = b.IsPolygon ? leftFace-position.X : b.MinX-(position.X+half);
+                if (rightGap >= -Epsilon && rightGap <= probe && (!b.IsPolygon||SimMath.Abs(leftNormal.Y)<WalkableNormalY))
                     right = true;
-                float leftGap = position.X - half - b.MaxX;
-                if (leftGap >= -Epsilon && leftGap <= probe)
+                float leftGap = b.IsPolygon ? position.X-rightFace : position.X-half-b.MaxX;
+                if (leftGap >= -Epsilon && leftGap <= probe && (!b.IsPolygon||SimMath.Abs(rightNormal.Y)<WalkableNormalY))
                     left = true;
             }
             return left == right ? 0 : left ? -1 : 1;

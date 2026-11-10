@@ -41,6 +41,11 @@ namespace Knockbox.Simulation
         public float KnockoutPower;
         public float KnockoutSpeed;
         public int LooseTicks;
+        // 현재 경기의 CombatTuning에서 결정한다. 에셋의 구 Combat 수치 및 구 기록은 기본 false 경로를 보존한다.
+        [NonSerialized] public bool SmoothBoxRelease;
+        /// <summary>현재 경기의 연결 상자 접촉 면적/하중 처리. false는 과거 기록의 점 접촉을 보존한다.</summary>
+        [NonSerialized] public bool StableConnectorContacts;
+        [NonSerialized] public float ReleasedBoxFrictionScale;
         /// <summary>상자 피해 상한: 같은 캐릭터가 상자에게 받는 피해는 BoxDamageWindowTicks 동안 합쳐 BoxDamageCap까지(그 뒤 상자는 밀기만 한다).</summary>
         public int BoxDamageCap;
         public int BoxDamageWindowTicks;
@@ -186,6 +191,14 @@ namespace Knockbox.Simulation
             v.Value(nameof(HitCooldownTicks), HitCooldownTicks);
             v.Value(nameof(SplatMinMass), SplatMinMass);
             v.Value(nameof(ParryRestitution), ParryRestitution);
+            // 꺼진 구 설정에는 한 바이트도 추가하지 않는다. 새 반응은 온라인/리플레이 설정 해시로 구분한다.
+            if (StableConnectorContacts)
+                v.Value(nameof(StableConnectorContacts), StableConnectorContacts);
+            if (SmoothBoxRelease)
+            {
+                v.Value(nameof(SmoothBoxRelease), SmoothBoxRelease);
+                v.Value(nameof(ReleasedBoxFrictionScale), ReleasedBoxFrictionScale);
+            }
         }
     }
 }

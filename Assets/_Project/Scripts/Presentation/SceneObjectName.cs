@@ -9,8 +9,24 @@ namespace Knockbox.Presentation
         {
             if (string.IsNullOrEmpty(value)) return "Object";
             var result = new StringBuilder(value.Length);
+            bool hasWord=false;
             foreach (char c in value)
-                result.Append(char.IsLetterOrDigit(c) || c == '_' ? c : '_');
+            {
+                bool letterOrDigit=IsAsciiLetterOrDigit(c);
+                result.Append(letterOrDigit || c == '_' ? c : '_');
+                hasWord|=letterOrDigit;
+            }
+            return hasWord?result.ToString():"Object";
+        }
+
+        static bool IsAsciiLetterOrDigit(char c)=>(c>='A'&&c<='Z')||(c>='a'&&c<='z')||(c>='0'&&c<='9');
+
+        // 파일은 오브젝트 이름과 다른 정책이다. 기존 한글 폰트/원본 파일을 이름 변경 대상으로 만들지 않는다.
+        public static string FileStem(string value)
+        {
+            if(string.IsNullOrEmpty(value))return "Object";
+            var result=new StringBuilder(value.Length);
+            foreach(char c in value)result.Append(char.IsLetterOrDigit(c)||c=='_'?c:'_');
             return result.ToString();
         }
 

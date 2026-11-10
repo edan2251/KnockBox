@@ -15,6 +15,10 @@ namespace Knockbox.Simulation
         /// <summary>4: CR-003(CP18). Mode 칸에 규칙(RuleSet.Format)을 쓰고 상태에 폼·에너지가 들어갔다. 3 이하 기록은 설정 체크섬이 달라 재생할 수 없다.</summary>
         /// <summary>8: 좌클릭 탭/홀드와 무기 투척. 프레임은 5부터 같은 4바이트다. 구 조작·무기 규칙은 설정 체크섬으로 구분한다.</summary>
         public const ushort FormatVersion = 8;
+        /// <summary>제작기 물리 맵은 전체 지형·질량·시작 방식 해시를 쓰는 v9. 구 맵 기록은 v8로 유지한다.</summary>
+        public const ushort PhysicsMapVersion = 9;
+        public bool UsesGeometryChecksum { get; private set; }
+        public ushort WrittenVersion => UsesGeometryChecksum ? PhysicsMapVersion : FormatVersion;
         const ushort WeaponsVersion = 7;
         const ushort ChargeVersion = 6;
         const ushort AimVersion = 5;
@@ -52,7 +56,9 @@ namespace Knockbox.Simulation
             var rec = new InputRecording
             {
                 ConfigChecksum = config.ComputeChecksum(),
-                ArenaChecksum = ComputeArenaChecksum(arenas),
+                UsesGeometryChecksum = Array.Exists(arenas, a => a.RequiresExtendedMapChecksum),
+                ArenaChecksum = Array.Exists(arenas, a => a.RequiresExtendedMapChecksum)
+                    ? ComputeGeometryChecksum(arenas) : ComputeArenaChecksum(arenas),
                 Seed = seed,
                 Spawn0 = spawn0,
                 Spawn1 = spawn1,
@@ -77,6 +83,24 @@ namespace Knockbox.Simulation
             h.AddInt(arenas.Length);
             for (int i = 0; i < arenas.Length; i++)
                 h.AddUInt(arenas[i].ComputeChecksum());
+            return h.Hash;
+        }
+
+        /// <summary>v8 이하의 해시는 통과 설정을 담지 못한다. 그 기록을 새 통과 맵에 잘못 적용하지 않는다.</summary>
+        public bool CanVerifyPlayerCollision(ArenaDef[] arenas) => UsesGeometryChecksum || !Array.Exists(arenas, a => a.HasPlayerPassThroughProps || a.HasAuthoredRopes || a.HasConvexTerrain || a.HasPropGraph);
+
+        public uint ExpectedArenaChecksum(ArenaDef[] arenas) => UsesGeometryChecksum
+            ? ComputeGeometryChecksum(arenas) : ComputeArenaChecksum(arenas);
+
+        public static uint ComputeGeometryChecksum(ArenaDef[] arenas)
+        {
+            var h = Hasher.Create(); h.AddUInt(0x394D524B); h.AddInt(arenas.Length);
+            foreach (var arena in arenas)
+            {
+                string name = arena.Name ?? ""; h.AddInt(name.Length);
+                foreach (char c in name) h.AddInt(c);
+                h.AddUInt(arena.ComputeGeometryChecksum());
+            }
             return h.Hash;
         }
 
@@ -108,7 +132,9 @@ namespace Knockbox.Simulation
             uint configChecksum = config.ComputeChecksum();
             if (configChecksum != ConfigChecksum)
                 throw new InvalidOperationException($"설정 체크섬이 기록과 다름: {ConfigChecksum:X8} → {configChecksum:X8}");
-            uint arenaChecksum = ComputeArenaChecksum(arenas);
+            if (!CanVerifyPlayerCollision(arenas))
+                throw new InvalidOperationException("이 구 기록은 새 기둥·로프 설정을 검증할 수 없습니다. 기록 당시 맵이 필요합니다.");
+            uint arenaChecksum = ExpectedArenaChecksum(arenas);
             if (arenaChecksum != ArenaChecksum)
                 throw new InvalidOperationException($"맵 체크섬이 기록과 다름({Arena} → {arenas[0].Name}…): {ArenaChecksum:X8} → {arenaChecksum:X8}");
             var state = BuildState(config, arenas);
@@ -135,7 +161,7 @@ namespace Knockbox.Simulation
             using (var w = new BinaryWriter(stream))
             {
                 w.Write(Magic);
-                w.Write(FormatVersion);
+                w.Write(WrittenVersion);
                 w.Write(ConfigChecksum);
                 w.Write(ArenaChecksum);
                 w.Write(Seed);
@@ -173,13 +199,14 @@ namespace Knockbox.Simulation
             if (r.ReadUInt32() != Magic)
                 throw new InvalidDataException("입력 기록 파일이 아님");
             ushort version = r.ReadUInt16();
-            if (version != FormatVersion && version != WeaponsVersion && version != ChargeVersion && version != AimVersion && version != NoAimVersion)
+            if (version != PhysicsMapVersion && version != FormatVersion && version != WeaponsVersion && version != ChargeVersion && version != AimVersion && version != NoAimVersion)
                 throw new InvalidDataException(version < NoAimVersion
                     ? $"CR-003(폼 전투) 전의 입력 기록(버전 {version})은 호환되지 않음"
                     : $"지원하지 않는 입력 기록 버전: {version}");
 
             var rec = new InputRecording
             {
+                UsesGeometryChecksum = version >= PhysicsMapVersion,
                 ConfigChecksum = r.ReadUInt32(),
                 ArenaChecksum = r.ReadUInt32(),
                 Seed = r.ReadUInt32(),

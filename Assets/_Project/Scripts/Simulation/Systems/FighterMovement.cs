@@ -550,15 +550,26 @@ namespace Knockbox.Simulation
                 if (!b.IsSolidBlock)
                     continue;
                 float gap = side > 0 ? b.MinX - (p.X + half) : (p.X - half) - b.MaxX;
-                if (gap < -TerrainCollision.Epsilon || gap > probe)
+                if (!b.IsPolygon && (gap < -TerrainCollision.Epsilon || gap > probe))
                     continue;
                 float top = b.MaxY;
+                float edge=side>0?b.MinX:b.MaxX;
+                if(b.IsPolygon)
+                {
+                    if(!b.Polygon.Slice(p,new Vec2(half,half),false,out float left,out float right,out _,out _))continue;
+                    edge=side>0?left+half:right-half;
+                    gap=side>0?left-p.X:p.X-right;
+                    if(gap< -TerrainCollision.Epsilon||gap>probe)continue;
+                    var target=new Vec2(side>0?edge+half+.05f:edge-half-.05f,0);
+                    if(!b.Polygon.Slice(target,new Vec2(half,half),true,out _,out float high,out _,out var n)||n.Y<TerrainCollision.WalkableNormalY)continue;
+                    top=high-half;
+                }
                 if (top <= p.Y - half + 0.1f || top > p.Y + half + body.LedgeReach)
                     continue;
                 if (p.Y + half <= b.MinY)
                     continue;
                 var up = new Vec2(p.X, top + half + 0.02f);
-                var to = new Vec2(side > 0 ? b.MinX + half + 0.05f : b.MaxX - half - 0.05f, up.Y);
+                var to = new Vec2(side > 0 ? edge + half + 0.05f : edge - half - 0.05f, up.Y);
                 if (TerrainCollision.OverlapsSolid(up, half - 0.01f, arena) || TerrainCollision.OverlapsSolid(to, half - 0.01f, arena))
                     continue;
                 f.MantleFrom = p;

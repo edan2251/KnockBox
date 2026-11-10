@@ -42,11 +42,13 @@ namespace Knockbox.Presentation
             for (int i = 0; i < arena.BoxCount; i++)
             {
                 ref readonly var b = ref arena.GetBox(i);
-                if (x < b.MinX || x > b.MaxX || b.MaxY > fromY + 1e-3f)
-                    continue;
-                if (b.MaxY > surfaceY)
+                if (x < b.MinX || x > b.MaxX)continue;
+                float top=b.MaxY;
+                if(b.IsPolygon&&!b.Polygon.Slice(new Knockbox.Simulation.Vec2(x,fromY),Knockbox.Simulation.Vec2.Zero,true,out _,out top,out _,out _))continue;
+                if(top>fromY+1e-3f)continue;
+                if (top > surfaceY)
                 {
-                    surfaceY = b.MaxY;
+                    surfaceY = top;
                     found = true;
                 }
             }
@@ -63,14 +65,16 @@ namespace Knockbox.Presentation
                 ref readonly var b = ref arena.GetBox(i);
                 if (!b.IsSolidBlock || y < b.MinY || y > b.MaxY)
                     continue;
-                if (side > 0 && b.MinX >= x - 1e-3f && b.MinX < wallX)
+                float left=b.MinX,right=b.MaxX;
+                if(b.IsPolygon&&!b.Polygon.Slice(new Knockbox.Simulation.Vec2(x,y),Knockbox.Simulation.Vec2.Zero,false,out left,out right,out _,out _))continue;
+                if (side > 0 && left >= x - 1e-3f && left < wallX)
                 {
-                    wallX = b.MinX;
+                    wallX = left;
                     found = true;
                 }
-                else if (side < 0 && b.MaxX <= x + 1e-3f && b.MaxX > wallX)
+                else if (side < 0 && right <= x + 1e-3f && right > wallX)
                 {
-                    wallX = b.MaxX;
+                    wallX = right;
                     found = true;
                 }
             }

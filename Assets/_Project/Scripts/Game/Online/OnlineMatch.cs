@@ -108,7 +108,7 @@ namespace Knockbox.Game.Online
 
         async void Start()
         {
-            if (!commandLine)
+            if (!commandLine || runner.IsAuthoringPreview)
                 return;
             runner.Running = false;
             try
@@ -164,6 +164,11 @@ namespace Knockbox.Game.Online
         /// <summary>연결로 세션을 연다. 방장은 손님을 기다리고, 손님은 Hello를 보낸다. 연결이 되면 경기를 시작한다.</summary>
         public void StartSession(ITransport connection, bool host, int delay)
         {
+            if (runner.IsAuthoringPreview)
+            {
+                connection?.Dispose();
+                throw new InvalidOperationException("제작기 시험은 로컬 연습 전용입니다.");
+            }
             EndSession();
             bool wasRunning=runner.Running,wasOnlineRematch=runner.OnlineRematch,wasRandomizeSeed=runner.RandomizeSeed;
             bool hotkeysWereEnabled=hotkeys!=null&&hotkeys.enabled;

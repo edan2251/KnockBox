@@ -27,6 +27,8 @@ namespace Knockbox.Presentation
         float noiseTime;
         float zoomAmount;
         float zoomLeft;
+        Vector2 kick;
+        float kickLeft, kickDuration, kickZoom;
         float lightPosition, lightVelocity;
         float lightAge = LightDuration;
         const float LightImpulse = 350f;
@@ -88,7 +90,22 @@ namespace Knockbox.Presentation
             zoomLeft = Mathf.Max(zoomLeft, duration);
         }
 
-        public float Zoom => zoomLeft > 0f ? zoomAmount : 0f;
+        /// <summary>타격 방향으로 한 번 밀렸다 곡선적으로 복귀하는 표시 전용 반동.</summary>
+        public void Kick(Vector2 direction, float distance, float zoom, float duration)
+        {
+            float envelope = KickEnvelope;
+            kick = Vector2.ClampMagnitude(kick * envelope + direction.normalized * Mathf.Max(0, distance), .22f);
+            kickZoom = Mathf.Max(kickZoom * envelope, Mathf.Clamp(zoom, 0, .04f));
+            kickLeft = kickDuration = Mathf.Max(.01f, duration);
+        }
+
+        float KickEnvelope
+        {
+            get { float t = kickDuration > 0 ? Mathf.Clamp01(kickLeft / kickDuration) : 0; return t*t*t; }
+        }
+        public Vector2 KickOffset => kick * KickEnvelope * (ReduceMotion ? ReducedShakeScale : 1f);
+        public float Zoom => (zoomLeft > 0f ? zoomAmount : 0f)
+            + kickZoom * KickEnvelope * (ReduceMotion ? ReducedShakeScale : 1f);
 
         /// <summary>흔들림과 확대를 멈춘다(라운드·시나리오 시작).</summary>
         public void ResetEffects()
@@ -97,6 +114,8 @@ namespace Knockbox.Presentation
             EnsureInitialized();
             trauma = 0f;
             zoomLeft = 0f;
+            kick = Vector2.zero;
+            kickLeft = kickDuration = kickZoom = 0;
             // 흔들림 노이즈도 처음부터: 캡처가 앞서 재생한 시나리오에 따라 달라지지 않게.
             noiseTime = 0f;
             lightPosition = lightVelocity = 0;
@@ -116,9 +135,10 @@ namespace Knockbox.Presentation
             float amount = MaxShake * trauma * trauma * (ReduceMotion ? ReducedShakeScale : 1f);
             float nx = Mathf.PerlinNoise(noiseTime * NoiseFrequency, 0.37f) * 2f - 1f;
             float ny = Mathf.PerlinNoise(0.71f, noiseTime * NoiseFrequency) * 2f - 1f;
-            ShakeOffset = new Vector2(nx, ny) * amount;
+            ShakeOffset = new Vector2(nx, ny) * amount + KickOffset;
             transform.localPosition = basePosition + (Vector3)ShakeOffset;
             TickLight(dt);
+            kickLeft = Mathf.Max(0, kickLeft - dt);
         }
 
         void TickLight(float dt)

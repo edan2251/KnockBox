@@ -1,0 +1,291 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2c402aa8ef1cbe048a3fc3c608dfafa5, type: 3}
+  m_Name: CP3_Rope_Graph_Trial
+  m_EditorClassIdentifier: Knockbox.Game::Knockbox.Game.Maps.MapDefinition
+  stableId: cp3_rope_graph_trial
+  displayName: CP3_Rope_Graph_Trial
+  preservedBaseline: 0
+  revision: 2
+  columns: 36
+  rows: 20
+  boundary: 0
+  spawn0: {x: 0, y: -8}
+  spawn1: {x: 1.25, y: -8}
+  boxes:
+  - id: box-000
+    kind: 0
+    minX: -18
+    minY: -10
+    maxX: 18
+    maxY: -8
+    vertices: []
+  - id: box-001
+    kind: 0
+    minX: -14
+    minY: 7
+    maxX: -2
+    maxY: 7.5
+    vertices: []
+  - id: box-002
+    kind: 0
+    minX: 1
+    minY: 7
+    maxX: 12
+    maxY: 7.5
+    vertices: []
+  physicalBoxes:
+  - id: chain_upper
+    center: {x: -8, y: 2.5}
+    size: {x: 1.5, y: 1.5}
+    mass: 2.25
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0.15
+  - id: chain_beam
+    center: {x: -8, y: -3}
+    size: {x: 4, y: 0.6}
+    mass: 2.4
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0.15
+  - id: chain_lower
+    center: {x: -8, y: -6}
+    size: {x: 1.2, y: 1.2}
+    mass: 1.44
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0.15
+  - id: connector_left
+    center: {x: 3, y: -3}
+    size: {x: 0.65, y: 0.65}
+    mass: 0.65
+    playerPassThrough: 0
+    connector: 1
+    connectorSpeedLoss: 0.15
+  - id: connector_middle
+    center: {x: 6, y: -2}
+    size: {x: 0.65, y: 0.65}
+    mass: 0.65
+    playerPassThrough: 0
+    connector: 1
+    connectorSpeedLoss: 0.15
+  - id: connector_right
+    center: {x: 9, y: -3}
+    size: {x: 0.65, y: 0.65}
+    mass: 0.65
+    playerPassThrough: 0
+    connector: 1
+    connectorSpeedLoss: 0.15
+  - id: network_beam
+    center: {x: 6, y: -5}
+    size: {x: 8, y: 0.6}
+    mass: 4.8
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0.15
+  - id: network_lower_left
+    center: {x: 3, y: -7}
+    size: {x: 1.2, y: 1.2}
+    mass: 1.44
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0.15
+  - id: network_lower_right
+    center: {x: 9, y: -7}
+    size: {x: 1.2, y: 1.2}
+    mass: 1.44
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0.15
+  ropes:
+  - id: graph_rope_0
+    boxId: chain_upper
+    graph: 1
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: -8, y: 7}
+    localAnchor: {x: 0, y: 0.75}
+    length: 3.75
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: graph_rope_1
+    boxId: chain_beam
+    graph: 1
+    sourceBoxId: chain_upper
+    sourceLocalAnchor: {x: 0, y: -0.75}
+    anchor: {x: -8, y: 1.75}
+    localAnchor: {x: 0, y: 0.3}
+    length: 4.45
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: graph_rope_2
+    boxId: chain_lower
+    graph: 1
+    sourceBoxId: chain_beam
+    sourceLocalAnchor: {x: 0, y: -0.3}
+    anchor: {x: -8, y: -3.3}
+    localAnchor: {x: 0, y: 0.6}
+    length: 2.1000001
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: graph_rope_3
+    boxId: connector_left
+    graph: 1
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: 3, y: 7}
+    localAnchor: {x: 0, y: 0.325}
+    length: 9.675
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: graph_rope_4
+    boxId: connector_middle
+    graph: 1
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: 6, y: 7}
+    localAnchor: {x: 0, y: 0.325}
+    length: 8.675
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: graph_rope_5
+    boxId: connector_right
+    graph: 1
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: 9, y: 7}
+    localAnchor: {x: 0, y: 0.325}
+    length: 9.675
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: graph_rope_6
+    boxId: network_beam
+    graph: 1
+    sourceBoxId: connector_left
+    sourceLocalAnchor: {x: 0, y: -0.325}
+    anchor: {x: 3, y: -3.325}
+    localAnchor: {x: -3, y: 0.3}
+    length: 1.3749998
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: graph_rope_7
+    boxId: network_beam
+    graph: 1
+    sourceBoxId: connector_middle
+    sourceLocalAnchor: {x: 0, y: -0.325}
+    anchor: {x: 6, y: -2.325}
+    localAnchor: {x: -3, y: 0.3}
+    length: 3.8263068
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: graph_rope_8
+    boxId: network_beam
+    graph: 1
+    sourceBoxId: connector_middle
+    sourceLocalAnchor: {x: 0, y: -0.325}
+    anchor: {x: 6, y: -2.325}
+    localAnchor: {x: 3, y: 0.3}
+    length: 3.8263068
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: graph_rope_9
+    boxId: network_beam
+    graph: 1
+    sourceBoxId: connector_right
+    sourceLocalAnchor: {x: 0, y: -0.325}
+    anchor: {x: 9, y: -3.325}
+    localAnchor: {x: 3, y: 0.3}
+    length: 1.3749998
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: graph_rope_10
+    boxId: network_lower_left
+    graph: 1
+    sourceBoxId: network_beam
+    sourceLocalAnchor: {x: -3, y: -0.3}
+    anchor: {x: 3, y: -5.3}
+    localAnchor: {x: 0, y: 0.6}
+    length: 1.0999999
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: graph_rope_11
+    boxId: network_lower_right
+    graph: 1
+    sourceBoxId: network_beam
+    sourceLocalAnchor: {x: 3, y: -0.3}
+    anchor: {x: 9, y: -5.3}
+    localAnchor: {x: 0, y: 0.6}
+    length: 1.0999999
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  theme: 2
+  mapTheme:
+    mode: 0
+    preset: 0
+    gradientTop: {r: 0.043137256, g: 0.20392157, b: 0.25882354, a: 1}
+    gradientBottom: {r: 0.019607844, g: 0.050980393, b: 0.10980392, a: 1}
+    terrain: {r: 0.4862745, g: 0.84705883, b: 0.8, a: 1}
+    prop: {r: 0.14117648, g: 0.29411766, b: 0.3372549, a: 1}
+    highlight: {r: 0.7294118, g: 0.9607843, b: 0.9098039, a: 1}
+    gradientCurve: 1
+  light: {x: 0, y: 25}
+  ceiling: 1
+  shadow: 0.65
