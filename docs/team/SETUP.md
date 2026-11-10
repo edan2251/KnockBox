@@ -18,7 +18,7 @@
 - **그림·폰트·오디오 추가:** [아트 작업 안내](ART_WORKFLOW.md)
 - **폴더의 역할과 보존 대상:** [프로젝트 폴더 안내](PROJECT_FOLDERS.md)
 - **AI에게 작업 요청:** [AI 참고 안내](../ai_docs/AI_GUIDE.md)
-- **커밋할 파일 선택:** [Fork 커밋 안내](FORK_COMMIT_GUIDE.md)
+- **커밋 양식:** [공통 커밋 규칙](COMMIT_RULES.md)
 
 <a id="mcp-없이도-플레이할-수-있나요"></a>
 

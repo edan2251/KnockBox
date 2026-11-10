@@ -1,6 +1,59 @@
 # 현재 진행 현황
 
-기준일: 2026-11-11. D:/KnockBox, main, HEAD 562efb3. **CP5 완료 — 자동 검증 및 사용자 Unity Play 검수 완료.** 사용자는 앞선 CP5 착수 전에 연결 상자의 피해 수정·타격감에 대해 “이제 다 좋습니다”라고 확인했습니다. 그 구현을 유지했습니다. 스테이징·커밋·푸시는 하지 않았습니다.
+## 현재 상태
+
+기준: 2026-11-11, D:/KnockBox, `main`, HEAD `1f16bb2`. CP1~CP5 맵 제작기 작업은 사용자 Unity 검수를 마치고 `0b2da59`(기능), `fd6f0a0`(작업용 맵), `60d605a`(문서)로 커밋되어 있고, `1f16bb2`에 작업용 사본 맵 `CP5_Integrated_Trial_Copy`가 추가되었습니다. 그 위의 문서 현행화·기준 맵 보호·구조 리팩터링(A·B·C안) 변경은 아래 2026-11-11 기록에 있으며 사용자 커밋 전입니다. 커밋 후에는 `git log`로 실제 커밋을 확인합니다. 실제 Player 빌드와 두 PC Relay는 미검증입니다. 아래 "이전 기록" 절의 대기·미커밋 문구는 각 회차 당시 상태입니다.
+
+## 현재 승인 범위
+
+2026-11-11 승인: 문서 현행화와 기본기 유지 장치(작업 규칙·검사·실행 절차 보완). 코드 명확화, 온라인 종료 정책 변경, Prefab 입력 연결 변경, 기존 호환 분기 제거는 포함하지 않습니다. 스테이징·커밋·푸시는 사용자가 합니다.
+
+2026-11-11 승인: 구조 리팩터링 A안 1~3(MatchRunner 맵 해석), C안(상자 충격 합산 구조 정리), B안 축소 범위(연결부 원 판정 함수 통합. `SegmentBox` 이동과 동시 타격 처리 차이는 제외).
+
+계속 유지하는 제품 결정: 무기·총알은 새 경기에서 보류하고 관련 자료와 과거 기록은 보존합니다([미사용 기능 보존](../INACTIVE_FEATURES.md)). 현재 기둥 설정을 유지합니다.
+
+## 연결부 원 판정 함수 통합 · 2026-11-11
+
+사용자 승인 범위(B안 축소). 판정 규칙, 연산 순서, 상태, 기록 형식은 바꾸지 않았습니다.
+
+- 문제: 펀치 원이 연결부에 처음 닿는 시점을 구하는 `SweepCircle`이 `ConnectorBodies`(연결 상자)와 `RopeConnectors`(과거 로프 연결부)에 거의 같은 내용으로 두 벌 있었습니다. 차이는 상자 크기 형식(`Vec2`/`float`)과, 움직임이 거의 없을 때 모서리 원을 건너뛰는 기준(`a < 1e-12`/`a <= 1e-12`)뿐이었습니다.
+- 변경: `RopeConnectors.SweepCircle(start, delta, Vec2 half, radius, skipAtLimit)` 하나로 합쳤습니다. 과거 로프 연결부는 `skipAtLimit: true`(≤), 연결 상자는 `false`(<)를 넘겨 두 기준을 그대로 보존합니다. `ConnectorBodies`가 이미 `RopeConnectors.ClearLine`을 쓰는 선례를 따라 새 파일은 만들지 않았습니다. `Projectiles.SegmentBox` 이동, 동시 타격 처리(슬롯 0 선택/평균) 차이, 과거 로프 연결부 경로는 그대로 둡니다.
+- 비트 동일 확인(Unity MCP, 변경 전후 같은 스크립트): ① 연결부가 있는 맵 5개에서 연결부 주변 12곳 × 좌우 × Main 설정·과거 상자 설정으로 펀치, 528회. 과거 로프 연결부 끊어짐 30회, 연결 상자 파괴 110회가 들어 있습니다. ② C안 때의 맵 전체 무작위 입력 144회와 ③ 과거 Charge 설정 36회. 세 묶음 모두 매 틱 `SimState.ComputeChecksum` 해시가 같았습니다. 스크립트는 저장소에 넣지 않았습니다.
+- 검사: 전체 EditMode 1241개 중 1238개 통과, 3개 명시 실행 전용으로 건너뜀, 실패 0개. PlayMode·사용자 Play는 미실행입니다.
+- 백업: `D:/KnockBox_Backups/ConnectorSweep_20261111_070532`(3개 파일, SHA-256 대조).
+
+## 상자 충격 합산 구조 정리 · 2026-11-11
+
+사용자 승인 범위(C안). 판정 규칙, 연산 순서, 틱, 난수, 상태(`SimState`·체크섬), 기록 형식은 바꾸지 않았습니다.
+
+- 문제: `PropInteraction.PropImpulses`가 틱 동안의 합을 `PropState`에 담으면서, `Broken`을 쳐내기 표시로, `Warm.W0`을 방향으로, `Warm.W1.Normal`을 위력으로, `Position`·`Rotation`을 패링 법선·배율로 빌려 썼습니다. 읽는 쪽(`ApplyTo`)에서 같은 필드를 다른 뜻으로 다시 해석해야 했습니다.
+- 변경: 이름 있는 필드의 `PropInteraction.FighterImpulse`(선·각 충격량, 친 캐릭터, 쿨다운, 쳐내기 방향·위력, 패링 법선·배율)를 두고, 칸 48개는 `PropScratch.FighterImpulses`에 둡니다(틱마다 비우고 그 틱 안에서 적용, 할당 없음). 새 타입을 둔 이유: 기존 `PropBody`에는 이 뜻을 담을 필드가 없어 빌려 쓰는 것 말고는 방법이 없었습니다. 덧셈·나눗셈·조건 순서와 적용 대상 범위(`count`)는 그대로입니다.
+- 비트 동일 확인(Unity MCP, 변경 전후 같은 스크립트): ① Main 설정과 과거 상자 설정 × `Data/Maps`의 맵 정의 전부와 옛 txt 맵 × 시드 3개 × 1500틱 무작위 입력, 144회. ② 과거 Charge 설정과 현재 상자 설정 × 6단 기둥 돌진(속도 5종 × 좌우)·매달린 블록 패링·무작위 입력, 36회. 매 틱 `SimState.ComputeChecksum` 해시가 모두 같았습니다(①·② 총합 `9A81D353`·`5290149A`). ②에 돌진 211회, 쳐내기 12회(부드러운 경로와 과거 경로), 패링 1회, 구조물 피격이 들어 있습니다. 이 스크립트는 저장소에 넣지 않았습니다.
+- 검사: 지정 EditMode 16개 클래스 262개 통과. 전체 EditMode 1241개 중 1237개 통과, 3개 명시 실행 전용으로 건너뜀, 1개 실패. 실패 `SimulationRulesTests.SimulationSources_FollowRules`는 `ArenaDef.cs:312`(`WithGraphRopes`의 `HashSet`)를 지적합니다. 이 파일과 검사 파일은 커밋 `0b2da59` 이후 바뀌지 않아 이번 변경과 무관한 기존 실패로 분류했습니다. PlayMode·사용자 Play는 미실행입니다.
+- 기존 규칙 실패 수정(사용자 승인): `ArenaDef.WithGraphRopes`의 로프 ID 중복 검사를 `HashSet`에서 앞선 로프와의 순서 비교(`DuplicateRopeId`, 대소문자 구분, 최대 96개)로 바꿨습니다. 맵을 불러올 때만 쓰는 검증이며 같은 입력에서 같은 예외를 냅니다. 규칙 검사에는 예외를 추가하지 않았습니다. 수정 후 전체 EditMode 1241개 중 1238개 통과, 3개 명시 실행 전용으로 건너뜀, 실패 0개. 수정 전 원본은 커밋 `0b2da59`에 있습니다.
+- 백업: `D:/KnockBox_Backups/PropImpulses_20261111_055944`(4개 파일, SHA-256 대조).
+
+## MatchRunner 맵 해석 경로 정리 · 2026-11-11
+
+사용자 승인 범위(A안 1~3). Simulation·틱·난수·기록 형식·맵 데이터·씬은 바꾸지 않았습니다.
+
+- 통합: 시험 맵 확인과 등록 목록 탐색이 `GetMeta`·`ResolveArena`·`ResolveRecordedArena`·`PrepareMatchArenas`에 따로 있던 것을 `FindDefinition`/`FindSavedDefinition` 하나로 모았습니다. 보존된 Brawl 체크섬 규칙은 `MatchRunner`와 `MapCatalog` 두 곳에서 `MapDefinition.ToMatchArena` 한 곳으로 옮겼습니다. 등록 순환으로 시작할 때 같은 검증을 두 번 하던 반복문을 지웠습니다. `CreateRotation`이 같은 몸 크기로 먼저 검증하므로 결과는 같습니다.
+- 분리: 맵 해석 코드를 같은 클래스의 partial 파일 `Game/Bootstrap/MatchRunner.Maps.cs`로 옮겼습니다(779줄 → 590 + 202줄, 이동만). 직렬화 필드와 `MatchRunner.cs.meta`는 그대로입니다. 새 경기는 정의를 먼저, 기록 재생은 옛 txt를 먼저 쓰는 순서 차이를 주석으로 밝혔습니다.
+- 동작 수정: 등록 목록이 비었을 때 `selectedMap`의 이름만 넘기던 것을 정의째 쓰도록 고쳤습니다. 수정 전 새 검사 `EmptyCatalog_StartsWithTheSelectedDefinitionItself`로 `맵 파일이 없음: map:…` 예외를 재현했고, 수정 후 통과했습니다. Main은 등록 목록이 있어 이 경로를 쓰지 않습니다.
+- 검증(Unity MCP): 작업 전 EditMode 16개 클래스 261개, PlayMode `AuthoredMainTests`·`MapRotationPlayTests`·`MatchRunnerTests` 8개 통과. 1단계·2단계 뒤 각각 261개 통과, 3단계 뒤 262개 통과, PlayMode 8개 통과. 기대값은 바꾸지 않았습니다. 맵·씬 파일은 작업 전 사본과 같습니다. 사용자 Play는 미실행입니다.
+- 백업: `D:/KnockBox_Backups/MapResolution_20261111_021711`(89개 파일, SHA-256 별도 복원 대조).
+
+## 문서 현행화와 기본기 유지 장치 · 2026-11-11
+
+- 작업 규칙: 승인 기록을 이 문서로 분리하고, 새 파일·추상화 사유, 호환 분기 기준, 변경별 검사 선택, 코드 변경 시 문서·주석 확인, 결과 보고 방식을 [WORKING_RULES](../WORKING_RULES.md)에 보탰습니다. 검사 선택표는 [변경별 검사](../../team/TEAM_WORKFLOW.md#변경별-검사)에 있습니다.
+- 맵 보호: 제작기의 **맵 저장**(`MapAuthoringOperations.Save`)이 `Data/Maps/Validation/`의 기준 맵을 덮어쓰지 않습니다. 버튼을 끄고 사본 저장을 안내합니다. 다른 Unity 편집이나 외부 파일 수정까지 막지는 않습니다. 작업용 사본, `BrawlTrial` 등 Maps 바로 아래의 시험 맵은 그대로 저장됩니다.
+- 추가 검사: `MapAuthoringTests.ReferenceMapRejectsRealSave_FileStaysSame_WorkingCopySaves`, `MaintenanceSafetyTests.ValidationReferenceMaps_KeepRecordedGeometry`(기준 맵 11개 해시), `RopeGraphReplayTests.Cp5ReferenceMap_PunchBaseline_KeepsCoreBehaviourAndRecordedChecksums`.
+- CP5 물리 기준: 저장된 CP5 기준 맵(지형 해시 `7D89F13C`), Main과 같은 튜닝 에셋과 `MatchRunner.PreviewConfig(true)`(설정 `B1E12A79`), 시드 77, 0틱 펀치 1회, 600틱. HEAD `60d605a`에서 Scripts·Data 미커밋 변경 없이 Unity 6000.3.23f1 Windows Editor EditMode로 기록했습니다. 이 상태가 과거 CP5 승인 순간과 같은지는 직접 대조하지 않았습니다. 핵심 단언(4틱 파괴, 연결된 줄 3개만 해제, 남은 줄 최대 길이 유지, 지지 잃은 발판 낙하, 먼 적층·기둥은 펀치 없는 실행과 매 틱 동일, 두 번 실행 일치)이 통과한 뒤 t299 `41814349`, t599 `863FA985`를 고정했습니다. 적층 상자는 입력이 없어도 처음 45틱 동안 접촉마다 약 0.01씩 가라앉습니다.
+- `Tools/check_docs.py`: Markdown 상대 링크·앵커와 백틱 안의 저장소 경로(`Assets/_Project/`, `docs/`, `Tools/`)만 확인합니다. 작업 전 문서에서 SETUP의 깨진 링크와 PROGRESS의 끊긴 PLAYTEST 앵커를 찾아 둘 다 고쳤습니다. 현재 23개 문서, 문제 0개입니다.
+- 실제 검증(열린 Unity 편집기, Unity MCP `run_tests`): 작업 전 관련 3개 검사 묶음 24개 통과. 변경 후 컴파일 오류 0건, 바뀐 3개 묶음과 `MapAuthoringOperations.Save`를 쓰는 맵 검사 6개 묶음 113개 통과. 기준 맵·씬 파일은 작업 전 사본과 바이트 단위로 같습니다. Console의 `SerializedObjectNotCreatableException` 2건은 스크립트를 다시 불러올 때 나는 기존 Unity Inspector 예외입니다. 전체 EditMode, PlayMode, 사용자 Play는 이번에 실행하지 않았습니다.
+- 백업: `D:/KnockBox_Backups/Docs_Fundamentals_20261111_013551`(68개 파일, SHA-256 별도 복원 대조).
+- 사용자 확인 후 보완: CP5 기준 맵을 편집하면 맵 저장이 꺼지는데 위쪽 경고는 "맵 저장을 눌러주세요"라고 안내하고 있었습니다. 보호된 맵은 사본 저장을 안내하도록 고쳤고(`PendingSaveReason`), 같은 검사에 단언을 추가했습니다. 다시 실행한 `MapAuthoringTests`·`MapRopeAuthoringTests`·`MapAuthoringPreviewTests` 40개 중 39개가 통과했습니다. 실패한 `UnchangedAuthoringRoundTrip_IsExact_AndOrderDoesNotFollowHierarchy`는 저장된 MapAuthoring 씬의 배치가 연결된 맵 파일과 같아야 하는 검사입니다. 사용자가 CP5 맵 배치를 바꾼 씬을 저장한 상태라 실패하며, 이 보완 전 실행에서는 통과했습니다. 사용자 씬(작업 전 사본 `user_scene_before_fix`)과 맵 파일은 바꾸지 않았습니다.
+- 사용자 선택에 따라 편집한 CP5 배치를 제작기의 사본 저장과 같은 절차(`DuplicateDraft`)로 `Data/Maps/CP5_Integrated_Trial_Copy.asset`(미등록, 지형 해시 `9AC30CA0`)에 보관했습니다. MapAuthoring 씬의 편집 대상만 이 사본으로 바꿔 저장했습니다. 사용자 씬과 다른 줄은 `definition`·`loadedId`·`loadedGeometry` 세 개뿐이고, CP5 기준 맵 파일은 그대로입니다. 재실행한 `MapAuthoringTests`·`MaintenanceSafetyTests` 29개가 통과했습니다.
 
 ## CP5 — 제작기 정리와 통합 검증
 
@@ -279,7 +332,7 @@ Unity Play 손맛·화면, 새 빌드와 Editor↔Player 부동소수점 일치,
 2. **CP3_Rope_Fixed:** 같은 배치의 파단 불가 대조군. 해시 `65D57D92`.
 3. **CP4_Cut_Rope_Trial:** 왼쪽 경사, 중앙 절단용 사각형, 적층 상자 3개, 기존 통과 기둥, 매달린 상자. 해시 `F3262F09`.
 
-현재 편집을 저장하고 원하는 시험 정의를 선택해 **맵 불러오기 → 저장한 맵으로 시험**을 사용합니다. 절단은 중앙 Terrain_Box_2의 윗변 중간 (0, -2)과 오른쪽 변 중간 (2, -4)으로 확인할 수 있습니다. 자세한 버튼·복귀 방법은 [팀 안내](../../team/TEAM_WORKFLOW.md#독립-로프), 실제 검수 목록은 [플레이 검수](../../team/PLAYTEST.md#5-cp3cp4-로프와-절단-검수)에 있습니다.
+현재 편집을 저장하고 원하는 시험 정의를 선택해 **맵 불러오기 → 저장한 맵으로 시험**을 사용합니다. 절단은 중앙 Terrain_Box_2의 윗변 중간 (0, -2)과 오른쪽 변 중간 (2, -4)으로 확인할 수 있습니다. 자세한 버튼·복귀 방법은 [팀 안내](../../team/TEAM_WORKFLOW.md#독립-로프), 실제 검수 목록은 [플레이 검수](../../team/PLAYTEST.md#5-cp3cp4-최초-당김-로프와-절단-검수)에 있습니다.
 
 ### 보존과 다음 착수 조건
 

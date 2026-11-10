@@ -55,7 +55,7 @@ Relay 연결이나 전송 문제
 
 경기 실행·설정·맵 선택·기록 재생
 
-먼저 볼 위치: `Game/Bootstrap/MatchRunner.cs`
+먼저 볼 위치: `Game/Bootstrap/MatchRunner.cs`, 맵 해석은 `Game/Bootstrap/MatchRunner.Maps.cs`
 
 담당하는 일: 온라인·연습·리플레이가 공유하는 실행기
 

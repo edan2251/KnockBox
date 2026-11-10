@@ -1,6 +1,6 @@
 # Unity 팀 작업 안내
 
-Unity에서 게임 화면과 맵을 직접 편집할 때 보는 안내입니다. **2026-11-06 유지보수 구조와 11-10 CP2-1 긴 물리 기둥**를 기준으로 합니다.
+Unity에서 게임 화면과 맵을 직접 편집할 때 보는 안내입니다. **2026-11-11, main `60d605a`의 Main·MapAuthoring 구조**를 기준으로 합니다. 맵 제작 버튼과 순서는 [맵 제작 사용 안내](MAP_AUTHORING.md)를 봅니다.
 
 작업 위치·Git·보존·검증 원칙은 [현재 작업 규칙](../ai_docs/WORKING_RULES.md)을 따릅니다. 원본 프로젝트의 개발 브랜치는 `exp/brawl-v1`였습니다. 과거 작업의 통과 기록을 새 위치의 이관 검증 결과로 보지는 않습니다.
 
@@ -46,7 +46,7 @@ Play 중 바꾼 값은 종료하면 사라집니다. 애니메이션 대상은 �
 - `DuelCardsResult`: VS·카드·결과가 공유하는 두 캐릭터, 배경 패널, 명판, 선택 UI
 - `AcquiredCards`: 보유 카드
 - `GameplayHud`: 경기 HUD
-- `WeaponVisual`: 과거 무기 표시 보존. 현재 새 경기에서는 비활성입니다.
+- `WeaponVisual`: 과거 무기 표시 보존. Main의 `Brawl_Weapon` 루트는 활성이며, 무기가 꺼진 현재 경기에서는 코드가 모델·표시 자식을 숨깁니다.
 - `PostFxProfile.asset`: 후처리 기본 설정. 실행할 때 컴포넌트까지 복제하므로 타격 펄스가 원본을 수정하지 않습니다.
 
 ### 편집값과 실행 코드의 역할
@@ -56,6 +56,8 @@ Play 중 바꾼 값은 종료하면 사라집니다. 애니메이션 대상은 �
 주요 오브젝트를 삭제하거나 참조를 끊지 마세요. `CaptureAuthoredLayout`과 `MaintenanceSceneMigration.Run`은 최초 이전 도구입니다. 일상 편집에서 다시 실행하지 않습니다.
 
 `FrontendTheme`의 폰트·초상 크기는 새 테스트 화면을 만들 때의 기본값입니다. 이미 배치된 Main은 **실제 Text/RectTransform**에서 폰트와 크기를 고칩니다. 플레이어 색, 카드 호버, 준비 여부처럼 상태에 따라 달라지는 색에는 Theme/Palette와 연출 코드도 관여합니다.
+
+UI 입력(`KNOCKBOX_UI_input`)의 액션 연결은 `Frontend.prefab`에서는 비어 있고, Main 씬의 오버라이드가 씬에 내장된 `DefaultInputActions` 사본을 가리킵니다. Input System 1.20은 연결이 비어 있으면 활성화 때 기본 액션을 넣습니다. UI 입력을 바꾸려면 이 구조를 먼저 확인하고, 인스턴스 Revert나 Apply로 정리하지 마세요.
 
 UI 초상은 실제 FighterView에서 가져온 부품으로 저장되어 있습니다. 게임 캐릭터의 스프라이트 형태를 바꾸면 저장된 UI 초상도 함께 확인하세요. 자동 외형 재동기화 도구는 현재 범위에 없습니다.
 
@@ -83,7 +85,7 @@ UI 초상은 실제 FighterView에서 가져온 부품으로 저장되어 있습
 
 Main의 `mapCatalog`, `selectedMap`
 
-담당하는 값: 등록 목록이 있으면 라운드 순환. 목록이 비었을 때만 선택 맵/Brawl로 시작
+담당하는 값: 등록 목록이 있으면 라운드 순환. 목록이 비었을 때만 selectedMap 정의(없으면 Brawl)로 시작
 
 
 `FindRecordedConfig`, `ResolveRecordedArena`
@@ -167,7 +169,9 @@ Main의 지형 자식은 이 데이터로 만든 결과물입니다. 지형은 M
 ## 7. 실행 중 생성 대상
 
 - `MatchRunner`는 고정 틱·입력·경기 설정·리플레이를 담당합니다. `MatchPresenter`는 사건을 받아 각 표시 담당으로 전달합니다.
-- `FrontendController`는 상태에 따라 화면과 메뉴 명령을 처리합니다. `FrontendView`/`FrontendLayout`은 저장된 화면, 편집 차이, 기존 전환 연출을 사용합니다. Main은 새 Canvas나 버튼을 만들지 않습니다.
+- `FrontendController`는 상태에 따라 화면과 메뉴 명령을 처리합니다. `FrontendView`/`FrontendLayout`은 저장된 화면, 편집 차이, 기존 전환 연출을 사용합니다. Main은 새 Canvas나 버튼을 만들지 않습니다. 이 필수 검사와 제작기 시험 연결은 씬 이름 `Main`으로 판별하므로 씬 이름을 바꾸지 마세요.
+- `MatchPresenter`의 화면 담당 참조가 빠지면 오류를 냅니다. 다만 카메라 리그·팔레트·도형 라이브러리, FighterView의 Pose·팔다리 부품, PostFx Volume은 비어 있으면 실행 중에 새로 만듭니다. 이 참조를 지우지 마세요.
+- `Match/Arena`의 지형 자식은 Play할 때 지우고 맵 정의에서 다시 만듭니다. 지형은 이 자식이 아니라 MapAuthoring과 맵 정의에서 편집합니다.
 - 무기 상태·탄약·발사체·카드 획득 판정은 Simulation에 있습니다. 무기 표시는 배치된 WeaponVisual을 재사용합니다.
 - 투사체·충돌 효과·먼지·KO 조각은 정해진 최대 수의 풀에서 재사용하거나 필요할 때 만드는 일시적 표현입니다. 담당 컴포넌트는 Main에 배치되어 있고 ShapeLibrary/Palette 참조를 볼 수 있습니다. 모든 개별 조각을 프리팹으로 만든 것은 아닙니다.
 - 맵별 투영 그림자 메시와 KO 전용 충돌체는 정의에 따라 만듭니다. KO의 Unity 물리는 시각 효과 전용입니다.
@@ -192,6 +196,26 @@ MapAuthoring의 시험 사본도 저장·재열기·실행을 확인합니다. �
 - `PresentationRulesTests`
 
 경기·온라인 변경에는 관련 결정론, 저장·복원, 락스텝, 리플레이 검사도 필요합니다. 실행 방식과 에디터·배치 병행 제한은 [현재 작업 규칙의 검증과 보고](../ai_docs/WORKING_RULES.md#검증과-보고)를 따릅니다.
+
+<a id="변경별-검사"></a>
+
+### 변경별 검사
+
+변경한 범위에 맞는 줄만 실행합니다. 검사는 사람이나 AI가 직접 실행합니다. CI와 Git 훅은 설치되어 있지 않아 자동으로 돌지 않습니다. Unity 검사는 열린 편집기의 Test Runner나 Unity MCP `run_tests`로 실행하고, 같은 프로젝트를 배치 모드로 따로 열지 않습니다.
+
+- **문서만:** `python Tools/check_docs.py`. Unity 검사는 필요 없습니다.
+- **C# 주석만:** 컴파일 확인.
+- **제작기·맵 데이터:** 컴파일 + 바뀐 기능의 `Map*` 검사 + `MapAuthoringTests` + `MaintenanceSafetyTests`(기준 맵 해시).
+- **Presentation·UI:** 컴파일 + `PresentationRulesTests`·`PaletteTests` + 관련 PlayMode(`AuthoredMainTests`, `FrontendFlowTests`) + 사용자 Play.
+- **Game(실행기·입력·온라인):** 컴파일 + `OnlineLockstepTests`·`RegisteredMapRotationTests`·`MaintenanceSafetyTests` + 관련 PlayMode.
+- **Simulation(판정·물리·상태):** 컴파일 + `StateChecksumTests`·`SimulationRulesTests`·`SyncTestTests`·`DeterminismTests`·`BrawlInputCompatibilityTests` + 바뀐 기능의 검사 + `RopeGraphReplayTests`(CP5 물리 기준).
+- **설정·기록 형식·맵 schema·프로토콜:** Simulation 검사 + 전체 EditMode.
+- **씬·Prefab:** 컴파일 + `NamingConventionTests` + `AuthoredMainTests` + 사용자 Play.
+- **광범위한 변경, 주요 체크포인트 완료:** 전체 EditMode 한 번 + 관련 PlayMode.
+
+`Slow`와 `LegacyCombat` 카테고리는 이름만 보고 빼지 않습니다. 바뀐 코드가 옛 폼·투사체·무기 경로나 해당 측정에 닿으면 포함합니다. 기존 실패와 새 실패를 구분해야 할 때만 변경 전에 같은 관련 검사를 실행합니다.
+
+검사가 실패하면 기대값을 새 결과로 바꾸거나 조건을 약하게 하지 않습니다. 원인을 고치고, 의도한 동작 변경이라면 사용자 승인을 받은 뒤 같은 변경에서 기대값과 기록을 함께 고칩니다.
 
 <a id="9-이름과-복구-자료를-보존하세요"></a>
 

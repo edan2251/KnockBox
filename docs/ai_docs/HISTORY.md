@@ -29,3 +29,9 @@
 2026-11-07 작업 전 공유 파일 1,836개, 123,315,301바이트를 Snapshot과 빈 RestoreCheck에 보존해 해시를 대조했습니다. 분리 전 ai_docs 전체 873개는 History와 별도 HistoryRestoreCheck에서 모두 SHA-256이 같았습니다. 과거 자료 867개는 프로젝트 밖으로 이동했고 현재 ai_docs에는 안내 8개만 남겼습니다.
 
 현재 문서 링크 138개가 정상입니다. 게임 코드·에셋·설정·패키지 등을 포함한 보호 파일 951개의 내용은 같고 Git HEAD·인덱스·staged diff도 그대로입니다. Unity 실행·게임 테스트·새 빌드는 수행하지 않았습니다. 최종 상세 결과는 이 보관 폴더의 validation_final.json에 있습니다.
+
+## 코드 주석의 옛 문서 표기
+
+코드 주석의 `01-architecture.md`, `03-combat.md`, `09-props-physics.md` 같은 번호 문서, `CR-002`~`CR-005`, "08 5절" 같은 표기는 이관 전 Project_Brawl의 명세·요청서를 가리킵니다. 저장소에는 없고 위 로컬 보관 위치의 `spec/`, `requests/`에 있습니다. 현재 동작은 [현행 개발 명세](CURRENT_DEV_SPEC.md)와 코드를 기준으로 합니다.
+
+코드 주석의 `CP1`~`CP23`(예: "CP4 Shift 차징", "CP16 부분 붕괴")은 옛 프로젝트의 체크포인트 번호입니다. 현재 [맵 제작기 계획](MAP_AUTHORING_PLAN.md)의 CP1~CP5와 번호가 겹치지만 다른 작업입니다. 맵 제작기 작업 주석은 기능 이름이나 `MapAuthoring`, `Validation/CP5_*` 같은 파일명으로 구분합니다.

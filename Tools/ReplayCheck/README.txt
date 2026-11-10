@@ -1,5 +1,5 @@
 현재 소스 안내 (2026-11-06 이관)
-현재 온라인 프로토콜은 9, 입력 기록 형식은 v8입니다. 프로젝트 docs/ai_docs/ONLINE_CODE_MAP.md와 docs/ai_docs/progress/migration_20261106.md를 확인하세요.
+현재 온라인 프로토콜은 9입니다. 입력 기록은 기존 맵 v8, 제작기 물리 상자·다각형 맵 v9입니다. 프로젝트 docs/ai_docs/ONLINE_CODE_MAP.md와 docs/ai_docs/CURRENT_DEV_SPEC.md를 확인하세요. 이관 당시 기록(migration_20261106.md)은 저장소 밖 보관본에 있습니다(docs/ai_docs/HISTORY.md).
 아래 2026-11-04 버전/검증 내용은 당시 기록이며 원문을 보존합니다. 새 위치의 실행 결과를 뜻하지 않습니다.
 
 ﻿Knockbox 다른 PC 결정론 확인 (CR-004 온라인 1단계)
