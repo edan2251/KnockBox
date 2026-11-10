@@ -309,13 +309,23 @@ namespace Knockbox.Simulation
         public ArenaDef WithGraphRopes(GraphRope[] connections)
         {
             if(connections==null || connections.Length>GraphRope.Capacity)throw new System.ArgumentException("로프는 최대 96개입니다.");
-            var ids=new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal);
-            foreach(var r in connections)
-                if(string.IsNullOrEmpty(r.Id)||!ids.Add(r.Id)||r.Body<0||r.Body>=DynamicPropCount
+            for(int i=0;i<connections.Length;i++)
+            {
+                var r=connections[i];
+                if(string.IsNullOrEmpty(r.Id)||DuplicateRopeId(connections,i)||r.Body<0||r.Body>=DynamicPropCount
                     ||r.Joint.OtherBody < -1 || r.Joint.OtherBody>=DynamicPropCount || r.Body==r.Joint.OtherBody
                     ||r.Joint.Kind!=PropJointKind.Rope || r.Joint.Length<.05f)
                     throw new System.ArgumentException("로프 ID·연결점·길이를 확인해주세요.");
+            }
             return new ArenaDef(Name,Columns,Rows,HasBoundary,boxes,SpawnFoot0,SpawnFoot1,props,staticProps,dynamicProps,joints,(GraphRope[])connections.Clone());
+        }
+
+        /// <summary>앞선 로프에 같은 ID가 있는지(대소문자 구분). 최대 96개라 HashSet 없이 비교한다.</summary>
+        static bool DuplicateRopeId(GraphRope[] connections,int index)
+        {
+            for(int j=0;j<index;j++)
+                if(string.Equals(connections[j].Id,connections[index].Id,System.StringComparison.Ordinal))return true;
+            return false;
         }
 
         public uint ComputeGeometryChecksum()
