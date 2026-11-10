@@ -86,6 +86,73 @@ namespace Knockbox.Tests.EditMode
                 TestContext.WriteLine("graph online compared="+count+"; destroyed="+hb+"; dropped="+(la.Dropped+lb.Dropped));
             }
         }
+        // 물리 기준 시나리오: 저장된 CP5 기준 맵 + Main과 같은 튜닝 에셋/MatchRunner 설정 + 시드 77 + 0틱 펀치 1회, 600틱.
+        // 핵심 동작을 먼저 단언하고, 체크섬은 그 동작이 조용히 바뀌지 않았는지 보조로 고정한다.
+        // 기록: 2026-11-11, HEAD 60d605a(Scripts·Data 미커밋 변경 없음), Unity 6000.3.23f1 Windows Editor EditMode.
+        // Player 빌드의 부동소수점 일치는 이 값으로 보장하지 않는다. 의도한 동작·튜닝 변경은 사용자 승인 후 값과 기록을 함께 고친다.
+        const uint BaselineGeometry=0x7D89F13Cu;
+        static SimConfig MainConfig()
+        {
+            var go=new UnityEngine.GameObject("Physics_Baseline_Runner");go.SetActive(false);
+            try
+            {
+                var r=go.AddComponent<MatchRunner>();r.BrawlExperiment=true;r.Rules=RuleSet.Brawl;
+                r.Tuning=UnityEditor.AssetDatabase.LoadAssetAtPath<MovementTuning>("Assets/_Project/Data/Tuning/MovementTuning.asset");
+                r.CombatTuning=UnityEditor.AssetDatabase.LoadAssetAtPath<CombatTuning>("Assets/_Project/Data/Tuning/CombatTuning.asset");
+                return r.PreviewConfig(true);
+            }
+            finally{UnityEngine.Object.DestroyImmediate(go);}
+        }
+        static float Stretch(in PropState props,in GraphRope r)
+        {
+            var s=props;var b=PropState.Get(ref s,r.Body).ToWorld(r.Joint.LocalAnchor);
+            var a=r.Joint.OtherBody<0?r.Joint.WorldAnchor:PropState.Get(ref s,r.Joint.OtherBody).ToWorld(r.Joint.OtherLocal);
+            return SimMath.Sqrt((a-b).LengthSquared)-r.Joint.Length;
+        }
+        // Bodies 0..3 = stack ×3 and pass-through pillar, away from the punch. They settle ~0.01 per contact during the first 45 ticks
+        // with or without input, so the control is an idle run of the same scene rather than the authored start position.
+        static List<uint> RunCp5Baseline(SimConfig c,ArenaDef arena,bool punch,List<Vec2> untouched,out int broken,out float maxStretch,out float beamDrop)
+        {
+            var w=new SimWorld(c,arena,SimState.CreateRound(c,arena,77,new Vec2(10,-3.4f),new Vec2(16,-8+c.HalfBody),MatchPhase.Fighting));
+            for(int i=0;i<arena.GraphRopeCount;i++){Assert.IsTrue(arena.GetGraphRope(i).Active(w.State.Props),"rope "+i+" starts attached");Assert.Less(Math.Abs(Stretch(w.State.Props,arena.GetGraphRope(i))),.001f);}
+            var s0=w.State.Props;float beamStart=PropState.Get(ref s0,5).Position.Y;
+            var hashes=new List<uint>();broken=-1;maxStretch=0;
+            for(int t=0;t<600;t++)
+            {
+                w.Step(new InputFrame(0,0,punch&&t==0?InputButtons.Attack:InputButtons.None,1),default);hashes.Add(w.ComputeChecksum());
+                if(broken<0&&w.State.Props.IsDestroyed(4))broken=t;
+                maxStretch=Math.Max(maxStretch,Stretch(w.State.Props,arena.GetGraphRope(3)));
+                var s=w.State.Props;for(int i=0;i<4;i++)untouched.Add(PropState.Get(ref s,i).Position);
+            }
+            var end=w.State.Props;beamDrop=beamStart-PropState.Get(ref end,5).Position.Y;
+            return hashes;
+        }
+        [Test] public void Cp5ReferenceMap_PunchBaseline_KeepsCoreBehaviourAndRecordedChecksums()
+        {
+            var d=UnityEditor.AssetDatabase.LoadAssetAtPath<Knockbox.Game.Maps.MapDefinition>(MapIntegratedWorkflowTests.TrialPath);
+            var arena=d.ToArena();var c=MainConfig();
+            Assert.AreEqual(BaselineGeometry.ToString("X8"),arena.ComputeGeometryChecksum().ToString("X8"),"기준 맵이 바뀌었습니다.");
+            Assert.IsTrue(c.Combat.Props.SmoothBoxRelease&&c.Combat.Props.StableConnectorContacts,"Main 설정의 현재 상자 경로");
+            var hit=new List<Vec2>();var idle=new List<Vec2>();
+            var first=RunCp5Baseline(c,arena,true,hit,out int broken,out float stretch,out float drop);
+            RunCp5Baseline(c,arena,false,idle,out int idleBroken,out _,out float idleDrop);
+            var second=RunCp5Baseline(c,arena,true,new List<Vec2>(),out _,out _,out _);
+            Assert.That(broken,Is.InRange(1,30),"a single punch destroys the connector");Assert.AreEqual(-1,idleBroken,"without input nothing breaks");
+            var w=new SimWorld(c,arena,SimState.CreateRound(c,arena,77,new Vec2(10,-3.4f),new Vec2(16,-8+c.HalfBody),MatchPhase.Fighting));
+            for(int t=0;t<600;t++)w.Step(new InputFrame(0,0,t==0?InputButtons.Attack:InputButtons.None,1),default);
+            for(int i=0;i<3;i++)Assert.IsFalse(arena.GetGraphRope(i).Active(w.State.Props),"rope "+i+" attached to the connector is released");
+            Assert.IsTrue(arena.GetGraphRope(3).Active(w.State.Props),"beam-to-lower-box rope survives");
+            Assert.Less(stretch,.05f,"surviving rope keeps its maximum length");
+            Assert.Greater(drop,.5f,"the beam falls after losing its support");Assert.Less(Math.Abs(idleDrop),.05f,"the supported beam stays up without input");
+            CollectionAssert.AreEqual(idle,hit,"the punch does not move the distant stack or pass-through pillar");
+            CollectionAssert.AreEqual(first,second,"같은 입력의 두 실행이 같아야 합니다.");
+            TestContext.WriteLine($"config={c.ComputeChecksum():X8} broken={broken} stretch={stretch} drop={drop} idleDrop={idleDrop} t299={first[299]:X8} t599={first[599]:X8}");
+            string actual=$"config={c.ComputeChecksum():X8} broken={broken} t299={first[299]:X8} t599={first[599]:X8}";
+            Assert.AreEqual(0xB1E12A79u.ToString("X8"),c.ComputeChecksum().ToString("X8"),"튜닝/실행 설정이 바뀌었습니다. 의도한 변경인지 확인하세요. "+actual);
+            Assert.AreEqual(4,broken,actual);
+            Assert.AreEqual(0x41814349u.ToString("X8"),first[299].ToString("X8"),"물리 결과가 기준과 다릅니다. "+actual);
+            Assert.AreEqual(0x863FA985u.ToString("X8"),first[599].ToString("X8"),"물리 결과가 기준과 다릅니다. "+actual);
+        }
         [Test] public void DifferentGraphEndpointRejectsReplayAndOnlineHandshake()
         {
             var a=TrialArena();var r=new GraphRope[a.GraphRopeCount];for(int i=0;i<r.Length;i++)r[i]=a.GetGraphRope(i);r[3].Joint.OtherLocal.X=.1f;
