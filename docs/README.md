@@ -12,21 +12,21 @@
 
    실제 UI·설정·프리팹과 맵 제작·저장·시험 방법입니다.
 
-3. [아트 작업 안내](team/ART_WORKFLOW.md)
+3. [맵 제작 사용 안내](team/MAP_AUTHORING.md)
+
+   지형·상자·기둥·연결 상자 생성, 로프 연결, 저장과 미등록 시험 순서입니다.
+
+4. [아트 작업 안내](team/ART_WORKFLOW.md)
 
    현재 리소스 위치와 새 아트 추가·연결·검수 기준입니다.
 
-4. [플레이 검수 안내](team/PLAYTEST.md)
+5. [플레이 검수 안내](team/PLAYTEST.md)
 
    현재 조작·경기 흐름과 로컬 테스트 방법입니다.
 
-5. [프로젝트 폴더 안내](team/PROJECT_FOLDERS.md)
+6. [프로젝트 폴더 안내](team/PROJECT_FOLDERS.md)
 
    실제 작업 씬과 사용 중인 설정 폴더의 용도입니다.
-
-6. [남은 Fork 커밋 순서](team/FORK_COMMIT_GUIDE.md)
-
-   현재 Git 상태와 문서 커밋의 Stage 대상·제목·Description입니다.
 
 7. [공통 커밋 규칙](team/COMMIT_RULES.md)
 
