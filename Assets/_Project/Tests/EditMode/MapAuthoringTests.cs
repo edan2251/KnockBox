@@ -138,6 +138,35 @@ namespace Knockbox.Tests.EditMode
             finally{Object.DestroyImmediate(draft);EditorSceneManager.OpenScene(MapAuthoringOperations.MainPath,OpenSceneMode.Single);}
         }
         [Test]
+        public void ReferenceMapRejectsRealSave_FileStaysSame_WorkingCopySaves()
+        {
+            const string reference=MapAuthoringOperations.ReferenceFolder+"CP5_Integrated_Trial.asset";
+            byte[] before=File.ReadAllBytes(reference);
+            EditorSceneManager.OpenScene(MapAuthoringOperations.ScenePath,OpenSceneMode.Single);
+            try
+            {
+                var a=Object.FindFirstObjectByType<MapAuthoring>();var source=AssetDatabase.LoadAssetAtPath<MapDefinition>(reference);
+                uint geometry=source.ToArena().ComputeGeometryChecksum();
+                a.definition=source;MapAuthoringOperations.Open(a);
+                a.physicsRoot.GetComponentsInChildren<MapPhysicalBoxHandle>().First().transform.localPosition+=new Vector3(.25f,0,0);
+                Assert.IsTrue(MapAuthoringOperations.HasUnsavedPlacement(a));
+                StringAssert.Contains("새 사본으로 저장",MapAuthoringOperations.PendingSaveReason(a),"the warning must not ask for the disabled save button");
+                StringAssert.Contains("Validation",Assert.Throws<InvalidOperationException>(()=>MapAuthoringOperations.Save(a)).Message);
+                Assert.AreEqual(geometry,source.ToArena().ComputeGeometryChecksum());CollectionAssert.AreEqual(before,File.ReadAllBytes(reference));
+                Assert.NotNull(MapAuthoringOperations.ProtectedReason(AssetDatabase.LoadAssetAtPath<MapDefinition>(Baseline)));
+                Assert.IsNull(MapAuthoringOperations.ProtectedReason(AssetDatabase.LoadAssetAtPath<MapDefinition>(Trial)),"editable trial maps stay saveable");
+
+                // The working copy uses the same real save path and keeps the reference file untouched.
+                string folder=Scratch();var copy=Object.Instantiate(source);copy.MakeEditableCopy("test-"+Guid.NewGuid().ToString("N"),"Reference copy");
+                AssetDatabase.CreateAsset(copy,folder+"/Map.asset");a.definition=copy;MapAuthoringOperations.Open(a);
+                a.physicsRoot.GetComponentsInChildren<MapPhysicalBoxHandle>().First().transform.localPosition+=new Vector3(.25f,0,0);
+                MapAuthoringOperations.Save(a);
+                Assert.IsFalse(MapAuthoringOperations.HasUnsavedPlacement(a));Assert.AreNotEqual(geometry,copy.ToArena().ComputeGeometryChecksum());
+                CollectionAssert.AreEqual(before,File.ReadAllBytes(reference));
+            }
+            finally{EditorSceneManager.OpenScene(MapAuthoringOperations.MainPath,OpenSceneMode.Single);}
+        }
+        [Test]
         public void EditedCopy_SaveReopenRegisterAndRunnerLoad_UsesSameDefinition()
         {
             EditorSceneManager.OpenScene(MapAuthoringOperations.ScenePath,OpenSceneMode.Single);

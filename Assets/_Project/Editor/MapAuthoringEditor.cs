@@ -102,6 +102,14 @@ namespace Knockbox.EditorTools
         public static bool HasUnsavedPlacement(MapAuthoring a)=>!string.IsNullOrEmpty(PendingSaveReason(a));
         public static string PendingSaveReason(MapAuthoring a)
         {
+            string reason=PendingSaveCheck(a);
+            // 보호된 맵에는 맵 저장 버튼이 꺼지므로, 저장하라는 대신 사본으로 남기는 방법을 안내한다.
+            if(reason!=null&&!reason.StartsWith("아래 배치 오류",StringComparison.Ordinal)&&ProtectedReason(a.definition)!=null)
+                return "보호된 기준 맵이라 맵 저장이 꺼져 있습니다. '현재 배치를 새 사본으로 저장'을 누르면 지금 배치가 새 맵 파일로 저장됩니다.";
+            return reason;
+        }
+        static string PendingSaveCheck(MapAuthoring a)
+        {
             if(a==null||a.definition==null||string.IsNullOrEmpty(a.LoadedId))return null;
             MapDefinition draft=null;
             try
@@ -118,9 +126,20 @@ namespace Knockbox.EditorTools
             catch(Exception e){return "저장 상태를 확인할 수 없습니다.\n"+e.Message;}
             finally{if(draft!=null)UnityEngine.Object.DestroyImmediate(draft);}
         }
+        /// <summary>Validation 맵은 회귀 검사·직접 검수의 기준 원본이다. 작업은 사본에서 한다.</summary>
+        public const string ReferenceFolder=Folder+"/Validation/";
+        /// <summary>제작기의 맵 저장을 거절할 이유. 다른 Unity 편집이나 외부 파일 수정까지 막지는 않는다.</summary>
+        public static string ProtectedReason(MapDefinition d)
+        {
+            if(d==null)return null;
+            if(d.PreservedBaseline)return "기존 Brawl은 보호됩니다. 새 사본을 만들어주세요.";
+            return AssetDatabase.GetAssetPath(d).StartsWith(ReferenceFolder,StringComparison.Ordinal)
+                ?"Validation 폴더의 기준 맵은 맵 저장으로 덮어쓰지 않습니다. '현재 배치를 새 사본으로 저장'으로 작업용 사본을 만드세요.":null;
+        }
         public static void Save(MapAuthoring a)
         {
-            if(a.definition.PreservedBaseline)throw new InvalidOperationException("기존 Brawl은 보호됩니다. 새 사본을 만들어주세요.");
+            string protectedReason=ProtectedReason(a.definition);
+            if(protectedReason!=null)throw new InvalidOperationException(protectedReason);
             var draft=Draft(a);
             try
             {
@@ -333,7 +352,9 @@ namespace Knockbox.EditorTools
             MapInspectorLayout.Snapping(a,ref snapping);
 
             MapInspectorLayout.Section("3. 저장과 로컬 시험");
-            using(new EditorGUI.DisabledScope(!loaded||a.definition.PreservedBaseline))
+            string protectedReason=MapAuthoringOperations.ProtectedReason(a.definition);
+            if(loaded&&protectedReason!=null)EditorGUILayout.HelpBox(protectedReason,MessageType.Info);
+            using(new EditorGUI.DisabledScope(!loaded||protectedReason!=null))
                 if(GUILayout.Button("맵 저장"))Run(()=>MapAuthoringOperations.Save(a),"맵 정의에 저장했습니다. 등록 없이 시험할 수 있습니다.");
             using(new EditorGUI.DisabledScope(!loaded||!string.IsNullOrEmpty(pending)))
                 if(GUILayout.Button("저장한 맵으로 시험"))Run(()=>MapAuthoringOperations.Test(a),"Main 연습을 시작합니다. Play를 중지하면 제작기로 돌아옵니다.");
