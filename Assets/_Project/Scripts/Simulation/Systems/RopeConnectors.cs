@@ -69,7 +69,7 @@ namespace Knockbox.Simulation
                     var start = previous.Action == now.Action && previous.AttackId == now.AttackId && FighterCombat.IsHitboxActive(previous, config)
                         ? FighterCombat.CircleCenter(previous, attack, circle) : end - (now.Position - previous.Position);
                     t = SimMath.Min(t, SweepCircle(start - connectorFrom,
-                        (end - start) - (connectorTo - connectorFrom), half, circle.Radius));
+                        (end - start) - (connectorTo - connectorFrom), new Vec2(half, half), circle.Radius, skipAtLimit: true));
                 }
             }
             if (t > 1f) return 2f;
@@ -78,19 +78,24 @@ namespace Knockbox.Simulation
             return ClearLine(at, target, arena, props) ? t : 2f;
         }
 
-        // 원을 확장 사각형만으로 검사하면 모서리 바깥에서도 맞는다. 두 띠와 네 모서리 원을 합친다.
-        static float SweepCircle(Vec2 start, Vec2 delta, float half, float radius)
+        /// <summary>
+        /// 원(반지름 radius)이 원점 중심 상자(반 크기 half)에 처음 닿는 시점 0~1. 안 닿으면 1보다 크다.
+        /// 원을 확장 사각형만으로 검사하면 모서리 바깥에서도 맞는다. 두 띠와 네 모서리 원을 합친다.
+        /// 연결 상자(ConnectorBodies)도 같은 계산을 쓴다. 움직임이 거의 없을 때 모서리 원을 건너뛰는 기준만
+        /// 과거 로프 연결부는 a ≤ 1e-12, 연결 상자는 a &lt; 1e-12로 달라서, 기록 호환을 위해 skipAtLimit로 둘 다 유지한다.
+        /// </summary>
+        internal static float SweepCircle(Vec2 start, Vec2 delta, Vec2 half, float radius, bool skipAtLimit)
         {
-            float t = SimMath.Min(Projectiles.SegmentBox(start, delta, -half - radius, -half, half + radius, half),
-                Projectiles.SegmentBox(start, delta, -half, -half - radius, half, half + radius));
+            float t = SimMath.Min(Projectiles.SegmentBox(start, delta, -half.X - radius, -half.Y, half.X + radius, half.Y),
+                Projectiles.SegmentBox(start, delta, -half.X, -half.Y - radius, half.X, half.Y + radius));
             for (int x = -1; x <= 1; x += 2)
                 for (int y = -1; y <= 1; y += 2)
                 {
-                    var p = start - new Vec2(x * half, y * half);
+                    var p = start - new Vec2(x * half.X, y * half.Y);
                     float c = p.LengthSquared - radius * radius;
                     if (c <= 0f) return 0f;
                     float a = delta.LengthSquared, b = Vec2.Dot(p, delta), disc = b * b - a * c;
-                    if (a <= 1e-12f || disc < 0f) continue;
+                    if ((skipAtLimit ? a <= 1e-12f : a < 1e-12f) || disc < 0f) continue;
                     float entry = (-b - SimMath.Sqrt(disc)) / a;
                     if (entry >= 0f && entry <= 1f) t = SimMath.Min(t, entry);
                 }

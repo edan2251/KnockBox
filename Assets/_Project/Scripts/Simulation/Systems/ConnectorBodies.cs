@@ -84,8 +84,8 @@ namespace Knockbox.Simulation
                 var circle=attack.GetCircle(i);var end=FighterCombat.CircleCenter(now,attack,circle);
                 var start=prev.Action==now.Action&&prev.AttackId==now.AttackId&&FighterCombat.IsHitboxActive(prev,config)
                     ?FighterCombat.CircleCenter(prev,attack,circle):end-(now.Position-prev.Position);
-                hit=SimMath.Min(hit,SweepCircle(Local(body.Rotation,start-oldPosition),
-                    Local(body.Rotation,(end-start)-(body.Position-oldPosition)),half,circle.Radius));
+                hit=SimMath.Min(hit,RopeConnectors.SweepCircle(Local(body.Rotation,start-oldPosition),
+                    Local(body.Rotation,(end-start)-(body.Position-oldPosition)),half,circle.Radius,skipAtLimit:false));
             }
             return hit;
         }
@@ -128,20 +128,6 @@ namespace Knockbox.Simulation
                 if(enter>exit)return 2;
             }
             return enter;
-        }
-        static float SweepCircle(Vec2 p,Vec2 d,Vec2 half,float radius)
-        {
-            float hit=SimMath.Min(Projectiles.SegmentBox(p,d,-half.X-radius,-half.Y,half.X+radius,half.Y),
-                Projectiles.SegmentBox(p,d,-half.X,-half.Y-radius,half.X,half.Y+radius));
-            for(int x=-1;x<=1;x+=2)for(int y=-1;y<=1;y+=2)
-            {
-                var start=p-new Vec2(x*half.X,y*half.Y);float c=start.LengthSquared-radius*radius;
-                if(c<=0)return 0;
-                float a=d.LengthSquared,b=Vec2.Dot(start,d),disc=b*b-a*c;
-                if(a<1e-12f||disc<0)continue;
-                float t=(-b-SimMath.Sqrt(disc))/a;if(t>=0&&t<=1)hit=SimMath.Min(hit,t);
-            }
-            return hit;
         }
     }
 }
