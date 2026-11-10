@@ -82,6 +82,17 @@ namespace Knockbox.Game.Maps
         public Vector2 Spawn(int player)=>player==0?spawn0:spawn1;
         public ArenaMeta Metadata()=>new ArenaMeta{Theme=theme,HasLight=true,Light=light,Ceiling=ceiling,Shadow=shadow,Rotation=false,MapTheme=mapTheme};
 
+        /// <summary>보존된 Brawl 원본의 판정 체크섬. 옛 txt "Brawl"과 같아야 과거 기록·온라인이 유지된다.</summary>
+        public const uint PreservedBrawlChecksum=0x483E0206u;
+        /// <summary>경기용 변환. 보존된 Brawl 원본이 바뀌었으면 경기를 시작하지 않는다.</summary>
+        public ArenaDef ToMatchArena()
+        {
+            var arena=ToArena();
+            if(preservedBaseline&&arena.ComputeChecksum()!=PreservedBrawlChecksum)
+                throw new InvalidOperationException("보존된 Brawl 원본이 바뀌었습니다. 시험용 사본을 사용해주세요.");
+            return arena;
+        }
+
         public ArenaDef ToArena()
         {
             var errors=Validate();

@@ -82,6 +82,27 @@ namespace Knockbox.Tests.EditMode
         }
 
         [Test]
+        public void EmptyCatalog_StartsWithTheSelectedDefinitionItself()
+        {
+            // Main의 selectedMap 설명: 등록 목록이 비면 이 정의를 사용한다. BrawlOriginal이 아닌 사본도 이름이 아니라 정의째 해석해야 한다.
+            var selected = Own(Object.Instantiate(AssetDatabase.LoadAssetAtPath<MapDefinition>(MapAuthoringOperations.Folder + "/BrawlTrial.asset")));
+            selected.MakeEditableCopy("selected-" + Guid.NewGuid().ToString("N"), "Selected map probe");
+            var go = new GameObject("Selected_Map_Runner"); go.SetActive(false);
+            try
+            {
+                var r = go.AddComponent<MatchRunner>(); r.BrawlExperiment = true;
+                Set(r, "mapCatalog", Own(ScriptableObject.CreateInstance<MapCatalog>())); Set(r, "selectedMap", selected);
+                typeof(MatchRunner).GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(r, null);
+                Assert.AreEqual(selected.MatchName, r.ArenaName);
+                Assert.NotNull(r.World, "the selected map starts a match");
+                Assert.AreEqual(selected.ToArena().ComputeGeometryChecksum(), r.World.Arena.ComputeGeometryChecksum());
+                Assert.AreSame(selected.Metadata().MapTheme, r.GetMeta(selected.MatchName).MapTheme);
+                Assert.AreEqual(selected.ToArena().ComputeChecksum(), r.ResolveRecordedArena(selected.MatchName).ComputeChecksum());
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        [Test]
         public void SavedUnregisteredDefinition_StartsAloneWithItsTheme_LeavesCatalogAndMainSelectionUntouched()
         {
             var baseline = AssetDatabase.LoadAssetAtPath<MapDefinition>(MapAuthoringOperations.Folder + "/BrawlOriginal.asset");

@@ -33,12 +33,7 @@ namespace Knockbox.Game.Maps
             var ordered=new List<MapDefinition>(maps);
             ordered.Sort((a,b)=>StringComparer.Ordinal.Compare(a.Id,b.Id));
             var arenas=new ArenaDef[ordered.Count];
-            for(int i=0;i<arenas.Length;i++)
-            {
-                arenas[i]=ordered[i].ToArena();
-                if(ordered[i].PreservedBaseline&&arenas[i].ComputeChecksum()!=0x483E0206u)
-                    throw new InvalidOperationException("보존된 Brawl 원본이 바뀌었습니다. 시험용 사본을 사용해주세요.");
-            }
+            for(int i=0;i<arenas.Length;i++)arenas[i]=ordered[i].ToMatchArena();
             return arenas;
         }
         public MapDefinition Find(string matchName)
