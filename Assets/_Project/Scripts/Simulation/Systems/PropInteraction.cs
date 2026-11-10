@@ -44,7 +44,7 @@ namespace Knockbox.Simulation
                 return;
             }
             var before = s.Props;
-            var impulses = new PropImpulses();
+            var impulses = new PropImpulses(scratch.FighterImpulses);
             ResolveFighter(ref s.Fighter0, prev0, frozen0, 0, before, ref impulses, arena, config, s.Tick, events);
             ResolveFighter(ref s.Fighter1, prev1, frozen1, 1, before, ref impulses, arena, config, s.Tick, events);
             impulses.ApplyTo(ref s.Props, arena, config, scratch);
@@ -52,95 +52,126 @@ namespace Knockbox.Simulation
             PropPhysics.CheckBreaks(ref s.Props, arena, scratch, s.Tick, events);
         }
 
-        /// <summary>틱 동안 두 캐릭터가 구조물에 준 충격량의 합(몸마다 선·각 충격량). 할당 없이 PropState 모양을 빌린다.</summary>
+        /// <summary>한 몸이 이번 틱 두 캐릭터에게서 받은 충격과 표시. 상태가 아니며 틱 안에서만 쓴다.</summary>
+        internal struct FighterImpulse
+        {
+            /// <summary>선 충격량과 각 충격량의 합(Add·Press).</summary>
+            public Vec2 Linear;
+            public float Angular;
+            /// <summary>Add로 친 캐릭터가 있으면 true. Press(서 있는 무게)는 바꾸지 않는다.</summary>
+            public bool Touched;
+            public int Toucher;
+            /// <summary>0이면 쿨다운을 바꾸지 않는다.</summary>
+            public int HitCooldown0, HitCooldown1, StrikeCooldown0, StrikeCooldown1;
+            /// <summary>돌진으로 상자를 쳐냄: 방향과 위력.</summary>
+            public bool Knockout;
+            public Vec2 KnockoutDirection;
+            public float KnockoutPower;
+            /// <summary>패링으로 구조물 속도를 접촉 법선 기준으로 반사하고 ReflectScale배.</summary>
+            public bool Reflect;
+            public Vec2 ReflectNormal;
+            public float ReflectScale;
+        }
+
+        /// <summary>틱 동안 두 캐릭터가 구조물에 준 충격량의 합. 칸은 PropScratch에 있어 할당하지 않는다.</summary>
         struct PropImpulses
         {
-            PropState sums;
+            readonly FighterImpulse[] sums;
+            int count;
+
+            public PropImpulses(FighterImpulse[] slots)
+            {
+                sums = slots;
+                count = 0;
+                System.Array.Clear(sums, 0, sums.Length);
+            }
+
+            ref FighterImpulse Slot(int body)
+            {
+                ref var sum = ref sums[body];
+                if (body + 1 > count)
+                    count = body + 1;
+                return ref sum;
+            }
 
             public void Add(int body, Vec2 impulse, Vec2 point, in PropBody b, int toucher)
             {
-                ref var sum = ref PropState.Get(ref sums, body);
-                sum.Velocity += impulse;
-                sum.AngularVelocity += PropBody.Cross(point - b.Position, impulse);
-                sum.LastToucher = toucher + 1;
-                if (body + 1 > sums.Count)
-                    sums.Count = body + 1;
+                ref var sum = ref Slot(body);
+                sum.Linear += impulse;
+                sum.Angular += PropBody.Cross(point - b.Position, impulse);
+                sum.Touched = true;
+                sum.Toucher = toucher;
             }
 
             /// <summary>서 있는 캐릭터의 무게(상자 전용): 깨우지도, 마지막 접촉자를 바꾸지도 않는다.</summary>
             public void Press(int body, Vec2 impulse, Vec2 point, in PropBody b)
             {
-                ref var sum = ref PropState.Get(ref sums, body);
-                sum.Velocity += impulse;
-                sum.AngularVelocity += PropBody.Cross(point - b.Position, impulse);
-                if (body + 1 > sums.Count)
-                    sums.Count = body + 1;
+                ref var sum = ref Slot(body);
+                sum.Linear += impulse;
+                sum.Angular += PropBody.Cross(point - b.Position, impulse);
             }
 
             public void Strike(int body, int fighter, int cooldown)
             {
-                ref var sum = ref PropState.Get(ref sums, body);
-                sum.SetStrikeCooldown(fighter, cooldown);
-                if (body + 1 > sums.Count)
-                    sums.Count = body + 1;
+                ref var sum = ref Slot(body);
+                if (fighter == 0)
+                    sum.StrikeCooldown0 = cooldown;
+                else
+                    sum.StrikeCooldown1 = cooldown;
             }
 
             public void Hit(int body, int fighter, int cooldown)
             {
-                ref var sum = ref PropState.Get(ref sums, body);
-                sum.SetHitCooldown(fighter, cooldown);
-                if (body + 1 > sums.Count)
-                    sums.Count = body + 1;
+                ref var sum = ref Slot(body);
+                if (fighter == 0)
+                    sum.HitCooldown0 = cooldown;
+                else
+                    sum.HitCooldown1 = cooldown;
             }
 
-            /// <summary>임시 합산 상태만 사용: Broken은 쳐내기 표시, Warm.W0은 방향, W1.Normal은 위력(실제 접촉 캐시와 별개).</summary>
             public void Knockout(int body, Vec2 direction, float power)
             {
-                ref var sum = ref PropState.Get(ref sums, body);
-                sum.Broken = 1;
-                sum.Warm.W0.Normal = direction.X;
-                sum.Warm.W0.Tangent = direction.Y;
-                sum.Warm.W1.Normal = power;
-                if (body + 1 > sums.Count)
-                    sums.Count = body + 1;
+                ref var sum = ref Slot(body);
+                sum.Knockout = true;
+                sum.KnockoutDirection = direction;
+                sum.KnockoutPower = power;
             }
 
             public void Reflect(int body, Vec2 normal, float scale)
             {
-                ref var sum = ref PropState.Get(ref sums, body);
-                sum.Position = normal;
-                sum.Rotation = new Vec2(scale, 1f);
-                if (body + 1 > sums.Count)
-                    sums.Count = body + 1;
+                ref var sum = ref Slot(body);
+                sum.Reflect = true;
+                sum.ReflectNormal = normal;
+                sum.ReflectScale = scale;
             }
 
             public void ApplyTo(ref PropState props, ArenaDef arena, SimConfig config, PropScratch scratch)
             {
-                for (int i = 0; i < sums.Count; i++)
+                for (int i = 0; i < count; i++)
                 {
-                    ref readonly var sum = ref PropState.At(in sums, i);
+                    ref readonly var sum = ref sums[i];
                     ref var b = ref PropState.Get(ref props, i);
                     ref readonly var def = ref arena.GetProp(arena.DynamicProp(i));
                     float m = PropPhysics.Mass(def, config.Combat.Props);
                     // 패링: 구조물 속도를 접촉 법선 기준으로 반사 × 0.8(충격량보다 먼저).
-                    if (sum.Rotation.Y > 0f)
+                    if (sum.Reflect)
                     {
-                        var n = sum.Position;
-                        b.Velocity = (b.Velocity - n * (2f * Vec2.Dot(b.Velocity, n))) * sum.Rotation.X;
-                        b.AngularVelocity *= -sum.Rotation.X;
+                        var n = sum.ReflectNormal;
+                        b.Velocity = (b.Velocity - n * (2f * Vec2.Dot(b.Velocity, n))) * sum.ReflectScale;
+                        b.AngularVelocity *= -sum.ReflectScale;
                     }
-                    scratch.TickImpulse[i] += SimMath.Sqrt(sum.Velocity.LengthSquared);
-                    b.Velocity += sum.Velocity / m;
-                    b.AngularVelocity += sum.AngularVelocity / PropPhysics.Inertia(def, m);
-                    if (sum.Broken != 0)
+                    scratch.TickImpulse[i] += SimMath.Sqrt(sum.Linear.LengthSquared);
+                    b.Velocity += sum.Linear / m;
+                    b.AngularVelocity += sum.Angular / PropPhysics.Inertia(def, m);
+                    if (sum.Knockout)
                     {
-                        var dir = new Vec2(sum.Warm.W0.Normal, sum.Warm.W0.Tangent);
+                        var dir = sum.KnockoutDirection;
                         float along = Vec2.Dot(b.Velocity, dir);
                         ref readonly var pc = ref config.Combat.Props;
                         if (pc.SmoothBoxRelease)
                         {
                             // 임계점에서 속도를 12로 강제 올리지 않는다. 위력 1~1.5배 구간에서 부드럽게 보정한다.
-                            float strength = SimMath.Clamp((sum.Warm.W1.Normal - pc.KnockoutPower)
+                            float strength = SimMath.Clamp((sum.KnockoutPower - pc.KnockoutPower)
                                 / SimMath.Max(1f, pc.KnockoutPower * 0.5f), 0f, 1f);
                             strength = strength * strength * (3f - 2f * strength);
                             if (along < pc.KnockoutSpeed)
@@ -157,10 +188,10 @@ namespace Knockbox.Simulation
                         b.SleepTicks = 0;
                     }
                     // 충격을 받으면 깬다.
-                    if (sum.LastToucher > 0 || sum.Rotation.Y > 0f)
+                    if (sum.Touched || sum.Reflect)
                         b.SleepTicks = 0;
-                    if (sum.LastToucher > 0)
-                        b.LastToucher = sum.LastToucher - 1;
+                    if (sum.Touched)
+                        b.LastToucher = sum.Toucher;
                     if (sum.HitCooldown0 > 0)
                         b.HitCooldown0 = sum.HitCooldown0;
                     if (sum.HitCooldown1 > 0)

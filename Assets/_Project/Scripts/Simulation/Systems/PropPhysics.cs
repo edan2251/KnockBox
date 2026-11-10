@@ -45,6 +45,8 @@ namespace Knockbox.Simulation
         // Rebuilt from fighter support state before each Step, including after restore/rollback.
         public readonly float[] RiderForce = new float[PropState.Capacity];
         public readonly float[] RiderTorque = new float[PropState.Capacity];
+        /// <summary>이번 틱 두 캐릭터가 몸마다 준 충격과 표시. PropInteraction.Resolve가 매 틱 비우고 채운 뒤 바로 적용한다.</summary>
+        internal readonly PropInteraction.FighterImpulse[] FighterImpulses = new PropInteraction.FighterImpulse[PropState.Capacity];
         /// <summary>이번 틱이 시작할 때의 위치·회전(잠들기 판정은 실제로 움직인 양으로 한다).</summary>
         public readonly Vec2[] StartPosition = new Vec2[PropState.Capacity];
         public readonly Vec2[] StartRotation = new Vec2[PropState.Capacity];
