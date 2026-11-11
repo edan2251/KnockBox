@@ -2,24 +2,9 @@ using System;
 
 namespace Knockbox.Simulation
 {
-    /// <summary>
-    /// 공격 버튼이 무엇을 하는가(03-combat.md 1절).
-    /// Test: 테스트용 공격(CP4). Charge: 모드 A 돌진 충돌(CP5). Swing: 모드 B 무기 휘두르기(CP6).
-    /// </summary>
-    public enum CombatMode : byte
-    {
-        Test,
-        Charge,
-        Swing,
-    }
-
-    /// <summary>SimConfig.GetAttack의 공격 번호.</summary>
+    /// <summary>SimConfig.GetAttack의 공격 번호. 0~3은 폼 시대의 시험 공격·휘두르기 번호였다(번호는 체크섬에 들어가므로 비워 둔다).</summary>
     public static class AttackIds
     {
-        public const int Test = 0;
-        public const int SwingForward = 1;
-        public const int SwingUp = 2;
-        public const int SwingDown = 3;
         /// <summary>몸 폼의 주먹(CR-004). 판정 원은 조준 방향(AttackDir) 기준으로 놓인다.</summary>
         public const int Punch = 4;
         public const int Pan = 5;
@@ -602,7 +587,8 @@ namespace Knockbox.Simulation
         /// <summary>법선 속도가 이보다 작으면 튕기지 않고 그냥 닿는다(바닥에서 잔떨림 방지).</summary>
         public float BounceMinSpeed;
 
-        // 가드와 패링
+        // 가드와 패링: 2026-11-11 폼 전투 제거로 동작은 없다. 설정 해시(기록·온라인 설정 대조)에 들어가므로 데이터만 남긴다(2단계에서 제거).
+        // StaggerTicks·StaggerPushSpeed도 패링 전용이었다.
         public int ParryWindowTicks;
         public int ParryCooldownTicks;
         public float GuardMaxSpeed;
@@ -638,15 +624,18 @@ namespace Knockbox.Simulation
         public int BoundaryImmunityTicks;
         public float BoundaryImmuneRestitution;
 
+        /// <summary>폼 시대 시험 공격. 동작은 없고 설정 해시 호환용 데이터다(2단계에서 제거).</summary>
         public AttackDef TestAttack;
+        /// <summary>돌진 수치. 몸 폼의 박치기가 쓴다.</summary>
         public ChargeModeParams Charge;
+        /// <summary>폼 시대 보(휘두르기). 동작은 없고 설정 해시 호환용 데이터다(2단계에서 제거).</summary>
         public SwingModeParams Swing;
         public GrabParams Grab;
         /// <summary>구조물 물리와 캐릭터 상호작용(09-props-physics.md, CP14).</summary>
         public PropParams Props;
-        /// <summary>공격 에너지(10-forms-and-growth.md 4.4, CP18).</summary>
+        /// <summary>폼 시대 공격 에너지. 규칙은 없고 Max가 파이터 상태의 고정 시작값으로만 쓰인다(체크섬 호환, 2단계에서 제거).</summary>
         public EnergyParams Energy;
-        /// <summary>바위 폼의 투사체(CP19).</summary>
+        /// <summary>폼 시대 바위 투사체 수치. 무기 피격의 돌진 중 경직(LungeStunVelocityScale·LungeStunTicks)만 동작에 쓰이고 나머지는 해시 호환용이다.</summary>
         public RockParams Rock;
         /// <summary>몸 폼(CR-004). 기본은 꺼짐(0).</summary>
         public BodyParams Body;

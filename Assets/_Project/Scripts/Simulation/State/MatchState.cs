@@ -5,7 +5,7 @@ namespace Knockbox.Simulation
     /// <summary>
     /// 경기 흐름(06-match-and-tools.md 1절).
     /// Countdown → Fighting → KO → RoundEnd(1틱) → RoundTransition(1틱, 훅) → Countdown, 또는 RoundEnd → MatchEnd.
-    /// 세트 흐름(CR-003 개정, 레거시가 아닌 규칙): FormSelect(경기 시작, 초기 폼) → … → RoundEnd → (세트 종료면) SetPick(세트 패자) → RoundTransition.
+    /// 세트 흐름(카드 흐름, 레거시가 아닌 규칙): Countdown → … → RoundEnd → (세트 종료면) SetPick(세트 패자) → RoundTransition.
     /// 새 단계는 끝에 붙여 기존 번호를 바꾸지 않는다.
     /// </summary>
     public enum MatchPhase : byte
@@ -16,20 +16,16 @@ namespace Knockbox.Simulation
         RoundEnd,
         RoundTransition,
         MatchEnd,
-        /// <summary>경기 시작의 초기 폼 비공개 동시 선택(D-053).</summary>
-        FormSelect,
+        // 6은 폼 시대의 FormSelect 자리다. 기록·체크섬 호환을 위해 번호를 비워 둔다(2026-11-11 폼 전투 제거).
         /// <summary>세트가 끝난 뒤 세트 패자만 고르는 단계(D-050).</summary>
-        SetPick,
+        SetPick = 7,
     }
 
-    /// <summary>선택지 번호. 0 없음, 1~3 폼 획득(폼 번호 + 1), 증강은 AugmentBase + 증강 번호(CP23).</summary>
+    /// <summary>선택지 번호. 0 없음, 증강(카드)은 AugmentBase + 증강 번호(CP23). 1~3은 폼 시대의 폼 획득 번호였다.</summary>
     public static class PickOption
     {
         public const int None = 0;
         public const int AugmentBase = 16;
-        public static int Form(FighterForm form) => 1 + (int)form;
-        public static bool IsForm(int option) => option >= 1 && option <= Forms.PlayableCount;
-        public static FighterForm FormOf(int option) => (FighterForm)(option - 1);
         public static bool IsAugment(int option) => option >= AugmentBase;
         public static int AugmentOf(int option) => option - AugmentBase;
     }
@@ -60,9 +56,6 @@ namespace Knockbox.Simulation
         public int Option1;
         public int Option2;
         public int Option3;
-        /// <summary>FormSelect에서 고른 폼 번호(아직이면 -1).</summary>
-        public int FormChoice0;
-        public int FormChoice1;
         /// <summary>선택을 마친 틱(PhaseTick 기준, 아직이면 -1). PickHoldTicks 뒤 다음 단계로.</summary>
         public int PickedAt;
         /// <summary>마지막 KO의 승자. 0, 1, 또는 무승부·미정이면 -1.</summary>
@@ -115,8 +108,9 @@ namespace Knockbox.Simulation
             v.Value(nameof(Option1), Option1);
             v.Value(nameof(Option2), Option2);
             v.Value(nameof(Option3), Option3);
-            v.Value(nameof(FormChoice0), FormChoice0);
-            v.Value(nameof(FormChoice1), FormChoice1);
+            // 폼 시대의 FormChoice0·1 자리(항상 -1). 기록·체크섬 호환용이며 2단계에서 제거한다.
+            v.Value("FormChoice0", -1);
+            v.Value("FormChoice1", -1);
             v.Value(nameof(PickedAt), PickedAt);
             v.Begin(nameof(Rotation));
             Rotation.Visit(ref v);

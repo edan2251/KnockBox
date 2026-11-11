@@ -7,7 +7,6 @@ namespace Knockbox.Game
     {
         Idle,
         JumpRepeat,
-        GuardHold,
         AttackEvery40,
         WalkBackAndForth,
         Random,
@@ -42,8 +41,6 @@ namespace Knockbox.Game
             {
                 case DummyBehavior.JumpRepeat:
                     return new InputFrame(0, 0, tick % JumpPeriod < JumpHoldTicks ? InputButtons.Jump : InputButtons.None);
-                case DummyBehavior.GuardHold:
-                    return new InputFrame(0, 0, InputButtons.Guard);
                 case DummyBehavior.AttackEvery40:
                     return new InputFrame(0, 0, tick % AttackPeriod == 0 ? InputButtons.Attack : InputButtons.None);
                 case DummyBehavior.WalkBackAndForth:

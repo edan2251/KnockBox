@@ -6,9 +6,9 @@ using UnityEngine.InputSystem;
 namespace Knockbox.Game
 {
     /// <summary>
-    /// 디버그 단축키(06-match-and-tools.md 4절) 중 지금 있는 기능만: F1 전투 모드 전환(라운드 리셋), F3 판정 오버레이,
-    /// F4 잡기 켜기/끄기(라운드 리셋), F5 라운드 리셋(튜닝 재적용),
-    /// F6 P2 입력원 순환(키보드 오른쪽 → 게임패드 → 허수아비), `[` `]` 허수아비 행동 바꾸기,
+    /// 디버그 단축키(06-match-and-tools.md 4절) 중 지금 있는 기능만: F3 판정 오버레이,
+    /// F4 표면 이동 모드 순환(라운드 리셋), F5 라운드 리셋(튜닝 재적용),
+    /// F6 P2 입력원 순환(키보드 오른쪽 → 게임패드 → 허수아비 → 봇 → 박치기 연습 봇), `[` `]` 허수아비 행동 바꾸기,
     /// F7 흔들림 줄이기, F8 SyncTest, F2 맵 순환, F9 입력 기록 시작·중지, F10 마지막 기록 재생,
     /// F11 전투 튜닝 프리셋(기본 ↔ 더 빠르게), `~` 도움말, O/P P1/P2 즉사, Ctrl+P 일시정지, Ctrl+O 한 틱 진행.
     /// 에디터와 개발 빌드에서만 동작한다.
@@ -20,11 +20,8 @@ namespace Knockbox.Game
         MatchPresenter presenter;
         CameraRig cameraRig;
         readonly DummyInputSource dummy = new DummyInputSource();
-        BotInputSource bot;
         BrawlBot brawlBot;
         LungePracticeBot practiceBot;
-        /// <summary>빌드의 F1 순환: 가위·바위·보(시험 공격 폼은 에디터 전용).</summary>
-        static readonly FighterForm[] BuildForms = { FighterForm.Scissors, FighterForm.Rock, FighterForm.Paper };
 
         void Awake()
         {
@@ -33,7 +30,6 @@ namespace Knockbox.Game
             // 명령줄 자동 진행(-autobots, -ticksperframe N). 인수가 없으면 스스로 꺼진다(CP24).
             if (GetComponent<AutoPlayDebug>() == null)
                 gameObject.AddComponent<AutoPlayDebug>();
-            bot = new BotInputSource(() => runner.World, 1, 0xB07u);
             // CR-004 D/E 지표: 플레이하는 동안 라운드마다 한 줄만 남긴다.
             var metrics = new SurfaceMetrics();
             runner.Ticked += metrics.OnTicked;
@@ -59,16 +55,6 @@ namespace Knockbox.Game
             if (cameraRig == null && Camera.main != null)
                 cameraRig = Camera.main.GetComponent<CameraRig>();
 
-            if (k.f1Key.wasPressedThisFrame)
-            {
-                // 시작 폼 순환(CR-003). 전투 중 전환은 CP21.
-                var forms = Application.isEditor ? (FighterForm[])System.Enum.GetValues(typeof(FighterForm)) : BuildForms;
-                var rules = runner.Rules;
-                rules.StartForm = forms[(System.Array.IndexOf(forms, rules.StartForm) + 1) % forms.Length];
-                runner.Rules = rules;
-                RestartKeepingDummy();
-                Debug.Log($"[Knockbox] 시작 폼: {rules.StartForm}");
-            }
             if (k.f12Key.wasPressedThisFrame && presenter != null)
                 presenter.SetDebugText(!presenter.DebugTextVisible);
             if (k.backquoteKey.wasPressedThisFrame && presenter != null && presenter.Help != null)
@@ -99,25 +85,6 @@ namespace Knockbox.Game
                 RestartKeepingDummy();
                 Debug.Log($"[Knockbox] 표면 이동: {SurfaceModeName(runner.SurfaceMode)}");
             }
-            else if (k.f4Key.wasPressedThisFrame)
-            {
-                // 가드·잡기 한 스위치(10 문서 5.1, D-043).
-                var rules = runner.Rules;
-                bool on = !(rules.Switches.GuardEnabled && rules.Switches.GrabEnabled);
-                rules.Switches.GuardEnabled = on;
-                rules.Switches.GrabEnabled = on;
-                runner.Rules = rules;
-                RestartKeepingDummy();
-                Debug.Log($"[Knockbox] 가드·잡기 {(on ? "켬" : "끔")}");
-            }
-            if (k.insertKey.wasPressedThisFrame)
-            {
-                var rules = runner.Rules;
-                rules.Switches.EnergyEnabled = !rules.Switches.EnergyEnabled;
-                runner.Rules = rules;
-                RestartKeepingDummy();
-                Debug.Log($"[Knockbox] 공격 에너지 {(rules.Switches.EnergyEnabled ? "켬" : "끔")}");
-            }
             if (k.f3Key.wasPressedThisFrame && presenter != null)
                 presenter.SetOverlay(!presenter.OverlayVisible);
             if (k.f5Key.wasPressedThisFrame)
@@ -132,12 +99,6 @@ namespace Knockbox.Game
                     current.Behavior = DummyInputSource.Cycle(current.Behavior, step);
                     Debug.Log($"[Knockbox] 허수아비 행동: {current.Behavior}");
                 }
-            }
-            if (k.homeKey.wasPressedThisFrame && presenter != null)
-            {
-                // 현재 폼 표시 방식 순환(10 문서 5.1). 연출 옵션이라 시뮬레이션에 영향이 없다.
-                presenter.FormDisplay = (FormDisplayMode)(((int)presenter.FormDisplay + 1) % 3);
-                Debug.Log($"[Knockbox] 폼 표시: {presenter.FormDisplay}");
             }
             if (k.f7Key.wasPressedThisFrame && cameraRig != null)
             {
@@ -198,11 +159,6 @@ namespace Knockbox.Game
             runner.StartNewMatch();
             if (p2 is DummyInputSource)
                 runner.PracticeOpponent = p2;
-            else if (p2 is BotInputSource b)
-            {
-                b.Reset();
-                runner.PracticeOpponent = b;
-            }
             else if (p2 is BrawlBot bb)
             {
                 bb.Reset();
@@ -225,17 +181,8 @@ namespace Knockbox.Game
                 next = dummy;
             else if (current is DummyInputSource)
             {
-                // CR-004 실험 경기는 몸 폼 봇.
-                if (runner.BrawlExperiment)
-                {
-                    brawlBot.Reset();
-                    next = brawlBot;
-                }
-                else
-                {
-                    bot.Reset();
-                    next = bot;
-                }
+                brawlBot.Reset();
+                next = brawlBot;
             }
             else if (current is BrawlBot)
             {

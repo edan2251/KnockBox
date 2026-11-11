@@ -21,7 +21,6 @@ namespace Knockbox.Game
             public SpriteRenderer[] Box;
             public SpriteRenderer[] Circles;
             public SpriteRenderer Velocity;
-            public SpriteRenderer Parry;
             public SpriteRenderer[] GrabBox;
         }
 
@@ -90,7 +89,6 @@ namespace Knockbox.Game
                 for (int i = 0; i < m.Circles.Length; i++)
                     m.Circles[i] = ShapeLibrary.Create(transform, $"P{k + 1}Hit{i}", shapes.Ring, SortingLayers.UI, SortingOrder + 1, palette.hit);
                 m.Velocity = ShapeLibrary.Create(transform, $"P{k + 1}Velocity", shapes.Square, SortingLayers.UI, SortingOrder + 2, palette.energySoft);
-                m.Parry = ShapeLibrary.Create(transform, $"P{k + 1}Parry", shapes.Ring, SortingLayers.UI, SortingOrder, palette.energy);
                 marks[k] = m;
             }
         }
@@ -163,13 +161,6 @@ namespace Knockbox.Game
                 PlaceRect(m.GrabBox[1], center - new Vector2(0f, hh), g.BoxWidth + Line, Line);
                 PlaceRect(m.GrabBox[2], center + new Vector2(hw, 0f), Line, g.BoxHeight + Line);
                 PlaceRect(m.GrabBox[3], center - new Vector2(hw, 0f), Line, g.BoxHeight + Line);
-            }
-
-            m.Parry.enabled = f.ParryTicks > 0;
-            if (m.Parry.enabled)
-            {
-                m.Parry.transform.localPosition = c;
-                ShapeLibrary.SetSize(m.Parry, size * 1.6f, size * 1.6f);
             }
         }
 

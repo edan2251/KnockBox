@@ -222,24 +222,13 @@ namespace Knockbox.Simulation
         public readonly AugmentDef[] Augments;
         public readonly float HalfBody;
 
-        public SimConfig(in MovementParams movement, in MatchParams match)
-            : this(movement, match, CombatParams.Default, CombatMode.Test)
-        {
-        }
-
         /// <summary>
-        /// CP16까지의 생성자: 전역 모드를 시작 폼으로 바꾸고 레거시 규칙(가드 켬, 에너지 끔, 모드 B의 방향 휘두르기)을 쓴다.
-        /// 기존 테스트가 이 생성자로 (A) 기존 행동 회귀를 검사한다(10 문서 2절).
+        /// 기본 이동·경기 수치에 현재 몸 폼 전투(BrawlParams.Combat, 좌클릭 즉시 주먹)와 규칙(RuleSet.Brawl).
+        /// 2026-11-11 폼 전투 제거 전에는 Test 폼(시험 공격, 가드 켬)이었다.
         /// </summary>
-        public SimConfig(in MovementParams movement, in MatchParams match, in CombatParams combat, CombatMode mode, bool grabEnabled = true)
-            : this(movement, match, LegacyCombat(combat), RuleSet.Legacy(mode, grabEnabled))
+        public SimConfig(in MovementParams movement, in MatchParams match)
+            : this(movement, match, BrawlParams.Combat(CombatParams.Default), RuleSet.Brawl)
         {
-        }
-
-        static CombatParams LegacyCombat(CombatParams combat)
-        {
-            combat.Swing.ForwardOnly = false;
-            return combat;
         }
 
         public SimConfig(in MovementParams movement, in MatchParams match, in CombatParams combat, in RuleSet rules)
@@ -269,16 +258,8 @@ namespace Knockbox.Simulation
             HalfBody = movement.BodySize * 0.5f;
         }
 
-        public FighterForm StartForm => Rules.StartForm;
-        public FighterForm StartFormOf(int fighter) => Rules.StartFormOf(fighter);
-        public bool GuardEnabled => Rules.Switches.GuardEnabled;
         /// <summary>잡기 켜기/끄기. 꺼져 있으면 잡기 입력을 무시한다.</summary>
         public bool GrabEnabled => Rules.Switches.GrabEnabled;
-        public bool EnergyEnabled => Rules.Switches.EnergyEnabled;
-
-        /// <summary>CR-003 전의 전역 모드에 해당하는 값(시작 폼 기준). 시뮬레이션은 파이터의 폼을 읽는다.</summary>
-        public CombatMode Mode =>
-            StartForm == FighterForm.Scissors ? CombatMode.Charge : StartForm == FighterForm.Paper ? CombatMode.Swing : CombatMode.Test;
 
         public static SimConfig CreateDefault() => new SimConfig(MovementParams.Default, MatchParams.Default);
 
@@ -287,13 +268,11 @@ namespace Knockbox.Simulation
         {
             switch (id)
             {
-                case AttackIds.SwingForward: return ref Combat.Swing.Forward;
-                case AttackIds.SwingUp: return ref Combat.Swing.Up;
-                case AttackIds.SwingDown: return ref Combat.Swing.Down;
                 case AttackIds.Punch: return ref Combat.Body.Punch;
                 case AttackIds.Pan: return ref Combat.Weapons.Pan;
                 case AttackIds.Pistol: return ref Combat.Weapons.Pistol;
-                default: return ref Combat.TestAttack;
+                // 폼 시대의 시험 공격(TestAttack)은 설정 해시에만 남는 데이터다. 알 수 없는 번호는 주먹으로 본다.
+                default: return ref Combat.Body.Punch;
             }
         }
 
@@ -324,9 +303,10 @@ namespace Knockbox.Simulation
             v.Begin(nameof(Combat));
             Combat.Visit(ref v);
             v.End();
-            v.Value(nameof(StartForm), (int)StartForm);
-            v.Value("StartFormP2", (int)StartFormOf(1));
-            v.Value("OwnedForms", (int)Rules.OwnedForms);
+            // 기록 호환용 고정값(2026-11-11 폼 전투 제거): 시작 폼 Body(4), P2 시작 폼 Body(4), 시작 보유 폼 0. 2단계(기록 v10)에서 제거.
+            v.Value("StartForm", (int)FighterForm.Body);
+            v.Value("StartFormP2", (int)FighterForm.Body);
+            v.Value("OwnedForms", 0);
             v.Value("LegacyMatch", Rules.LegacyMatch);
             v.Value("AugmentCount", Augments.Length);
             for (int i = 0; i < Augments.Length; i++)
@@ -335,9 +315,9 @@ namespace Knockbox.Simulation
                 Augments[i].Visit(ref v);
                 v.End();
             }
-            v.Value(nameof(GuardEnabled), GuardEnabled);
+            v.Value("GuardEnabled", false); // 기록 호환용 고정값
             v.Value(nameof(GrabEnabled), GrabEnabled);
-            v.Value(nameof(EnergyEnabled), EnergyEnabled);
+            v.Value("EnergyEnabled", false); // 기록 호환용 고정값
         }
     }
 }

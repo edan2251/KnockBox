@@ -41,13 +41,7 @@ namespace Knockbox.Game
             {
                 Name = GetString(root, "name", fallbackName),
                 Arena = GetString(root, "arena", "Box"),
-                Mode = GetString(root, "mode", ""),
-                Form = GetString(root, "form", ""),
-                Form2 = GetString(root, "form2", ""),
-                Owned = GetInt(root, "owned", 0),
-                Grab = GetBool(root, "grab", !root.ContainsKey("form")),
-                Guard = GetBool(root, "guard", false),
-                Energy = GetBool(root, "energy", true),
+                Grab = GetBool(root, "grab", true),
                 Overlay = GetBool(root, "overlay", false),
                 Help = GetBool(root, "help", false),
                 Theme = ParseTheme(GetString(root, "theme", "")),
@@ -56,6 +50,11 @@ namespace Knockbox.Game
             };
             if (def.Ticks <= 0)
                 throw new FormatException("\"ticks\"는 1 이상이어야 함");
+            foreach (string removed in new[] { "mode", "form", "form2", "owned", "guard", "energy" })
+            {
+                if (root.ContainsKey(removed))
+                    throw new FormatException($"\"{removed}\": 폼 전투 시대의 키다(2026-11-11 제거). 시나리오는 현재 몸 폼 규칙으로만 돈다");
+            }
 
             if (root.TryGetValue("spawn", out object spawnValue) && spawnValue != null)
             {
@@ -146,11 +145,9 @@ namespace Knockbox.Game
                     case "Attack": buttons |= InputButtons.Attack; break;
                     case "Charge": buttons |= InputButtons.Charge; break;
                     case "Dash": buttons |= InputButtons.Dash; break;
-                    case "Guard": buttons |= InputButtons.Guard; break;
                     case "Grab": buttons |= InputButtons.Grab; break;
-                    case "Switch": buttons |= InputButtons.SwitchForm; break;
                     default:
-                        throw new FormatException($"{where}: 알 수 없는 입력 이름 \"{item}\" (Left, Right, Up, Down, Jump, Attack, Charge, Dash, Guard, Grab, Switch)");
+                        throw new FormatException($"{where}: 알 수 없는 입력 이름 \"{item}\" (Left, Right, Up, Down, Jump, Attack, Charge, Dash, Grab)");
                 }
             }
         }

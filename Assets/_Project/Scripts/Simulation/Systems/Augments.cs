@@ -127,52 +127,6 @@ namespace Knockbox.Simulation
         static bool Wins(int priority, int id, int bestPriority, int bestId) =>
             priority > bestPriority || (priority == bestPriority && id < bestId);
 
-        /// <summary>
-        /// 후보(10 문서 5.3 필터): 대상 폼을 가졌고, 중복 상한 아래, 같은 슬롯을 다른 증강이 차지하지 않았고, 가진 증강과 무의미 조합이 아닌 것. Id 순.
-        /// </summary>
-        public static void AddCandidates(in FighterState f, SimConfig config, ref CandidateList list, ref int count)
-        {
-            if (f.Augments.Count >= AugmentState.Capacity)
-                return;
-            AugmentAspect heldTargets = AugmentAspect.None, heldRemoves = AugmentAspect.None;
-            for (int i = 0; i < f.Augments.Count; i++)
-            {
-                if (TryGet(config, f.Augments.Get(i), out var h))
-                {
-                    heldTargets |= h.Targets;
-                    heldRemoves |= h.Removes;
-                }
-            }
-            var catalog = config.Augments;
-            for (int k = 0; k < catalog.Length; k++)
-            {
-                var d = catalog[k];
-                if (d.Target != AugmentTarget.Common && !Forms.Owns(f.OwnedForms, (FighterForm)(int)d.Target))
-                    continue;
-                int stacks = f.Augments.Stacks(d.Id);
-                if (stacks >= SimMath.Max(1, d.MaxStacks))
-                    continue;
-                if (stacks == 0)
-                {
-                    if (d.Slot != AugmentSlot.None && HoldsSlot(f.Augments, d.Slot, config))
-                        continue;
-                    if ((d.Removes & heldTargets) != 0 || (d.Targets & heldRemoves) != 0)
-                        continue;
-                }
-                list.Add(PickOption.AugmentBase + d.Id, ref count);
-            }
-        }
-
-        static bool HoldsSlot(in AugmentState held, AugmentSlot slot, SimConfig config)
-        {
-            for (int i = 0; i < held.Count; i++)
-            {
-                if (TryGet(config, held.Get(i), out var d) && d.Slot == slot)
-                    return true;
-            }
-            return false;
-        }
-
         public static void Grant(ref FighterState f, int id, SimConfig config) => f.Augments.Add(id);
 
         /// <summary>
@@ -208,8 +162,6 @@ namespace Knockbox.Simulation
 
         static void Fire(ref FighterState f, int index, in AugmentDef d, SimConfig config, int tick, SimEventBuffer events)
         {
-            if (d.Trigger == AugmentTrigger.OnMeleeHit && config.EnergyEnabled)
-                f.Energy = SimMath.Min(config.Combat.Energy.Max, f.Energy + SimMath.RoundToInt(d.TriggerValue));
             events.Add(new SimEvent(tick, SimEventType.AugmentActive, index, f.Position, Vec2.Zero, d.Id));
         }
     }

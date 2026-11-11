@@ -94,7 +94,6 @@ namespace Knockbox.Simulation
                 case "hitstop": number = f.HitstopTicks; return true;
                 case "stun": number = f.StunTicks; return true;
                 case "combo": number = f.ComboHits; return true;
-                case "parry": number = f.ParryTicks; return true;
                 case "bounces": number = f.LungeBounces; return true;
                 case "spikeImmunity": number = f.SpikeImmunityTicks; return true;
                 case "boundaryImmunity": number = f.BoundaryImmunityTicks; return true;

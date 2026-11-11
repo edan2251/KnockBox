@@ -9,8 +9,6 @@ namespace Knockbox.Simulation
         Dash,
         Hit,
         Clash,
-        Parry,
-        GuardHit,
         Grab,
         Throw,
         WallSplat,
@@ -25,8 +23,6 @@ namespace Knockbox.Simulation
         OutOfBounds,
         /// <summary>공격 시작(연출이 팔을 내지르는 시점). Strength는 공격 번호.</summary>
         AttackStart,
-        /// <summary>패링 구간이 열림.</summary>
-        ParryWindow,
         MatchEnd,
         /// <summary>모드 A 돌진 발사. Direction은 발사 방향, Strength는 속도.</summary>
         LungeStart,
@@ -52,20 +48,10 @@ namespace Knockbox.Simulation
         BoxKnockout,
         /// <summary>구조물이 지형·다른 구조물에 세게 부딪힘(CP16 연출용). Fighter는 NoFighter, Position은 접촉점, Direction은 법선, Strength는 다가온 속도. 몸마다 틱에 한 번.</summary>
         PropImpact,
-        /// <summary>발사 틱에 에너지가 비용보다 적어 행동을 취소함(CR-003 4.4 규칙 4). Fighter는 취소한 쪽, Strength는 그때 에너지.</summary>
-        EnergyShort,
-        /// <summary>투사체 발사(CP19). Fighter는 소유자, Position은 생긴 곳, Direction은 진행 방향, Strength는 속력.</summary>
-        ProjectileFire,
-        /// <summary>투사체가 사라짐(CP19). Fighter는 소유자, Position은 사라진 곳. Strength는 이유(ProjectileEndReason).</summary>
-        ProjectileEnd,
-        /// <summary>근접 활성 판정이 투사체를 반사함(CP20). Fighter는 반사한 쪽(새 소유자), Position은 반사한 곳, Direction은 새 진행 방향, Strength는 반사 횟수.</summary>
-        ProjectileReflect,
         /// <summary>돌진 중 투사체에 맞아 돌진이 끊기고 짧게 기절함(CP20). Fighter는 기절한 쪽, Strength는 기절 틱.</summary>
         LungeStun,
         /// <summary>근접공격이 위력 있는 돌진에 져서 중단됨(CP20). Fighter는 중단된 쪽, Strength는 돌진 위력.</summary>
         AttackInterrupted,
-        /// <summary>폼 전환(CP21). Fighter는 전환한 쪽, Direction.X는 이전 폼 번호, Strength는 새 폼 번호.</summary>
-        FormSwitch,
         /// <summary>세트 종료(세트 흐름). Fighter는 세트 승자, Strength는 끝난 세트 번호.</summary>
         SetEnd,
         /// <summary>선택 단계 시작. Fighter는 고르는 쪽(초기 폼 선택은 NoFighter), Strength는 선택지 수.</summary>

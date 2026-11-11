@@ -65,8 +65,6 @@ namespace Knockbox.Simulation
             var pressed = InputFrame.Pressed(input.Buttons, f.PrevButtons) | f.PendingPresses;
             f.PendingPresses = InputButtons.None;
 
-            if (f.ParryTicks > 0)
-                f.ParryTicks--;
             if (f.ContactCooldown > 0)
                 f.ContactCooldown--;
             if (f.SpikeImmunityTicks > 0)
@@ -79,19 +77,15 @@ namespace Knockbox.Simulation
                 f.AttackBuffer--;
             if (f.GrabProtectTicks > 0)
                 f.GrabProtectTicks--;
-            TickEnergy(ref f, config);
-            // 가드 입력은 조작할 수 없을 때 눌러도 센다(경직 중 연타로 패링을 준비하지 못하게).
-            bool guardPressed = (pressed & InputButtons.Guard) != 0;
-            int sinceGuardPress = SimMath.Min(f.TicksSinceGuardPress + 1, FighterState.TimerCap);
-            f.TicksSinceGuardPress = guardPressed ? 0 : sinceGuardPress;
+            // 기록 호환(2026-11-11 폼 전투 제거): 가드 기능은 없지만 가드 비트를 누른 뒤 지난 틱은 체크섬에 들어가므로 계속 센다.
+            // 현재 키보드의 E(가드 비트)가 이 값을 바꾼다. 2단계(기록 v10)에서 필드와 함께 제거한다.
+            f.TicksSinceGuardPress = (pressed & InputButtons.Guard) != 0 ? 0 : SimMath.Min(f.TicksSinceGuardPress + 1, FighterState.TimerCap);
 
             switch (f.Action)
             {
                 case ActionState.Hitstun:
-                case ActionState.GuardStun:
                 case ActionState.Stagger:
                 case ActionState.Recoil:
-                case ActionState.LandingLag:
                 case ActionState.Thrown:
                     if (f.StunTicks > 0)
                     {
@@ -110,7 +104,7 @@ namespace Knockbox.Simulation
                     if (f.ActionTick < config.GetAttack(f.AttackId).TotalTicks)
                     {
                         // 몸 폼(5.1): 주먹 후딜 중 누른 좌클릭은 잠시 저장했다가 끝나면 시작한다.
-                        if (f.Form == FighterForm.Body && (pressed & InputButtons.Attack) != 0
+                        if ((pressed & InputButtons.Attack) != 0
                             && (!c.Body.SeparateChargeInput
                                 || ((input.Buttons | pressed) & InputButtons.Charge) == 0))
                             f.AttackBuffer = c.Body.PunchBufferTicks;
@@ -126,7 +120,7 @@ namespace Knockbox.Simulation
                         pressed |= InputButtons.Attack;
                     }
                     break;
-                case ActionState.Charge when f.Form == FighterForm.Body:
+                case ActionState.Charge:
                     // 준비·충전 중 우클릭: 취소하고 잡기로 전환(비용 없음, 5.2 받아내기 최우선).
                     if ((pressed & InputButtons.Grab) != 0 && config.GrabEnabled)
                     {
@@ -136,21 +130,6 @@ namespace Knockbox.Simulation
                     }
                     BodyCharge(ref f, input, config, index, tick, events, heldWeapon);
                     return pressed;
-                case ActionState.Charge:
-                    // 누르고 있는 동안 충전. 떼거나 최대 충전 뒤 24틱이 지나면 발사.
-                    if (input.Held(InputButtons.Attack) && f.ActionTick < c.Charge.FullChargeTicks + c.Charge.FullChargeHoldTicks)
-                        return pressed;
-                    Launch(ref f, input, config, index, tick, events);
-                    return pressed;
-                case ActionState.Shoot:
-                    // 바위(CP19): 선딜이 끝나는 틱에 발사, 후딜이 끝나면 조작 가능.
-                    int startup = ShotStartup(f, config);
-                    if (f.ActionTick == startup)
-                        Fire(ref f, input, config, index, tick, events);
-                    if (f.Action != ActionState.Shoot || f.ActionTick < startup + c.Rock.RecoveryTicks)
-                        return pressed;
-                    f.RestartAction(ActionState.Airborne);
-                    break;
                 case ActionState.Grab:
                     // 시작 → 활성 → 헛잡기 후딜. 잡으면 상호작용 판정이 Holding으로 바꾼다.
                     if (f.ActionTick < c.Grab.TotalWhiffTicks)
@@ -158,7 +137,7 @@ namespace Knockbox.Simulation
                     f.AttackDir = Vec2.Zero;
                     f.RestartAction(ActionState.Airborne);
                     break;
-                case ActionState.Holding when f.Form == FighterForm.Body:
+                case ActionState.Holding:
                     // 몸 폼(5.2): 좌클릭을 누르는 순간(탭/홀드 구분 없음) 커서 방향으로 던진다.
                     // 잡는 순간 이미 눌려 있던 좌클릭은 눌림이 아니므로 무시된다(뗐다가 다시 눌러야 한다).
                     // 최대 유지 시간 동안 던지지 않으면 놓아준다(단계 C 피드백: 자동 던짐 대신 해제). 방향 0 = 놓기.
@@ -173,188 +152,48 @@ namespace Knockbox.Simulation
                         f.ThrowDirection = Vec2.Zero;
                     }
                     return pressed;
-                case ActionState.Holding:
-                    // 잡기 버튼을 떼거나 최대 시간이 지나면 이번 틱에 던진다. 방향은 이번 틱의 8방향 입력.
-                    if (!f.ThrowPending && (!input.Held(InputButtons.Grab) || f.ActionTick >= c.Grab.MaxHoldTicks))
-                    {
-                        f.ThrowPending = true;
-                        f.ThrowDirection = input.MoveX == 0 && input.MoveY == 0
-                            ? new Vec2(c.Grab.NeutralThrowDirection.X * f.Facing, c.Grab.NeutralThrowDirection.Y)
-                            : SimMath.Normalize(new Vec2(input.MoveX, input.MoveY));
-                    }
-                    return pressed;
                 case ActionState.Lunge:
                 case ActionState.KO:
                 case ActionState.Held:
                     return pressed;
             }
 
+            // 대시 중(구 몸 폼 조작)에는 공격·잡기를 받지 않는다.
             if (f.Action == ActionState.Dash && f.DashTicksLeft > 0)
-            {
-                // 모드 B: 대시 시작 4틱 이후에는 공격으로 캔슬할 수 있다(대시 속도를 그대로 실은 공격).
-                ref readonly var swing = ref c.Swing;
-                int elapsed = config.Movement.DashTicks - f.DashTicksLeft;
-                if (f.Form == FighterForm.Paper && swing.DashAttackCancelEnabled && (pressed & InputButtons.Attack) != 0
-                    && elapsed >= swing.DashAttackCancelMinTicks && CanAfford(f, CostFor(f, FighterForm.Paper, config), config))
-                {
-                    StartAttack(ref f, input.MoveX, SwingAttack(f, input, c.Swing), index, tick, events);
-                    Spend(ref f, CostFor(f, FighterForm.Paper, config), config);
-                }
                 return pressed;
-            }
 
-            if (config.GuardEnabled && input.Held(InputButtons.Guard))
+            if ((pressed & InputButtons.Grab) != 0 && (pressed & InputButtons.Attack) == 0 && config.GrabEnabled)
             {
-                f.SetAction(ActionState.Guard);
-                if (guardPressed && sinceGuardPress >= c.ParryCooldownTicks)
-                {
-                    f.ParryTicks = c.ParryWindowTicks;
-                    events.Add(new SimEvent(tick, SimEventType.ParryWindow, index, f.Position, new Vec2(f.Facing, 0f), c.ParryWindowTicks));
-                }
-                return pressed;
-            }
-            if (f.Action == ActionState.Guard)
-            {
-                f.ParryTicks = 0;
-                f.RestartAction(ActionState.Airborne);
-            }
-
-            // 폼 전환(4.5): 지금 공격을 시작할 수 있는 자유 상태에서만 받는다(공격·후딜·경직·가드 중의 입력은 위에서 이미 돌아갔다).
-            // 즉시 바뀌고, 같은 틱에 누른 공격은 새 폼으로 시작한다. 에너지와 폼별 상태(날아가는 투사체)는 그대로.
-            if ((pressed & InputButtons.SwitchForm) != 0)
-            {
-                var next = Forms.NextOwned(f.Form, f.OwnedForms);
-                if (next != f.Form)
-                {
-                    events.Add(new SimEvent(tick, SimEventType.FormSwitch, index, f.Position, new Vec2((int)f.Form, 0f), (int)next));
-                    f.Form = next;
-                }
-            }
-
-            int grabCost = SimMath.Max(c.Energy.GrabCost, 0);
-            if ((pressed & InputButtons.Grab) != 0 && (pressed & InputButtons.Attack) == 0 && config.GrabEnabled && CanAfford(f, grabCost, config))
-            {
-                StartGrab(ref f, f.Form == FighterForm.Body ? AimFacing(input) : input.MoveX, index, tick, events);
                 // 몸 폼: 잡기 판정은 커서 방향(등 뒤도 잡을 수 있다).
-                if (f.Form == FighterForm.Body)
-                    f.AttackDir = AimOrMove(f, input);
-                Spend(ref f, grabCost, config);
+                StartGrab(ref f, AimFacing(input), index, tick, events);
+                f.AttackDir = AimOrMove(f, input);
                 return pressed;
             }
 
-            // 에너지가 모자라면 확인에서 막혀 공격이 시작되지 않는다. 입력은 버려지고 대기하지 않는다(4.4).
-            int cost = CostFor(f, f.Form, config);
             // 현재 몸 폼은 Shift 차징과 주먹을 분리한다. 동시에 누르면 차징이 우선하며,
             // 차징 중 좌클릭은 위의 Charge 분기에서 소비하므로 나중에 주먹으로 이어지지 않는다.
-            if (f.Form == FighterForm.Body && c.Body.SeparateChargeInput
-                && (pressed & InputButtons.Charge) != 0 && CanAfford(f, cost, config))
+            if (c.Body.SeparateChargeInput && (pressed & InputButtons.Charge) != 0)
             {
                 f.AttackBuffer = 0;
                 StartCharge(ref f, AimFacing(input));
                 return pressed;
             }
-            if ((pressed & InputButtons.Attack) != 0 && CanAfford(f, cost, config))
+            if ((pressed & InputButtons.Attack) != 0)
             {
-                switch (f.Form)
+                if (c.Body.SeparateChargeInput)
                 {
-                    case FighterForm.Scissors:
-                        // 충전은 확인만 하고, 소비는 발사할 때(Launch). 즉발 돌진 증강이면 누른 틱에 바로 발사(시작 = 발사).
-                        StartCharge(ref f, input.MoveX);
-                        if (Augments.Compute(f.Augments, config).InstantLunge)
-                            Launch(ref f, input, config, index, tick, events);
-                        break;
-                    case FighterForm.Paper:
-                        StartAttack(ref f, input.MoveX, SwingAttack(f, input, c.Swing), index, tick, events);
-                        Spend(ref f, cost, config);
-                        break;
-                    case FighterForm.Rock:
-                        // 선딜 시작은 확인만, 소비는 발사할 때(Fire).
-                        StartShoot(ref f, input.MoveX);
-                        break;
-                    case FighterForm.Body:
-                        if (c.Body.SeparateChargeInput)
-                        {
-                            int attackId = heldWeapon == BrawlWeaponKind.Pan ? AttackIds.Pan
-                                : heldWeapon == BrawlWeaponKind.Pistol ? AttackIds.Pistol : AttackIds.Punch;
-                            StartAttack(ref f, AimFacing(input), attackId, index, tick, events);
-                            f.AttackDir = AimOrMove(f, input);
-                        }
-                        else
-                        {
-                            // 구 기록: 좌클릭 탭/홀드는 다음 틱부터 BodyCharge가 가른다.
-                            StartCharge(ref f, AimFacing(input));
-                        }
-                        break;
-                    default:
-                        StartAttack(ref f, input.MoveX, AttackIds.Test, index, tick, events);
-                        break;
+                    int attackId = heldWeapon == BrawlWeaponKind.Pan ? AttackIds.Pan
+                        : heldWeapon == BrawlWeaponKind.Pistol ? AttackIds.Pistol : AttackIds.Punch;
+                    StartAttack(ref f, AimFacing(input), attackId, index, tick, events);
+                    f.AttackDir = AimOrMove(f, input);
+                }
+                else
+                {
+                    // 탭/홀드 조작(현재 결합 입력과 구 기록): 다음 틱부터 BodyCharge가 주먹과 박치기를 가른다.
+                    StartCharge(ref f, AimFacing(input));
                 }
             }
             return pressed;
-        }
-
-        /// <summary>공격 행동(충전, 돌진, 선딜·활성·후딜, 잡기)인지. 이 동안 에너지 회복 지연이 처음으로 돌아간다.</summary>
-        public static bool IsAttackAction(in FighterState f) =>
-            f.Action == ActionState.Charge || f.Action == ActionState.Lunge || f.Action == ActionState.Attack
-            || f.Action == ActionState.Grab || f.Action == ActionState.Holding || f.Action == ActionState.Shoot;
-
-        /// <summary>에너지 회복(4.4): 공격 행동 동안은 지연을 처음으로 돌리고, 끝난 뒤 지연이 지나면 틱마다 회복한다.</summary>
-        static void TickEnergy(ref FighterState f, SimConfig config)
-        {
-            if (!config.EnergyEnabled)
-                return;
-            ref readonly var e = ref config.Combat.Energy;
-            if (IsAttackAction(f))
-                f.EnergyRegenDelay = e.RegenDelayTicks;
-            else if (f.EnergyRegenDelay > 0)
-                f.EnergyRegenDelay--;
-            else if (f.Energy < e.Max)
-                f.Energy = SimMath.Min(e.Max, f.Energy + e.RegenPerTick);
-        }
-
-        /// <summary>증강을 적용한 폼의 공격 비용(하한 0, 5.3).</summary>
-        public static int CostFor(in FighterState f, FighterForm form, SimConfig config)
-        {
-            int cost = config.Combat.Energy.CostOf(form);
-            if (f.Augments.Count == 0)
-                return cost;
-            var e = Augments.Compute(f.Augments, config);
-            int add = form == FighterForm.Scissors ? e.LungeCostAdd : form == FighterForm.Rock ? e.ShotCostAdd : form == FighterForm.Paper ? e.SwingCostAdd : 0;
-            return SimMath.Max(0, cost + add);
-        }
-
-        /// <summary>증강을 적용한 바위 선딜(하한 1틱, 5.3).</summary>
-        public static int ShotStartup(in FighterState f, SimConfig config)
-        {
-            int startup = config.Combat.Rock.StartupTicks;
-            if (f.Augments.Count > 0)
-                startup += Augments.Compute(f.Augments, config).ShotStartupAdd;
-            return SimMath.Max(1, startup);
-        }
-
-        /// <summary>시작 확인(차감 없음). 스위치가 꺼져 있으면 항상 된다.</summary>
-        public static bool CanAfford(in FighterState f, int cost, SimConfig config) => !config.EnergyEnabled || f.Energy >= cost;
-
-        /// <summary>행동당 한 번만 소비한다(4.4 규칙 1).</summary>
-        static void Spend(ref FighterState f, int cost, SimConfig config)
-        {
-            if (!config.EnergyEnabled || f.ActionPaid)
-                return;
-            f.Energy -= cost;
-            f.ActionPaid = true;
-            f.EnergyRegenDelay = config.Combat.Energy.RegenDelayTicks;
-        }
-
-        /// <summary>모드 B 기술 고르기: 위 → 위 휘두르기, 공중에서 아래 → 내려찍기, 그 외(중립·좌우·지상 아래) → 앞 휘두르기.</summary>
-        static int SwingAttack(in FighterState f, in InputFrame input, in SwingModeParams swing)
-        {
-            if (swing.ForwardOnly)
-                return AttackIds.SwingForward;
-            if (input.MoveY > 0)
-                return AttackIds.SwingUp;
-            if (input.MoveY < 0 && !f.Grounded)
-                return AttackIds.SwingDown;
-            return AttackIds.SwingForward;
         }
 
         static void StartAttack(ref FighterState f, int moveX, int attackId, int index, int tick, SimEventBuffer events)
@@ -365,7 +204,6 @@ namespace Knockbox.Simulation
             f.AttackId = attackId;
             f.AttackHasHit = false;
             f.AttackDir = Vec2.Zero;
-            f.ActionPaid = false;
             f.AttackFromAir = !f.Grounded;
             f.DashTicksLeft = 0;
             f.RestartAction(ActionState.Attack);
@@ -378,41 +216,10 @@ namespace Knockbox.Simulation
                 f.Facing = (sbyte)moveX;
             f.DashTicksLeft = 0;
             f.ThrowPending = false;
-            f.ActionPaid = false;
             f.AttackBuffer = 0;
             f.AttackDir = Vec2.Zero;
             f.RestartAction(ActionState.Grab);
             events.Add(new SimEvent(tick, SimEventType.GrabStart, index, f.Position, new Vec2(f.Facing, 0f), 0f));
-        }
-
-        static void StartShoot(ref FighterState f, int moveX)
-        {
-            if (moveX != 0)
-                f.Facing = (sbyte)moveX;
-            f.DashTicksLeft = 0;
-            f.ActionPaid = false;
-            f.ShotPending = false;
-            f.RestartAction(ActionState.Shoot);
-        }
-
-        /// <summary>
-        /// 바위 발사 틱: 에너지가 모자라면 발사하지 않고 취소한다(4.4 규칙 4). 투사체는 이동이 끝난 뒤
-        /// Projectiles.SpawnPending이 풀에 넣는다(발사 방향은 이번 틱의 8방향 입력, 중립이면 바라보는 쪽).
-        /// </summary>
-        static void Fire(ref FighterState f, in InputFrame input, SimConfig config, int index, int tick, SimEventBuffer events)
-        {
-            int cost = CostFor(f, FighterForm.Rock, config);
-            if (config.EnergyEnabled && !f.ActionPaid && f.Energy < cost)
-            {
-                f.RestartAction(ActionState.Airborne);
-                events.Add(new SimEvent(tick, SimEventType.EnergyShort, index, f.Position, new Vec2(f.Facing, 0f), f.Energy));
-                return;
-            }
-            Spend(ref f, cost, config);
-            f.ShotPending = true;
-            f.ShotDirection = input.MoveX == 0 && input.MoveY == 0
-                ? new Vec2(f.Facing, 0f)
-                : SimMath.Normalize(new Vec2(input.MoveX, input.MoveY));
         }
 
         static void StartCharge(ref FighterState f, int moveX)
@@ -420,7 +227,6 @@ namespace Knockbox.Simulation
             if (moveX != 0)
                 f.Facing = (sbyte)moveX;
             f.DashTicksLeft = 0;
-            f.ActionPaid = false;
             f.RestartAction(ActionState.Charge);
         }
 
@@ -484,12 +290,12 @@ namespace Knockbox.Simulation
 
         /// <summary>몸 폼이 최소 충전까지 마쳐 해제하면 박치기가 나가는지. 연출과 봇의 대응에 쓴다.</summary>
         public static bool IsLungeReady(in FighterState f, SimConfig config) =>
-            f.Form == FighterForm.Body && f.Action == ActionState.Charge
+            f.Action == ActionState.Charge
             && f.ActionTick >= config.Combat.Body.TapHoldTicks + config.Combat.Body.MinLungeChargeTicks;
 
-        /// <summary>충전 진행 틱(몸 폼은 T 이후부터). 연출의 충전 단계에 쓴다.</summary>
+        /// <summary>충전 진행 틱(탭/홀드 임계 T 이후부터). 연출의 충전 단계에 쓴다.</summary>
         public static int ChargeTicks(in FighterState f, SimConfig config) =>
-            f.Form == FighterForm.Body ? SimMath.Max(0, f.ActionTick - config.Combat.Body.TapHoldTicks) : f.ActionTick;
+            SimMath.Max(0, f.ActionTick - config.Combat.Body.TapHoldTicks);
 
         /// <summary>
         /// 돌진 발사: 충전 틱(행동 틱)에 따라 18 → 34, 방향은 이번 틱의 8방향 입력(중립이면 바라보는 쪽).
@@ -497,16 +303,8 @@ namespace Knockbox.Simulation
         /// </summary>
         static void Launch(ref FighterState f, in InputFrame input, SimConfig config, int index, int tick, SimEventBuffer events)
         {
-            // 소비는 발사할 때 한 번. 발사 틱에 모자라면 발사하지 않고 취소하며 소비하지 않는다(4.4 규칙 4).
-            int cost = CostFor(f, FighterForm.Scissors, config);
-            if (config.EnergyEnabled && !f.ActionPaid && f.Energy < cost)
-            {
-                f.RestartAction(ActionState.Airborne);
-                events.Add(new SimEvent(tick, SimEventType.EnergyShort, index, f.Position, new Vec2(f.Facing, 0f), f.Energy));
-                return;
-            }
-            Spend(ref f, cost, config);
             // 증강(5.4): 즉발 돌진은 고정 속도, 속도 배율은 충전형·즉발 모두에 곱한다.
+            // 지금의 카드 세 장은 효과가 없어 두 값이 바뀌지 않는다(폼 시대 증강 카탈로그는 설정 해시용으로 남아 있다).
             var aug = Augments.Compute(f.Augments, config);
             float speed = (aug.InstantLunge ? config.Combat.Charge.InstantLungeSpeed : config.Combat.Charge.LungeSpeed(ChargeTicks(f, config))) * aug.LungeSpeedMul;
             if (aug.InstantLunge)
@@ -560,11 +358,9 @@ namespace Knockbox.Simulation
             return d * local.X + up * local.Y;
         }
 
-        /// <summary>몸 충돌의 공격성 가중치: 가위 폼에서 돌진 1.0, 대시는 튜닝 값(CR-003 기본 0), 그 외 0.</summary>
+        /// <summary>몸 충돌의 공격성 가중치: 돌진은 LungeAggression, 대시는 튜닝 값(CR-003 기본 0), 그 외 0.</summary>
         public static float Aggression(in FighterState f, SimConfig config)
         {
-            if (f.Form != FighterForm.Scissors && f.Form != FighterForm.Body)
-                return 0f;
             if (f.Action == ActionState.Lunge)
                 return config.Combat.Charge.LungeAggression;
             if (f.Action == ActionState.Dash && f.DashTicksLeft > 0)
@@ -940,11 +736,11 @@ namespace Knockbox.Simulation
                 Knockback = attack.KnockbackStrength,
                 Point = point,
             };
-            var outcome = ApplyStrike(ref attacker, ref defender, snapAttacker, snapDefender, strike, defenderIndex, config, tick, events);
-            // 적중 트리거 증강(5.4, 보의 에너지 환급).
-            if (outcome == SimEventType.Hit && attacker.Augments.Count > 0)
+            ApplyStrike(ref attacker, ref defender, snapAttacker, snapDefender, strike, defenderIndex, config, tick, events);
+            // 적중 트리거 증강(5.4).
+            if (attacker.Augments.Count > 0)
                 Augments.RunTriggers(ref attacker, 1 - defenderIndex, AugmentTrigger.OnMeleeHit, config, tick, events);
-            if (outcome == SimEventType.Hit && attack.PogoSpeed > 0f)
+            if (attack.PogoSpeed > 0f)
             {
                 // 내려찍기 포고 튕김: 히트스탑이 끝나면 위로 튀어 오르고 공중 점프·대시를 되찾는다.
                 attacker.Velocity.Y = attack.PogoSpeed;
@@ -1046,60 +842,17 @@ namespace Knockbox.Simulation
             public Vec2 Direction;
             public float Knockback;
             public Vec2 Point;
-            /// <summary>몸 충돌(돌진·대시)이면 이긴 쪽이 튕겨 나오고 돌진이 끝나며, 패링당하면 반사된다.</summary>
+            /// <summary>몸 충돌(돌진·대시)이면 이긴 쪽이 튕겨 나오고 돌진이 끝난다.</summary>
             public bool Body;
             /// <summary>몸 충돌의 접촉 법선(이긴 쪽 → 진 쪽).</summary>
             public Vec2 ContactNormal;
         }
 
-        /// <summary>결과(Parry, GuardHit, Hit)를 돌려준다.</summary>
-        static SimEventType ApplyStrike(ref FighterState attacker, ref FighterState defender, in FighterState snapAttacker, in FighterState snapDefender, in Strike strike, int defenderIndex, SimConfig config, int tick, SimEventBuffer events)
+        /// <summary>명중 적용(2026-11-11 폼 전투 제거로 가드·패링 결과는 없다).</summary>
+        static void ApplyStrike(ref FighterState attacker, ref FighterState defender, in FighterState snapAttacker, in FighterState snapDefender, in Strike strike, int defenderIndex, SimConfig config, int tick, SimEventBuffer events)
         {
             ref readonly var c = ref config.Combat;
-
-            if (snapDefender.Action == ActionState.Guard && snapDefender.ParryTicks > 0)
-            {
-                // 패링: 공격한 쪽은 비틀거린다. 판정 원 공격은 반대로 8 밀려나고, 돌진은 접촉 법선 기준 반사 × 0.8.
-                int away = SimMath.Sign(snapAttacker.Position.X - snapDefender.Position.X);
-                if (away == 0)
-                    away = -snapAttacker.Facing;
-                if (strike.Body)
-                {
-                    var v = snapAttacker.Velocity;
-                    var nrm = strike.ContactNormal;
-                    attacker.Velocity = (v - nrm * (2f * Vec2.Dot(v, nrm))) * c.Charge.ParryReflectScale;
-                }
-                else
-                {
-                    attacker.Velocity = new Vec2(away * c.StaggerPushSpeed, 0f);
-                }
-                attacker.StunTicks = c.StaggerTicks;
-                EnterStun(ref attacker, ActionState.Stagger);
-                defender.ParryTicks = 0;
-                attacker.HitstopTicks = c.ParryHitstop;
-                defender.HitstopTicks = c.ParryHitstop;
-                events.Add(new SimEvent(tick, SimEventType.Parry, defenderIndex, strike.Point, new Vec2(away, 0f), strike.Damage));
-                return SimEventType.Parry;
-            }
-
             int hitstop = HitstopFor(strike.Damage, c);
-            if (snapDefender.IsGuarding)
-            {
-                // 가드: 데미지 × 0.2, 넉백 × 0.35(수평만), 가드 경직, 히트스탑 절반.
-                int damage = SimMath.Max(1, SimMath.RoundToInt(strike.Damage * c.GuardDamageMultiplier));
-                defender.Health = SimMath.Max(0, defender.Health - damage);
-                defender.Velocity.X = strike.Direction.X * (strike.Knockback * c.GuardKnockbackMultiplier);
-                defender.StunTicks = c.GuardStunTicks;
-                EnterStun(ref defender, ActionState.GuardStun);
-                int guardHitstop = SimMath.RoundToInt(hitstop * c.GuardHitstopMultiplier);
-                attacker.HitstopTicks = guardHitstop;
-                defender.HitstopTicks = guardHitstop;
-                if (strike.Body)
-                    Rebound(ref attacker, snapAttacker, config);
-                events.Add(new SimEvent(tick, SimEventType.GuardHit, defenderIndex, strike.Point, strike.Direction, damage));
-                return SimEventType.GuardHit;
-            }
-
             // 명중: 넉백은 속도를 대체한다. 경직이 풀리기 전에 다시 맞으면 넉백 × 0.85^n, 경직 × 0.8^n.
             int n = snapDefender.IsLaunched ? snapDefender.ComboHits : 0;
             float knockback = strike.Knockback * SimMath.Pow(c.ComboKnockbackDecay, n);
@@ -1113,30 +866,16 @@ namespace Knockbox.Simulation
             if (strike.Body)
                 Rebound(ref attacker, snapAttacker, config);
             events.Add(new SimEvent(tick, SimEventType.Hit, defenderIndex, strike.Point, strike.Direction, strike.Damage));
-            return SimEventType.Hit;
         }
 
         /// <summary>
-        /// 투사체에 맞음(CP19): 공통 틀(가드면 가드 규칙, 아니면 명중·연속 명중 감쇠·경직). 쏜 쪽은 멀리 있으므로 히트스탑은 맞은 쪽만.
-        /// 패링 구간도 가드로 받는다(되돌려 비틀거리게 할 공격자가 곁에 없다).
+        /// 투사체·무기에 맞음(CP19): 명중·연속 명중 감쇠·경직. 쏜 쪽은 멀리 있으므로 히트스탑은 맞은 쪽만.
         /// </summary>
         public static void ProjectileHit(ref FighterState defender, int defenderIndex, int damage, Vec2 direction, float knockback, Vec2 point,
             SimConfig config, int tick, SimEventBuffer events)
         {
             ref readonly var c = ref config.Combat;
             int hitstop = HitstopFor(damage, c);
-            if (defender.IsGuarding)
-            {
-                int guarded = SimMath.Max(1, SimMath.RoundToInt(damage * c.GuardDamageMultiplier));
-                defender.Health = SimMath.Max(0, defender.Health - guarded);
-                defender.Velocity.X = direction.X * (knockback * c.GuardKnockbackMultiplier);
-                defender.ParryTicks = 0;
-                defender.StunTicks = c.GuardStunTicks;
-                EnterStun(ref defender, ActionState.GuardStun);
-                defender.HitstopTicks = SimMath.RoundToInt(hitstop * c.GuardHitstopMultiplier);
-                events.Add(new SimEvent(tick, SimEventType.GuardHit, defenderIndex, point, direction, guarded));
-                return;
-            }
             bool lunging = defender.Action == ActionState.Lunge;
             int n = defender.IsLaunched ? defender.ComboHits : 0;
             float k = knockback * SimMath.Pow(c.ComboKnockbackDecay, n);
@@ -1191,7 +930,6 @@ namespace Knockbox.Simulation
             f.ThrowPending = false;
             f.AttackId = FighterState.NoAttack;
             f.AttackHasHit = false;
-            f.ParryTicks = 0;
             f.DashTicksLeft = 0;
             f.JumpCutEligible = false;
             if (f.Velocity.Y > 0f)

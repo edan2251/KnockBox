@@ -28,12 +28,7 @@ namespace Knockbox.Game
         [SerializeField] PostFx postFx;
         [SerializeField] ArenaView arenaView;
         [SerializeField] PropView propView;
-        [SerializeField] ProjectileView projectileView;
         [SerializeField] BrawlWeaponView brawlWeaponView;
-        [SerializeField] PickPanelView pickPanel;
-
-        /// <summary>선택 화면(CP22). 증강 이름은 CP23이 채운다.</summary>
-        public PickPanelView PickPanel => pickPanel;
         [SerializeField] PropShadowView propShadows;
         [SerializeField] FighterShadowView fighterShadows;
         /// <summary>3D 시험 외형(CR-004, 에디터 전용 로컬 설정이 있을 때만).</summary>
@@ -95,7 +90,6 @@ namespace Knockbox.Game
         public bool OverlayVisible => overlay != null && overlay.gameObject.activeSelf;
 
         /// <summary>현재 폼 표시 방식(10 문서 5.1, HOME). 연출만 바뀐다.</summary>
-        public FormDisplayMode FormDisplay { get; set; } = FormDisplayMode.Always;
         public SfxLibrary Library => sfx;
         public HudView Hud => hud;
         public HelpOverlay Help => help;
@@ -139,8 +133,6 @@ namespace Knockbox.Game
             CreateTestModel();
             dust = Reuse(dust, "Dust");
             dust.Setup(palette, shapes);
-            projectileView = Reuse(projectileView, "Projectiles");
-            projectileView.Setup(palette, shapes);
             brawlWeaponView = Reuse(brawlWeaponView, "Brawl_Weapon");
             brawlWeaponView.Setup(palette, shapes);
             boundaryView = Reuse(boundaryView, "Boundary");
@@ -151,9 +143,6 @@ namespace Knockbox.Game
             koShatter.Setup(palette, shapes);
             hud = Reuse(hud, "Hud");
             hud.Setup(palette, shapes);
-            pickPanel = Reuse(pickPanel, "PickPanel");
-            pickPanel.Setup(palette, shapes);
-            pickPanel.AugmentName = id => runner.World != null && Augments.TryGet(runner.World.Config, id, out var d) ? d.Name : $"AUG {id}";
             sfxPlayer = Reuse(sfxPlayer, "Sfx");
             sfxPlayer.Setup(sfx);
             // 최종 출력 리미터는 AudioListener와 같은 오브젝트에 있어야 전체 소리에 걸린다(F-2).
@@ -290,7 +279,6 @@ namespace Knockbox.Game
             if (cameraRig != null)
                 cameraRig.FitArena(arena);
             hud.SetArena(arena);
-            pickPanel.SetArena(arena);
             worldBrightness.Rebuild(arenaView.transform, propView.transform, fighter0.transform, fighter1.transform,
                 modelRig != null ? modelRig.transform : null);
         }
@@ -390,7 +378,6 @@ namespace Knockbox.Game
             }
             propView.TickFeedback(dt);
             propView.Render(previous.Props, current.Props, alpha);
-            projectileView.Render(previous.Projectiles, current.Projectiles, alpha, world.Config.Combat.Rock.Radius);
             fighter0.Render(previous.Fighter0, current.Fighter0, alpha, dt, world.Arena, world.Config);
             fighter1.Render(previous.Fighter1, current.Fighter1, alpha, dt, world.Arena, world.Config);
             brawlWeaponView.Render(previous, current, alpha, dt, world.Config);
@@ -427,12 +414,9 @@ namespace Knockbox.Game
             boundaryView.Render(V(current.Fighter0.Position), V(current.Fighter1.Position), world.Config.HalfBody);
             boundaryView.Tick(dt);
             hud.Render(current, body0 + new Vector2(0f, FighterView.VisualLift), body1 + new Vector2(0f, FighterView.VisualLift),
-                world.Config.Match, world.Config.Combat.MaxHealth, world.Config.Combat.Energy, world.Config.EnergyEnabled, dt);
+                world.Config.Match, world.Config.Combat.MaxHealth, dt);
             hud.SetFlow = !world.Config.Rules.LegacyMatch;
-            pickPanel.Render(current);
-            hud.RenderForms(current, body0 + new Vector2(0f, FighterView.VisualLift), body1 + new Vector2(0f, FighterView.VisualLift), FormDisplay, world.Config);
-            projectileView.RenderWindup(current.Fighter0, 0, V(current.Fighter0.Position), world.Config);
-            projectileView.RenderWindup(current.Fighter1, 1, V(current.Fighter1.Position), world.Config);
+            hud.RenderAugments(body0 + new Vector2(0f, FighterView.VisualLift), body1 + new Vector2(0f, FighterView.VisualLift));
             if (labels != null && labels.gameObject.activeSelf)
             {
                 bool recordingOrReplay = runner.Recording != null || runner.Playback != null;
@@ -472,13 +456,10 @@ namespace Knockbox.Game
             fighter1.transform.localPosition += Vector3.up * rise;
             if (modelRig != null) modelRig.gameObject.SetActive(combat || (modelFighter == 0 ? scale0 : scale1) > .01f);
             hud.FrontendFlow = runner.World.Config.Match.IntroCountdownTicks > 0;
-            // 커튼이 열려 있을 때도 과거 PICK/WAIT/키 안내가 새 카드 화면 뒤로 비치지 않게 한다.
-            pickPanel.gameObject.SetActive(!runner.World.Config.Match.CollectCardsOnly);
             hud.gameObject.SetActive(combat);
             fighterShadows.gameObject.SetActive(combat || (entering && shadowsReady));
             aimLine.gameObject.SetActive(combat);
             boundaryView.gameObject.SetActive(combat);
-            projectileView.gameObject.SetActive(combat);
             brawlWeaponView.gameObject.SetActive(combat);
             fx.gameObject.SetActive(opacity > .05f);
             dust.gameObject.SetActive(opacity > .05f);
@@ -560,7 +541,7 @@ namespace Knockbox.Game
                 footerP2 = p2;
                 footerDummy = dummy;
                 var sw = world.Config.Rules.Switches;
-                footer = $"{footerArena} / {world.Config.StartForm}{(sw.GuardEnabled ? " +guard" : "")}{(sw.GrabEnabled ? " +grab" : "")}{(sw.EnergyEnabled ? "" : " (no energy)")}{(world.Config.Combat.Body.SurfaceMode == 1 ? " / surface D" : world.Config.Combat.Body.SurfaceMode == 2 ? " / surface E" : "")} / {footerPreset} / P2 {InputSourceName(p2)}"
+                footer = $"{footerArena} / Body{(sw.GrabEnabled ? " +grab" : "")}{(world.Config.Combat.Body.SurfaceMode == 1 ? " / surface D" : world.Config.Combat.Body.SurfaceMode == 2 ? " / surface E" : "")} / {footerPreset} / P2 {InputSourceName(p2)}"
                          + (recording ? " / REC" : "") + (playback ? " / REPLAY" : "");
             }
             return footer;
@@ -573,7 +554,6 @@ namespace Knockbox.Game
                 case KeyboardInputSource _: return "keyboard";
                 case GamepadInputSource _: return "gamepad";
                 case DummyInputSource d: return "dummy " + d.Behavior;
-                case BotInputSource _: return "bot";
                 case BrawlBot _: return "brawl bot";
                 case LungePracticeBot _: return "lunge practice";
                 case MouseAimInputSource _: return "mouse";
@@ -640,35 +620,12 @@ namespace Knockbox.Game
                     AddTrauma(0.05f + e.Strength * 0.003f);
                     sfxPlayer.Play(Sfx.Dash);
                     break;
-                case SimEventType.ProjectileFire:
-                    // 바위 발사(CP19): 작은 고리, 높은 바람 소리(돌진 소리 재사용, S-151).
-                    fx.RingBurst(V(e.Position), palette.FighterBody(e.Fighter), 0.15f, 0.6f, 0.12f);
-                    sfxPlayer.Play(Sfx.Dash, 0.55f, 1.45f);
-                    break;
-                case SimEventType.ProjectileEnd:
-                    if (e.Strength == (int)ProjectileEndReason.Terrain || e.Strength == (int)ProjectileEndReason.Prop
-                        || e.Strength == (int)ProjectileEndReason.Boundary)
-                    {
-                        fx.Shards(V(e.Position), -new Vector2(e.Direction.X, e.Direction.Y), 80f, 4, palette.FighterBody(e.Fighter), 6f, 0.12f, 0.3f);
-                        sfxPlayer.Play(Sfx.Land, 0.35f, 1.3f);
-                    }
-                    break;
                 case SimEventType.AugmentActive:
                     hud.ShowAugment(e.Fighter, Augments.TryGet(runner.World.Config, (int)e.Strength, out var augment) ? augment.Name : "AUG");
                     break;
-                case SimEventType.FormSwitch:
-                    // 전환: 새 폼 색은 쓰지 않고 짧은 흰 고리와 가벼운 소리.
-                    fx.RingBurst(V(e.Position), palette.flash, 0.4f, 1f, 0.12f);
-                    sfxPlayer.Play(Sfx.Jump, 0.35f, 1.6f);
-                    break;
-                case SimEventType.ProjectileReflect:
-                    // 보가 투사체를 되받아침(CP20): 반사한 쪽 색 고리와 패링 소리.
-                    fx.RingBurst(V(e.Position), palette.FighterBody(e.Fighter), 0.2f, 0.9f, 0.16f);
-                    sfxPlayer.Play(Sfx.Parry, 0.7f, 1.2f);
-                    break;
                 case SimEventType.LungeStun:
                 case SimEventType.AttackInterrupted:
-                    // 돌진이 끊김 / 근접공격이 돌진에 짐: 위험색 작은 고리.
+                    // 돌진이 무기에 맞아 끊김 / 근접공격이 돌진에 짐: 위험색 작은 고리.
                     fx.RingBurst(V(e.Position), palette.hit, 0.3f, 1.1f, 0.18f);
                     break;
                 case SimEventType.PowerCheck:
@@ -795,27 +752,6 @@ namespace Knockbox.Game
                     dust.Burst(V(e.Position), 2 + Mathf.RoundToInt(strength * 3f), 1.2f + strength, 0f);
                     AddTrauma(0.02f + strength * 0.06f);
                     sfxPlayer.Play(Sfx.Land, 0.35f + strength * 0.4f);
-                    break;
-                }
-                case SimEventType.GuardHit:
-                    fx.RingBurst(onBody, palette.uiSub, 0.25f, 0.9f, 0.15f);
-                    fx.Shards(onBody, V(e.Direction), 60f, 3, palette.uiSub, 6f, 0.14f, 0.3f);
-                    AddTrauma(0.12f);
-                    sfxPlayer.Play(Sfx.Guard);
-                    break;
-                case SimEventType.Parry:
-                {
-                    // 패링한 쪽 색의 고리 폭발, 짧은 화면 색 반전(흔들림 줄이기에서는 끔), 높은 "팅".
-                    var center = Fighter(e.Fighter).BodyCenter;
-                    var color = palette.FighterBody(e.Fighter);
-                    fx.RingBurst(center, color, 0.6f, 3.2f, 0.28f);
-                    fx.RingBurst(center, palette.flash, 0.3f, 2.0f, 0.18f);
-                    fx.Glow(center, palette.energy, 3.2f, 0.5f, 0.3f);
-                    Fighter(e.Fighter).FlashOutline(4f * Frame);
-                    if (!reduceMotion)
-                        fx.ScreenFlash(true);
-                    AddTrauma(0.25f);
-                    sfxPlayer.Play(Sfx.Parry);
                     break;
                 }
                 case SimEventType.Clash:

@@ -245,10 +245,6 @@ namespace Knockbox.Presentation
                     Impulse(e.Direction, -.18f);
                     FlashOutline(4f / 60f);
                     break;
-                case SimEventType.GuardHit:
-                    shake = Mathf.Max(shake, 0.03f);
-                    Impulse(e.Direction, 0.12f);
-                    break;
                 case SimEventType.WallSplat:
                     // 부딪힌 면에 납작하게 붙는다.
                     Flash(4f / 60f);
@@ -335,59 +331,10 @@ namespace Knockbox.Presentation
             Vector2 hip1 = pose.TransformPoint(new Vector3(0.17f, 0.04f, 0f));
             Vector2 shoulder0 = pose.TransformPoint(new Vector3(-0.46f, 0.5f, 0f));
             Vector2 shoulder1 = pose.TransformPoint(new Vector3(0.46f, 0.5f, 0f));
-            bool swing = current.Form == FighterForm.Paper && current.Action != ActionState.KO;
-            Vector2 grip = default, tip = default;
-            bool tipFixed = swing && SwingWeaponPose(current, position, alpha, config, out grip, out tip);
-            if (tipFixed)
-                rig.SetHands(grip, (current.Facing >= 0 ? shoulder0 : shoulder1) + new Vector2(-current.Facing * 0.2f, -0.25f), LimbRig.ArmLayers.Natural);
-            else
-                UpdateHandPose(current, position, shoulder0, shoulder1, alpha, config);
+            UpdateHandPose(current, position, shoulder0, shoulder1, alpha, config);
             rig.UpdateRig(hip0, hip1, shoulder0, shoulder1, position, current, arena, config.HalfBody, dt);
-            UpdateWeapon(current, swing, tipFixed, tip);
-        }
-
-        /// <summary>
-        /// 모드 B 공격 중 무기 자세(손잡이 = 첫 판정 원, 끝 = 마지막 판정 원). 공격 중이 아니면 false.
-        /// 틱 진행도 t는 직전 틱(ActionTick - 1)과 현재 틱 사이를 보간 비율로 잇는다(alpha = 1이면 현재 틱과 정확히 같다).
-        /// </summary>
-        bool SwingWeaponPose(in FighterState f, Vector2 position, float alpha, SimConfig config, out Vector2 grip, out Vector2 tip)
-        {
-            grip = tip = default;
-            if (f.Action != ActionState.Attack || f.AttackId == FighterState.NoAttack)
-                return false;
-            ref readonly var attack = ref config.GetAttack(f.AttackId);
-            int facing = f.Facing >= 0 ? 1 : -1;
-            float t = Mathf.Max(0f, f.ActionTick - 1 + alpha);
-            int firstActive = attack.StartupTicks;
-            int lastActive = attack.StartupTicks + attack.ActiveTicks - 1;
-            var c0 = attack.Circle0;
-            var c2 = attack.Circle2;
-            Vector2 restGrip = new Vector2(0.62f, -0.05f);
-            Vector2 restTip = restGrip + WeaponRestDirection * WeaponRestLength;
-            Vector2 localGrip, localTip;
-            if (t < firstActive)
-            {
-                // 시작: 휴식 자세에서 첫 키프레임으로 들어 올린다(뒤로 젖힘).
-                float k = Smooth(t / firstActive);
-                localGrip = Vector2.Lerp(restGrip, V(c0.Start), k);
-                localTip = Vector2.Lerp(restTip, V(c2.Start), k);
-            }
-            else if (t <= lastActive)
-            {
-                float k = attack.ActiveTicks > 1 ? (t - firstActive) / (attack.ActiveTicks - 1) : 0f;
-                localGrip = V(c0.At(k));
-                localTip = V(c2.At(k));
-            }
-            else
-            {
-                // 후딜: 마지막 키프레임에서 휴식 자세로 돌아온다.
-                float k = Smooth((t - lastActive) / Mathf.Max(attack.RecoveryTicks, 1));
-                localGrip = Vector2.Lerp(V(c0.End), restGrip, k);
-                localTip = Vector2.Lerp(V(c2.End), restTip, k);
-            }
-            grip = position + new Vector2(localGrip.x * facing, localGrip.y);
-            tip = position + new Vector2(localTip.x * facing, localTip.y);
-            return true;
+            // 보 폼의 막대 무기는 폼 전투와 함께 제거했다(2026-11-11). 프리팹의 무기 그림은 숨긴 채 둔다.
+            UpdateWeapon(current, false, false, default);
         }
 
         static Vector2 V(Vec2 v) => new Vector2(v.X, v.Y);
@@ -406,7 +353,7 @@ namespace Knockbox.Presentation
             Vector2 hand = rig.DrawnHand(facing > 0 ? 1 : 0);
             if (!tipFixed)
             {
-                var up = f.IsGuarding ? new Vector2(facing * 0.12f, 1f).normalized : new Vector2(WeaponRestDirection.x * facing, WeaponRestDirection.y);
+                var up = new Vector2(WeaponRestDirection.x * facing, WeaponRestDirection.y);
                 tip = hand + up * WeaponRestLength;
             }
             weaponTip = tip;
@@ -431,7 +378,7 @@ namespace Knockbox.Presentation
 
         /// <summary>충전 연출을 보일지. 몸 폼은 실제 돌진 가능한 최소 충전에 닿으면 눌리고 색이 바뀐다.</summary>
         static bool Charging(in FighterState f, SimConfig config) =>
-            f.Action == ActionState.Charge && (f.Form != FighterForm.Body || FighterCombat.IsLungeReady(f, config));
+            f.Action == ActionState.Charge && FighterCombat.IsLungeReady(f, config);
 
         /// <summary>충전 단계 1~3: 1/3 전, 최대 충전 전, 최대 충전.</summary>
         public static int ChargeStage(in FighterState f, SimConfig config)
@@ -443,13 +390,11 @@ namespace Knockbox.Presentation
         void UpdateColors(in FighterState f, float dt, SimConfig config)
         {
             body.color = flashLeft > 0f ? palette.flash : f.Action == ActionState.KO ? palette.FighterShade(index) : palette.FighterBody(index);
-            // 우선순위: 번쩍임 > 패링 구간(밝은 외곽선) > 위험(위력 6 이상) > 충전 단계 > 기본.
+            // 우선순위: 번쩍임 > 위험(위력 6 이상) > 충전 단계 > 기본.
             Color line;
             float power = Mathf.Sqrt(f.Velocity.X * f.Velocity.X + f.Velocity.Y * f.Velocity.Y) * FighterCombat.Aggression(f, config);
             if (outlineFlashLeft > 0f)
                 line = palette.flash;
-            else if (f.ParryTicks > 0)
-                line = palette.energy;
             else if (power >= config.Combat.Charge.PowerThreshold)
                 line = palette.hit;
             else if (Charging(f, config))
@@ -481,12 +426,6 @@ namespace Knockbox.Presentation
             int facing = f.Facing >= 0 ? 1 : -1;
             Vector2 front = facing > 0 ? shoulder1 : shoulder0;
             Vector2 back = facing > 0 ? shoulder0 : shoulder1;
-            if (f.IsGuarding)
-            {
-                var chest = (shoulder0 + shoulder1) * 0.5f;
-                rig.SetHands(chest + new Vector2(facing * 0.55f, -0.02f), chest + new Vector2(facing * 0.5f, -0.24f), LimbRig.ArmLayers.BothFront);
-                return;
-            }
             if (f.Action == ActionState.Climb || f.Action == ActionState.Mantle)
             {
                 // 기어오르기: 두 손으로 벽 위쪽을 번갈아 짚는다. 모서리 오르기: 두 손으로 윗면을 짚고 몸을 끌어올린다(CR-004).
@@ -665,15 +604,11 @@ namespace Knockbox.Presentation
             blinkLeft = Mathf.Max(0f, blinkLeft - dt);
             float open = blinkLeft > 0f ? 0.15f : 1f;
             float wide = 1f;
-            // 맞았을 때는 찡그린 납작한 선, 가드 중에는 가늘게.
+            // 맞았을 때는 찡그린 납작한 선.
             if (f.IsLaunched || f.Action == ActionState.KO || f.Action == ActionState.Stagger || f.Action == ActionState.Held)
             {
                 open = 0.035f / eyeSize.y;
                 wide = 1.35f;
-            }
-            else if (f.IsGuarding)
-            {
-                open = Mathf.Min(open, 0.6f);
             }
             else if (f.Action == ActionState.Charge)
             {

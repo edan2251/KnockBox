@@ -4,47 +4,22 @@ using Knockbox.Simulation;
 namespace Knockbox.Game
 {
     /// <summary>
-    /// 시나리오의 시뮬레이션 설정: 튜닝 에셋(없으면 명세 초기값) + 시나리오의 mode + tuning 덮어쓰기.
-    /// 덮어쓰기는 "Combat.TestAttack.KnockbackStrength"처럼 필드 경로로 쓰고, 반사로 적용한다(Game 계층이라 허용).
+    /// 시나리오의 시뮬레이션 설정: 튜닝 에셋(없으면 명세 초기값)에 현재 몸 폼 전투(BrawlParams.Combat)와 규칙(RuleSet.Brawl), 그리고 tuning 덮어쓰기.
+    /// 덮어쓰기는 "Combat.Body.Punch.KnockbackStrength"처럼 필드 경로로 쓰고, 반사로 적용한다(Game 계층이라 허용).
+    /// 2026-11-11 폼 전투 제거 전에는 mode·form으로 폼 규칙을 골랐다.
     /// </summary>
     public static class ScenarioConfig
     {
-        public static SimConfig Create(ScenarioDef def, MovementTuning movement = null, CombatTuning combat = null) =>
-            Apply(string.IsNullOrEmpty(def.Form)
-                ? SimConfigFactory.Create(movement, combat, ParseMode(def.Mode), def.Grab)
-                : SimConfigFactory.Create(movement, combat, ParseRules(def)), def.Tuning);
-
-        /// <summary>"form"이 있으면 폼 규칙(가드·잡기·에너지는 시나리오 값), 없으면 mode·grab의 레거시 규칙.</summary>
-        public static RuleSet ParseRules(ScenarioDef def)
+        public static SimConfig Create(ScenarioDef def, MovementTuning movement = null, CombatTuning combat = null)
         {
-            if (string.IsNullOrEmpty(def.Form))
-                return RuleSet.Legacy(ParseMode(def.Mode), def.Grab);
-            var form = ParseForm(def.Form, "form");
-            var form2 = string.IsNullOrEmpty(def.Form2) ? form : ParseForm(def.Form2, "form2");
-            if (def.Owned < 0 || def.Owned > Forms.AllPlayable)
-                throw new FormatException($"\"owned\": 0~{Forms.AllPlayable} 사이 비트여야 함");
-            return new RuleSet
-            {
-                Switches = new FeatureSwitches { GuardEnabled = def.Guard, GrabEnabled = def.Grab, EnergyEnabled = def.Energy },
-                OwnedForms = (byte)def.Owned,
-            }.WithForms(form, form2);
-        }
-
-        static FighterForm ParseForm(string text, string key)
-        {
-            if (!Enum.TryParse(text, false, out FighterForm form) || !Enum.IsDefined(typeof(FighterForm), form))
-                throw new FormatException($"\"{key}\": 알 수 없는 폼 \"{text}\" (가능: {string.Join(", ", Enum.GetNames(typeof(FighterForm)))})");
-            return form;
-        }
-
-        /// <summary>빈 문자열이면 테스트 모드.</summary>
-        public static CombatMode ParseMode(string mode)
-        {
-            if (string.IsNullOrEmpty(mode))
-                return CombatMode.Test;
-            if (Enum.TryParse(mode, false, out CombatMode parsed) && Enum.IsDefined(typeof(CombatMode), parsed))
-                return parsed;
-            throw new FormatException($"\"mode\": 알 수 없는 모드 \"{mode}\" (가능: {string.Join(", ", Enum.GetNames(typeof(CombatMode)))})");
+            var rules = RuleSet.Brawl;
+            rules.Switches.GrabEnabled = def.Grab;
+            var config = new SimConfig(
+                movement != null ? movement.Movement : MovementParams.Default,
+                movement != null ? movement.Match : MatchParams.Default,
+                BrawlParams.Combat(combat != null ? combat.Combat : CombatParams.Default),
+                rules);
+            return Apply(config, def.Tuning);
         }
 
         public static SimConfig Apply(SimConfig source, ScenarioTuning[] overrides)

@@ -15,8 +15,6 @@ namespace Knockbox.Game
         const float BarHeight = 0.12f;
         const float BarOffsetY = 1.05f;
         /// <summary>에너지 줄(CR-003 4.4): 체력 바 바로 아래의 얇은 민트 줄. 다음 공격 비용보다 적으면 흐린 색.</summary>
-        const float EnergyHeight = 0.05f;
-        const float EnergyGap = 0.04f;
         const float TrailHold = 0.4f;
         const float TrailSpeed = 2.5f;
         const float SlotSize = 0.24f;
@@ -40,10 +38,6 @@ namespace Knockbox.Game
         }
 
         [SerializeField] Bar[] bars = new Bar[2];
-        [SerializeField] SpriteRenderer[] energyBack = new SpriteRenderer[2];
-        [SerializeField] SpriteRenderer[] energyFill = new SpriteRenderer[2];
-        [SerializeField] SpriteRenderer[] formIcons = new SpriteRenderer[2];
-        [SerializeField] SpriteRenderer[] formOutlines = new SpriteRenderer[2];
         // 증강 발동 표시(CP23): 머리 위에 이름을 잠깐(AugmentShowSeconds) 띄운다. 평소에는 표시하지 않는다.
         const float AugmentShowSeconds = 0.7f;
         [SerializeField] TextMesh[] augmentTexts = new TextMesh[2];
@@ -78,16 +72,12 @@ namespace Knockbox.Game
             shapeLibrary = shapes;
             for (int i = 0; i < 2; i++)
             {
-                if(formOutlines[i] == null) formOutlines[i] = ShapeLibrary.Create(transform, $"Form{i}Outline", shapes.Square, SortingLayers.UI, 3, palette.ink);
-                if(formIcons[i] == null) formIcons[i] = ShapeLibrary.Create(transform, $"Form{i}Icon", shapes.Square, SortingLayers.UI, 4, palette.FighterBody(i));
                 if(bars[i].Back == null) bars[i].Back = ShapeLibrary.Create(transform, $"Bar{i}Back", shapes.Square, SortingLayers.UI, 0, palette.uiEmpty);
                 if(bars[i].Trail == null) bars[i].Trail = ShapeLibrary.Create(transform, $"Bar{i}Trail", shapes.Square, SortingLayers.UI, 1, palette.hit);
                 if(bars[i].Fill == null) bars[i].Fill = ShapeLibrary.Create(transform, $"Bar{i}Fill", shapes.Square, SortingLayers.UI, 2, palette.FighterBody(i));
                 bars[i].Shown = 1f;
                 bars[i].Trailing = 1f;
                 bars[i].Back.enabled=bars[i].Trail.enabled=bars[i].Fill.enabled=true;
-                if(energyBack[i] == null) energyBack[i] = ShapeLibrary.Create(transform, $"Energy{i}Back", shapes.Square, SortingLayers.UI, 0, palette.uiEmpty);
-                if(energyFill[i] == null) energyFill[i] = ShapeLibrary.Create(transform, $"Energy{i}Fill", shapes.Square, SortingLayers.UI, 2, palette.energy);
             }
             for (int i = 0; i < 2; i++)
             {
@@ -143,10 +133,6 @@ namespace Knockbox.Game
                     color = palette.flash;
                     subText = go ? "" : SetFlow ? $"SET {m.Set}   {m.SetScore0} - {m.SetScore1}" : $"ROUND {m.Round}";
                     return;
-                case MatchPhase.FormSelect:
-                    text = "";
-                    color = palette.flash;
-                    return;
                 case MatchPhase.SetPick:
                     // 큰 문구는 양쪽 선택 목록을 가리므로 쓰지 않고, 아래 작은 문구로만 알린다.
                     text = "";
@@ -198,18 +184,12 @@ namespace Knockbox.Game
             sub.transform.localPosition = new Vector3(0f, SubY, 0f);
         }
 
-        public void Render(in SimState state, Vector2 body0, Vector2 body1, in MatchParams match, float maxHealth, float dt) =>
-            Render(state, body0, body1, match, maxHealth, default, false, dt);
-
-        /// <param name="energyShown">에너지 스위치가 켜져 있을 때만 줄을 그린다.</param>
-        public void Render(in SimState state, Vector2 body0, Vector2 body1, in MatchParams match, float maxHealth, in EnergyParams energy, bool energyShown, float dt)
+        public void Render(in SimState state, Vector2 body0, Vector2 body1, in MatchParams match, float maxHealth, float dt)
         {
             int roundsToWin = SetFlow ? match.RoundsToWinSet : match.RoundsToWin;
             RenderBanner(state, match, dt);
             RenderBar(ref bars[0], body0, Health(state.Fighter0, maxHealth), dt);
             RenderBar(ref bars[1], body1, Health(state.Fighter1, maxHealth), dt);
-            RenderEnergy(0, state.Fighter0, body0, energy, energyShown);
-            RenderEnergy(1, state.Fighter1, body1, energy, energyShown);
 
             int count = Mathf.Clamp(roundsToWin, 0, MaxSlots);
             for (int k = 0; k < MaxSlots; k++)
@@ -256,48 +236,11 @@ namespace Knockbox.Game
             ShapeLibrary.SetSize(augmentRings[i], Mathf.Lerp(0.5f, 1.1f, k), 0.05f);
         }
 
-        /// <summary>현재 폼 표시(10 문서 5.1): 체력 바 위의 작은 모양. 방식은 FormDisplayMode.</summary>
-        public void RenderForms(in SimState state, Vector2 body0, Vector2 body1, FormDisplayMode mode, SimConfig config)
+        /// <summary>증강(카드) 발동 표시. 폼 아이콘·에너지 줄은 2026-11-11 폼 전투와 함께 제거했다.</summary>
+        public void RenderAugments(Vector2 body0, Vector2 body1)
         {
-            RenderForm(0, state.Fighter0, body0, mode, state.Match.Phase);
-            RenderForm(1, state.Fighter1, body1, mode, state.Match.Phase);
             RenderAugment(0, body0, Time.deltaTime);
             RenderAugment(1, body1, Time.deltaTime);
-        }
-
-        void RenderForm(int i, in FighterState f, Vector2 body, FormDisplayMode mode, MatchPhase phase)
-        {
-            bool acting = f.Action == ActionState.Charge || f.Action == ActionState.Lunge || f.Action == ActionState.Shoot || f.Action == ActionState.Attack;
-            bool shown = f.Action != ActionState.KO && phase != MatchPhase.MatchEnd && (mode != FormDisplayMode.OnAction || acting);
-            formIcons[i].enabled = shown;
-            formOutlines[i].enabled = shown && mode != FormDisplayMode.Minimal;
-            if (!shown)
-                return;
-            var sprite = f.Form == FighterForm.Scissors ? shapeLibrary.Triangle : f.Form == FighterForm.Rock ? shapeLibrary.Circle : shapeLibrary.Square;
-            formIcons[i].sprite = sprite;
-            formOutlines[i].sprite = sprite;
-            bool minimal = mode == FormDisplayMode.Minimal;
-            float size = minimal ? 0.14f : 0.3f;
-            var at = new Vector3(body.x, body.y + BarOffsetY + BarHeight + (minimal ? 0.14f : 0.24f), 0f);
-            formIcons[i].transform.localPosition = at;
-            formOutlines[i].transform.localPosition = at;
-            ShapeLibrary.SetSize(formIcons[i], size, size);
-            ShapeLibrary.SetSize(formOutlines[i], size + 0.08f, size + 0.08f);
-            formIcons[i].color = minimal ? palette.uiSub : palette.FighterBody(i);
-        }
-
-        void RenderEnergy(int i, in FighterState f, Vector2 body, in EnergyParams energy, bool shown)
-        {
-            shown &= energy.Max > 0;
-            energyBack[i].enabled = shown;
-            energyFill[i].enabled = shown;
-            if (!shown)
-                return;
-            float fraction = Mathf.Clamp01((float)f.Energy / energy.Max);
-            float y = body.y + BarOffsetY - BarHeight * 0.5f - EnergyGap - EnergyHeight * 0.5f;
-            Place(energyBack[i], body.x - BarWidth * 0.5f, y, BarWidth, EnergyHeight, 0f);
-            Place(energyFill[i], body.x - BarWidth * 0.5f, y, BarWidth * fraction, EnergyHeight, 0f);
-            energyFill[i].color = f.Energy >= energy.CostOf(f.Form) ? palette.energy : palette.uiSub;
         }
 
         void RenderBar(ref Bar bar, Vector2 body, float fraction, float dt)

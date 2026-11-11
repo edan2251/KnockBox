@@ -22,17 +22,10 @@ namespace Knockbox.Game
 
     public static class SimConfigFactory
     {
-        /// <summary>튜닝 에셋이 없으면 명세 초기값으로 만든다.</summary>
-        public static SimConfig Create(MovementTuning tuning) => Create(tuning, null, CombatMode.Test);
-
-        /// <summary>CP16까지의 규칙(전역 모드, 가드 켬, 에너지 끔, 모드 B 방향 휘두르기). 기존 테스트·레거시 시나리오용.</summary>
-        public static SimConfig Create(MovementTuning movement, CombatTuning combat, CombatMode mode, bool grabEnabled = true) =>
-            new SimConfig(
-                movement != null ? movement.Movement : MovementParams.Default,
-                movement != null ? movement.Match : MatchParams.Default,
-                combat != null ? combat.Combat : CombatParams.Default,
-                mode,
-                grabEnabled);
+        /// <summary>튜닝 에셋이 없으면 명세 초기값으로 만든다. 규칙은 현재 몸 폼(RuleSet.Brawl).</summary>
+        public static SimConfig Create(MovementTuning tuning) => tuning != null
+            ? new SimConfig(tuning.Movement, tuning.Match)
+            : SimConfig.CreateDefault();
 
         public static SimConfig Create(MovementTuning movement, CombatTuning combat, in RuleSet rules) =>
             new SimConfig(

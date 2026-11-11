@@ -7,7 +7,7 @@ namespace Knockbox.Game
     /// <summary>
     /// 디버그 전용 자동 진행(CP24): 명령줄 인수로 봇 대 봇 경기를 빠르게 돌리고 상태 전이를 로그에 남긴다.
     /// 개발 빌드나 에디터에서만 동작한다. 사람이 하는 플레이에는 영향이 없다(인수가 없으면 아무것도 하지 않음).
-    ///   -autobots            두 선수를 봇으로(선택 단계도 봇이 고른다)
+    ///   -autobots            두 선수를 몸 폼 봇(BrawlBot)으로. 카드 선택은 봇이 고르지 않고 선택 시간 초과 규칙으로 넘어간다
     ///   -ticksperframe N     프레임마다 N틱 더 진행(시뮬레이션 결과는 같고 화면만 빨리 감김)
     ///   -replaycheck 기록     입력 기록 재생 검사만 하고 끝냄(ReplayCheck, CR-004 온라인 1단계)
     ///   (온라인 인수 -host/-join/-relayhost/-relayjoin은 Online.OnlineMatch가 직접 본다)
@@ -60,8 +60,8 @@ namespace Knockbox.Game
             }
             if (!bots)
                 return;
-            runner.Player1Input = new BotInputSource(() => runner.World, 0, 0xA11u);
-            runner.Player2Input = new BotInputSource(() => runner.World, 1, 0xB22u);
+            runner.Player1Input = new BrawlBot(() => runner.World, 0, 0xA11u);
+            runner.Player2Input = new BrawlBot(() => runner.World, 1, 0xB22u);
             runner.Ticked += LogFlow;
             Debug.Log($"[Knockbox][flow] 자동 진행: 봇 대 봇, 프레임마다 추가 {extraTicks}틱, 규칙 {runner.World?.Config.Rules.Format()}");
         }
@@ -91,7 +91,7 @@ namespace Knockbox.Game
                         Debug.Log($"[Knockbox][flow] t={s.Tick} 세트 {(int)e.Strength} 끝: 승자 P{e.Fighter + 1}, 세트스코어 {m.SetScore0}:{m.SetScore1}, 라운드 점수 {m.Score0}:{m.Score1}");
                         break;
                     case SimEventType.PickStart:
-                        Debug.Log($"[Knockbox][flow] t={s.Tick} 선택 시작: {(e.Fighter < 0 ? "초기 폼(양쪽)" : $"세트 패자 P{e.Fighter + 1}")}, 선택지 {(int)e.Strength}개");
+                        Debug.Log($"[Knockbox][flow] t={s.Tick} 선택 시작: 세트 패자 P{e.Fighter + 1}, 선택지 {(int)e.Strength}개");
                         break;
                     case SimEventType.Picked:
                         Debug.Log($"[Knockbox][flow] t={s.Tick} 선택 완료 P{e.Fighter + 1}: 선택 수 {m.Picks0}/{m.Picks1}");
@@ -99,18 +99,16 @@ namespace Knockbox.Game
                     case SimEventType.MatchEnd:
                         matches++;
                         Debug.Log($"[Knockbox][flow] t={s.Tick} 경기 {matches} 끝: 승자 P{e.Fighter + 1}, 세트스코어 {m.SetScore0}:{m.SetScore1}, 선택 수 {m.Picks0}/{m.Picks1}, "
-                                  + $"보유 폼 {s.Fighter0.OwnedForms}/{s.Fighter1.OwnedForms}, 증강 {s.Fighter0.Augments.Count}/{s.Fighter1.Augments.Count}");
+                                  + $"증강 {s.Fighter0.Augments.Count}/{s.Fighter1.Augments.Count}");
                         break;
                 }
             }
             if (m.Phase == lastPhase)
                 return;
             lastPhase = m.Phase;
-            if (m.Phase == MatchPhase.FormSelect)
-                Debug.Log($"[Knockbox][flow] t={s.Tick} 초기 폼 선택(경기 시작): 선택 수 {m.Picks0}/{m.Picks1}, 세트스코어 {m.SetScore0}:{m.SetScore1}, 보유 폼 {s.Fighter0.OwnedForms}/{s.Fighter1.OwnedForms}, 증강 {s.Fighter0.Augments.Count}/{s.Fighter1.Augments.Count}");
-            else if (m.Phase == MatchPhase.Countdown)
-                Debug.Log($"[Knockbox][flow] t={s.Tick} 라운드 {m.Round} 시작(세트 {m.Set}): 폼 {s.Fighter0.Form}/{s.Fighter1.Form}, 보유 {s.Fighter0.OwnedForms}/{s.Fighter1.OwnedForms}, "
-                          + $"증강 {s.Fighter0.Augments.Count}/{s.Fighter1.Augments.Count}, 체력 {s.Fighter0.Health}/{s.Fighter1.Health}, 에너지 {s.Fighter0.Energy}/{s.Fighter1.Energy}, 투사체 {s.Projectiles.CountActive(-1)}");
+            if (m.Phase == MatchPhase.Countdown)
+                Debug.Log($"[Knockbox][flow] t={s.Tick} 라운드 {m.Round} 시작(세트 {m.Set}): "
+                          + $"증강 {s.Fighter0.Augments.Count}/{s.Fighter1.Augments.Count}, 체력 {s.Fighter0.Health}/{s.Fighter1.Health}");
         }
     }
 }

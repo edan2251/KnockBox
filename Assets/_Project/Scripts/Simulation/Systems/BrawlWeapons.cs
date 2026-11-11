@@ -212,10 +212,8 @@ namespace Knockbox.Simulation
                 case ActionState.Grab:
                     return f.ActionTick + 1 >= config.Combat.Grab.TotalWhiffTicks;
                 case ActionState.Hitstun:
-                case ActionState.GuardStun:
                 case ActionState.Stagger:
                 case ActionState.Recoil:
-                case ActionState.LandingLag:
                 case ActionState.Thrown:
                     return f.StunTicks <= 0;
                 default:

@@ -6,43 +6,37 @@ namespace Knockbox.Simulation
     /// 파이터의 행동 상태. Idle~Dash는 이동 규칙이 정하는 상태(조작 가능), 나머지는 전투 상태다.
     /// 경직 계열(Hitstun, GuardStun, Stagger, Recoil)은 StunTicks가 끝날 때까지 조작할 수 없다.
     /// </summary>
+    /// <remarks>번호는 체크섬과 기록에 들어간다. 2026-11-11 폼 전투 제거로 빠진 8 Guard, 10 GuardStun, 16 LandingLag, 21 Shoot 자리는 비워 둔다.</remarks>
     public enum ActionState : byte
     {
-        Idle,
-        Run,
-        Airborne,
-        WallSlide,
+        Idle = 0,
+        Run = 1,
+        Airborne = 2,
+        WallSlide = 3,
         /// <summary>벽 기어오르기(CR-004: 벽 쪽 + W). 이동 상태다.</summary>
-        Climb,
+        Climb = 4,
         /// <summary>모서리를 잡고 끌어올라 윗면에 서는 중(CR-004 "영차"). 위치는 정해진 경로를 따른다.</summary>
-        Mantle,
-        Dash,
-        Attack,
-        /// <summary>가드 버튼을 누르고 있음. 누른 순간부터 ParryTicks 동안은 패링 구간.</summary>
-        Guard,
-        Hitstun,
-        GuardStun,
-        /// <summary>패링당해 비틀거림.</summary>
-        Stagger,
+        Mantle = 5,
+        Dash = 6,
+        Attack = 7,
+        Hitstun = 9,
+        /// <summary>비틀거림. 폼 시대에는 패링당한 쪽이 들어갔다. 지금은 들어가는 경로가 없지만 번호·잡기 규칙 호환을 위해 남는다.</summary>
+        Stagger = 11,
         /// <summary>클래시 반동.</summary>
-        Recoil,
-        KO,
-        /// <summary>모드 A: 공격 버튼을 누르고 있는 동안 충전. 행동 틱이 충전 틱이다.</summary>
-        Charge,
-        /// <summary>모드 A: 충전을 풀어 날아가는 돌진.</summary>
-        Lunge,
-        /// <summary>모드 B: 공중에서 시작한 공격 도중 착지한 경직.</summary>
-        LandingLag,
+        Recoil = 12,
+        KO = 13,
+        /// <summary>공격 버튼(또는 차징 버튼)을 누르고 있는 동안 충전. 행동 틱이 충전 틱이다.</summary>
+        Charge = 14,
+        /// <summary>충전을 풀어 날아가는 돌진(박치기).</summary>
+        Lunge = 15,
         /// <summary>잡기: 시작 → 활성(잡기 상자) → 헛잡기 후딜. 행동 틱으로 단계를 나눈다.</summary>
-        Grab,
-        /// <summary>상대를 붙잡고 있음. 잡기 버튼을 떼거나 최대 시간이 지나면 던진다.</summary>
-        Holding,
+        Grab = 17,
+        /// <summary>상대를 붙잡고 있음.</summary>
+        Holding = 18,
         /// <summary>붙잡혀 있음(움직일 수 없음).</summary>
-        Held,
+        Held = 19,
         /// <summary>던져진 상태. 피격 경직과 같은 규칙이고 벽꽝 기준이 낮다.</summary>
-        Thrown,
-        /// <summary>바위 폼(CP19): 선딜 → 발사 틱 → 후딜. 선딜 동안 끊기면 발사하지 않는다.</summary>
-        Shoot,
+        Thrown = 20,
     }
 
     /// <summary>
@@ -111,9 +105,7 @@ namespace Knockbox.Simulation
         public bool AttackHasHit;
         /// <summary>이번 공격을 공중에서 시작했다(착지 경직 판정).</summary>
         public bool AttackFromAir;
-        /// <summary>남은 패링 구간 틱.</summary>
-        public int ParryTicks;
-        /// <summary>마지막으로 가드 버튼을 누른 뒤 지난 틱(패링 재사용 제한).</summary>
+        /// <summary>마지막으로 가드 비트를 누른 뒤 지난 틱. 가드 기능은 제거됐지만 기록 체크섬 호환을 위해 센다(2단계에서 제거).</summary>
         public int TicksSinceGuardPress;
         /// <summary>히트스탑 동안 새로 누른 버튼. 히트스탑이 끝난 첫 틱에 눌림으로 처리한다.</summary>
         public InputButtons PendingPresses;
@@ -135,21 +127,10 @@ namespace Knockbox.Simulation
         public int BoxDamageTicks;
         public int BoxDamageSum;
 
-        /// <summary>현재 폼(CR-003). 공격 버튼이 무엇을 하는지 정한다.</summary>
-        public FighterForm Form;
-        /// <summary>보유 폼 비트(Forms.Bit). 전환은 보유한 폼 사이에서만(CP21).</summary>
-        public byte OwnedForms;
-        /// <summary>공격 에너지(10 문서 4.4). 스위치가 꺼져 있으면 쓰지 않는다.</summary>
+        /// <summary>폼 시대의 공격 에너지. 에너지 규칙은 제거됐고 시작값(설정의 Energy.Max)만 기록 체크섬 호환을 위해 남는다(2단계에서 제거).</summary>
         public int Energy;
-        /// <summary>남은 회복 지연 틱. 공격 행동 동안 RegenDelayTicks로 유지되고, 행동이 끝난 뒤부터 줄어든다.</summary>
-        public int EnergyRegenDelay;
-        /// <summary>지금 행동이 이미 에너지를 소비했다(행동당 정확히 한 번, 4.4 규칙 1). 새 행동을 시작할 때 지운다.</summary>
-        public bool ActionPaid;
-        /// <summary>이번 틱에 바위 투사체를 발사하기로 했다(CP19). 이동이 끝난 뒤 투사체 풀에 넣고 지운다.</summary>
-        public bool ShotPending;
         /// <summary>증강 획득 목록(CP23). 경기 끝까지 유지.</summary>
         public AugmentState Augments;
-        public Vec2 ShotDirection;
         /// <summary>
         /// 조준 공격의 방향(CR-004 몸 폼의 주먹, 단위 벡터). 0이면 바라보는 쪽 기준(이전 공격). 판정 원과 넉백을 이 방향 기준으로 놓는다.
         /// </summary>
@@ -191,13 +172,12 @@ namespace Knockbox.Simulation
         public readonly bool InMovementState => Action <= ActionState.Dash;
 
         public readonly bool IsStunned =>
-            Action == ActionState.Hitstun || Action == ActionState.GuardStun || Action == ActionState.Stagger
-            || Action == ActionState.Recoil || Action == ActionState.LandingLag || Action == ActionState.Thrown;
+            Action == ActionState.Hitstun || Action == ActionState.Stagger
+            || Action == ActionState.Recoil || Action == ActionState.Thrown;
 
         /// <summary>날아가는 경직(지형에 부딪히면 벽꽝·튕김).</summary>
         public readonly bool IsLaunched => Action == ActionState.Hitstun || Action == ActionState.Thrown;
 
-        public readonly bool IsGuarding => Action == ActionState.Guard || Action == ActionState.GuardStun;
 
         public void SetAction(ActionState action)
         {
@@ -250,7 +230,7 @@ namespace Knockbox.Simulation
             v.Value(nameof(AttackId), AttackId);
             v.Value(nameof(AttackHasHit), AttackHasHit);
             v.Value(nameof(AttackFromAir), AttackFromAir);
-            v.Value(nameof(ParryTicks), ParryTicks);
+            v.Value("ParryTicks", 0); // 기록 호환용 고정값(폼 시대 패링 구간, 2단계에서 제거)
             v.Value(nameof(TicksSinceGuardPress), TicksSinceGuardPress);
             v.Value(nameof(PendingPresses), (int)PendingPresses);
             v.Value(nameof(LungeBounces), LungeBounces);
@@ -263,17 +243,17 @@ namespace Knockbox.Simulation
             v.Value(nameof(OnProp), OnProp);
             v.Value(nameof(BoxDamageTicks), BoxDamageTicks);
             v.Value(nameof(BoxDamageSum), BoxDamageSum);
-            v.Value(nameof(Form), (int)Form);
-            v.Value(nameof(OwnedForms), (int)OwnedForms);
+            v.Value("Form", (int)FighterForm.Body); // 기록 호환용 고정값(2026-11-11 폼 전투 제거, 2단계에서 제거)
+            v.Value("OwnedForms", 16); // 기록 호환용 고정값(몸 폼 비트 1 << 4)
             v.Value(nameof(Energy), Energy);
-            v.Value(nameof(EnergyRegenDelay), EnergyRegenDelay);
-            v.Value(nameof(ActionPaid), ActionPaid);
-            v.Value(nameof(ShotPending), ShotPending);
+            v.Value("EnergyRegenDelay", 0); // 기록 호환용 고정값(2단계에서 제거)
+            v.Value("ActionPaid", false); // 기록 호환용 고정값(2단계에서 제거)
+            v.Value("ShotPending", false); // 기록 호환용 고정값(폼 시대 바위 발사)
             v.Begin(nameof(Augments));
             Augments.Visit(ref v);
             v.End();
-            v.Value("ShotDirection.X", ShotDirection.X);
-            v.Value("ShotDirection.Y", ShotDirection.Y);
+            v.Value("ShotDirection.X", 0f); // 기록 호환용 고정값
+            v.Value("ShotDirection.Y", 0f);
             v.Value("AttackDir.X", AttackDir.X);
             v.Value("AttackDir.Y", AttackDir.Y);
             v.Value(nameof(AttackBuffer), AttackBuffer);

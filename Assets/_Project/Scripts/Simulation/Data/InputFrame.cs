@@ -11,7 +11,7 @@ namespace Knockbox.Simulation
         Dash = 1 << 2,
         Guard = 1 << 3,
         Grab = 1 << 4,
-        /// <summary>폼 전환(CR-003 CP21): 누를 때마다 보유한 다음 폼(가위 → 바위 → 보 순서)으로.</summary>
+        /// <summary>폼 시대의 폼 전환 비트. 동작은 없지만 기록 형식과 키보드 입력(R)이 그대로 싣는다(2026-11-11 폼 전투 제거, 2단계에서 정리).</summary>
         SwitchForm = 1 << 5,
         /// <summary>
         /// 좌우 키가 동시에 눌려 있음(CR-004 7절). 이때 MoveX는 상쇄되어 0이므로 "아무것도 안 누름"과 구분하려고 따로 싣는다.

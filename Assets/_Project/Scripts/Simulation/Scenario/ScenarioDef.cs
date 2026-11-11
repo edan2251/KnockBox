@@ -7,18 +7,8 @@ namespace Knockbox.Simulation
     {
         public string Name = "";
         public string Arena = "Box";
-        public string Mode = "";
-        /// <summary>폼 규칙(CR-003): 비어 있으면 mode·grab의 레거시 규칙(가드 켬, 에너지 끔). 있으면 Scissors·Rock·Paper.</summary>
-        public string Form = "";
-        /// <summary>폼 규칙에서 P2의 시작 폼(비우면 P1과 같음).</summary>
-        public string Form2 = "";
-        /// <summary>폼 규칙에서 시작 보유 폼 비트(1 가위, 2 바위, 4 보). 0이면 시작 폼만.</summary>
-        public int Owned;
+        /// <summary>잡기 켜기(현재 몸 폼 규칙, RuleSet.Brawl). 2026-11-11 폼 전투 제거로 mode·form·owned·guard·energy 키는 없앴다.</summary>
         public bool Grab = true;
-        /// <summary>폼 규칙일 때만 쓴다. 기본 끔(D-043).</summary>
-        public bool Guard;
-        /// <summary>폼 규칙일 때만 쓴다. 기본 켬.</summary>
-        public bool Energy = true;
         /// <summary>캡처할 때 F3 판정 오버레이를 켠다(연출 전용, 시뮬레이션과 무관).</summary>
         public bool Overlay;
         /// <summary>캡처할 때 `~` 단축키 도움말을 연다(연출 전용).</summary>

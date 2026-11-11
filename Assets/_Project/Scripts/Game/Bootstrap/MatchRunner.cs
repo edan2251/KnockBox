@@ -16,7 +16,7 @@ namespace Knockbox.Game
         [Tooltip("F11로 순환하는 전투 튜닝 프리셋(기본, 더 빠르게)")]
         [SerializeField] CombatTuning[] combatPresets;
         [Tooltip("시작 폼과 기능 스위치(CR-003): F1 폼, F4 가드·잡기, Insert 에너지. 다음 StartNewMatch부터 적용")]
-        [SerializeField] RuleSet rules = RuleSet.Default;
+        [SerializeField] RuleSet rules = RuleSet.Brawl;
         [SerializeField] TextAsset[] arenaFiles;
         [Tooltip("새 맵 정의 목록. 과거 txt/json 자료는 리플레이용으로 함께 보존합니다.")]
         [SerializeField] Maps.MapCatalog mapCatalog;
@@ -263,8 +263,7 @@ namespace Knockbox.Game
                                                 controls == 0 && balance == 0, smoothBoxes: boxResponse == 0, stableConnectors: connectorResponse == 0);
                                             if (config.ComputeChecksum() == recording.ConfigChecksum)
                                                 return config;
-                                            if (!candidate.LegacyMatch && candidate.StartFormOf(0) == FighterForm.Body
-                                                && candidate.StartFormOf(1) == FighterForm.Body)
+                                            if (!candidate.LegacyMatch)
                                             {
                                                 var cards = CardCollectionRules.Apply(config);
                                                 if (cards.ComputeChecksum() == recording.ConfigChecksum) return cards;
@@ -286,29 +285,15 @@ namespace Knockbox.Game
             return null;
         }
 
-        /// <summary>
-        /// 기록의 규칙 문자열(RuleSet.Format) → 후보 하나. CP16까지의 모드 이름("Charge" 등)이면 레거시 규칙의 잡기 켬·끔 두 후보.
-        /// </summary>
-        RuleSet[] RecordedRuleCandidates(string recorded)
-        {
-            if (RuleSet.TryParse(recorded, out var parsed))
-                return new[] { parsed };
-            var legacy = System.Enum.TryParse(recorded, out CombatMode recordedMode) ? recordedMode : Mode;
-            return new[] { RuleSet.Legacy(legacy, rules.Switches.GrabEnabled), RuleSet.Legacy(legacy, !rules.Switches.GrabEnabled) };
-        }
+        /// <summary>기록의 규칙 문자열(RuleSet.Format) → 후보 하나. 폼 시대 기록(다른 폼·전역 모드 이름)은 2026-11-11부터 읽지 않는다.</summary>
+        static RuleSet[] RecordedRuleCandidates(string recorded) =>
+            RuleSet.TryParse(recorded, out var parsed) ? new[] { parsed } : new RuleSet[0];
 
-        /// <summary>시작 폼과 기능 스위치. 다음 StartNewMatch부터 적용된다.</summary>
+        /// <summary>경기 규칙(잡기 스위치, 경기 흐름). 다음 StartNewMatch부터 적용된다.</summary>
         public RuleSet Rules
         {
             get => rules;
             set => rules = value;
-        }
-
-        /// <summary>CP16까지의 전역 모드(레거시 테스트용). 설정하면 레거시 스위치(가드 켬, 에너지 끔)로 바뀐다.</summary>
-        public CombatMode Mode
-        {
-            get => rules.StartForm == FighterForm.Scissors ? CombatMode.Charge : rules.StartForm == FighterForm.Paper ? CombatMode.Swing : CombatMode.Test;
-            set => rules = RuleSet.Legacy(value, rules.Switches.GrabEnabled);
         }
 
         /// <summary>다음 StartNewMatch부터 적용된다.</summary>
@@ -387,9 +372,7 @@ namespace Knockbox.Game
 
         void StartPreparedMatch(SimConfig config, ArenaDef[] arenas, uint matchSeed, bool allowLocalFastStart=true)
         {
-            // 세트 흐름(CR-003 개정)은 경기 시작의 초기 폼 선택부터, 레거시 흐름은 카운트다운부터.
-            var phase = allowLocalFastStart && skipCountdown ? MatchPhase.Fighting
-                : config.Rules.LegacyMatch || config.Match.CollectCardsOnly ? MatchPhase.Countdown : MatchPhase.FormSelect;
+            var phase = allowLocalFastStart && skipCountdown ? MatchPhase.Fighting : MatchPhase.Countdown;
             if (useLocalDevices)
             {
                 Player1Input = brawlExperiment ? new MouseAimInputSource(() => World, 0) : (IInputSource)new KeyboardInputSource(KeyboardLayout.Left);
@@ -428,16 +411,17 @@ namespace Knockbox.Game
             var combatParams = combat != null ? combat.Combat : CombatParams.Default;
             var matchParams = brawlExperiment ? BrawlParams.Match(match) : match;
             matchParams.RematchBothHold = onlineRematch;
-            bool bothBody = ruleSet.StartFormOf(0) == FighterForm.Body && ruleSet.StartFormOf(1) == FighterForm.Body;
+            const bool bothBody = true; // 2026-11-11 폼 전투 제거: 두 선수 모두 늘 몸 폼이다.
             combatParams.Props.SmoothBoxRelease = smoothBoxes && brawlExperiment && bothBody;
             combatParams.Props.StableConnectorContacts = stableConnectors && brawlExperiment && bothBody;
             combatParams.Props.ReleasedBoxFrictionScale = Mathf.Clamp(combat != null ? combat.ReleasedBoxFrictionScale : 0.15f, 0.02f, 1f);
             return new SimConfig(
                 brawlExperiment ? BrawlParams.Movement(movement) : movement,
                 matchParams,
-                brawlExperiment ? BrawlParams.Combat(combatParams, surfaceMode, separateChargeInput,
+                // 몸 폼 전투 값은 늘 적용한다(2026-11-11 폼 전투 제거 뒤 유일한 전투). 이동·경기 수치만 brawlExperiment를 따른다(Sandbox).
+                BrawlParams.Combat(combatParams, surfaceMode, separateChargeInput,
                     weaponsEnabled && bothBody, combinedAttackInput && bothBody, throwEnabled && bothBody,
-                    revisedBalance && bothBody) : combatParams,
+                    revisedBalance && bothBody),
                 ruleSet);
         }
 

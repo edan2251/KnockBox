@@ -208,13 +208,8 @@ namespace Knockbox.Simulation
             }
             switch (f.Action)
             {
-                case ActionState.Guard:
-                    ApplyHorizontal(ref f, m, moveX, c.GuardMaxSpeed, 1f, 1f);
-                    ApplyGravity(ref f, m, false, 0, 0);
-                    break;
                 case ActionState.Attack:
                 case ActionState.Grab:
-                case ActionState.Shoot:
                     if (f.Grounded)
                         f.Velocity.X = SimMath.MoveTowards(f.Velocity.X, 0f, m.GroundDecel * dt);
                     else
@@ -232,7 +227,7 @@ namespace Knockbox.Simulation
                         f.Velocity.X = SimMath.MoveTowards(f.Velocity.X, 0f, m.GroundDecel * dt);
                     ApplyGravity(ref f, m, false, 0, 0);
                     break;
-                case ActionState.Holding when f.Form == FighterForm.Body:
+                case ActionState.Holding:
                     // 몸 폼(5.2): 잡은 쪽은 느리게 걷고, 땅에서 점프할 수 있고(단계 C 피드백), 중력을 받는다. 잡힌 쪽은 상호작용 판정에서 따라온다.
                     ApplyHorizontal(ref f, m, moveX, c.Body.HoldMoveSpeed, 1f, 1f);
                     if (jumpPressed && f.Grounded && c.Body.HoldJumpSpeed > 0f)
@@ -243,9 +238,8 @@ namespace Knockbox.Simulation
                     }
                     ApplyGravity(ref f, m, jumpHeld, 0, 0);
                     break;
-                case ActionState.Holding:
                 case ActionState.Held:
-                    // 붙잡기 동안 둘 다 움직이지 않는다(공중이어도 떠 있음).
+                    // 붙잡힌 쪽은 스스로 움직이지 않는다(잡은 쪽을 따라가는 위치는 상호작용 판정이 정한다).
                     f.Velocity = Vec2.Zero;
                     break;
                 case ActionState.Charge:
@@ -820,15 +814,6 @@ namespace Knockbox.Simulation
             else
             {
                 f.TicksSinceWall = SimMath.Min(f.TicksSinceWall + 1, FighterState.TimerCap);
-            }
-
-            // 모드 B: 공중에서 시작한 공격 도중 착지하면 공격이 끝나고 착지 경직.
-            if (f.Action == ActionState.Attack && f.AttackFromAir && f.Grounded && !scratch.WasGrounded && f.Form == FighterForm.Paper)
-            {
-                f.RestartAction(ActionState.LandingLag);
-                f.StunTicks = config.Combat.Swing.LandingLagTicks;
-                f.AttackId = FighterState.NoAttack;
-                f.AttackHasHit = false;
             }
 
             // 돌진은 속도가 12 미만이 되거나 30틱이 지나면 끝나고 이동 상태로 돌아간다.

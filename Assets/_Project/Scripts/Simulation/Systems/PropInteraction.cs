@@ -67,10 +67,6 @@ namespace Knockbox.Simulation
             public bool Knockout;
             public Vec2 KnockoutDirection;
             public float KnockoutPower;
-            /// <summary>패링으로 구조물 속도를 접촉 법선 기준으로 반사하고 ReflectScale배.</summary>
-            public bool Reflect;
-            public Vec2 ReflectNormal;
-            public float ReflectScale;
         }
 
         /// <summary>틱 동안 두 캐릭터가 구조물에 준 충격량의 합. 칸은 PropScratch에 있어 할당하지 않는다.</summary>
@@ -137,14 +133,6 @@ namespace Knockbox.Simulation
                 sum.KnockoutPower = power;
             }
 
-            public void Reflect(int body, Vec2 normal, float scale)
-            {
-                ref var sum = ref Slot(body);
-                sum.Reflect = true;
-                sum.ReflectNormal = normal;
-                sum.ReflectScale = scale;
-            }
-
             public void ApplyTo(ref PropState props, ArenaDef arena, SimConfig config, PropScratch scratch)
             {
                 for (int i = 0; i < count; i++)
@@ -153,13 +141,6 @@ namespace Knockbox.Simulation
                     ref var b = ref PropState.Get(ref props, i);
                     ref readonly var def = ref arena.GetProp(arena.DynamicProp(i));
                     float m = PropPhysics.Mass(def, config.Combat.Props);
-                    // 패링: 구조물 속도를 접촉 법선 기준으로 반사 × 0.8(충격량보다 먼저).
-                    if (sum.Reflect)
-                    {
-                        var n = sum.ReflectNormal;
-                        b.Velocity = (b.Velocity - n * (2f * Vec2.Dot(b.Velocity, n))) * sum.ReflectScale;
-                        b.AngularVelocity *= -sum.ReflectScale;
-                    }
                     scratch.TickImpulse[i] += SimMath.Sqrt(sum.Linear.LengthSquared);
                     b.Velocity += sum.Linear / m;
                     b.AngularVelocity += sum.Angular / PropPhysics.Inertia(def, m);
@@ -188,7 +169,7 @@ namespace Knockbox.Simulation
                         b.SleepTicks = 0;
                     }
                     // 충격을 받으면 깬다.
-                    if (sum.Touched || sum.Reflect)
+                    if (sum.Touched)
                         b.SleepTicks = 0;
                     if (sum.Touched)
                         b.LastToucher = sum.Toucher;
@@ -370,26 +351,7 @@ namespace Knockbox.Simulation
                 f.BoxDamageSum += damage;
             }
             float knockback = SimMath.Max(p.HitKnockbackMin, speed * p.HitKnockbackScale);
-            if (f.Action == ActionState.Guard && f.ParryTicks > 0)
-            {
-                impulses.Reflect(body, n, p.ParryRestitution);
-                f.ParryTicks = 0;
-                f.HitstopTicks = c.ParryHitstop;
-                events.Add(new SimEvent(tick, SimEventType.Parry, index, point, n, damage));
-                return;
-            }
             int hitstop = FighterCombat.HitstopFor(damage, c);
-            if (f.IsGuarding)
-            {
-                int chip = SimMath.Max(1, SimMath.RoundToInt(damage * c.GuardDamageMultiplier));
-                f.Health = SimMath.Max(0, f.Health - chip);
-                f.Velocity.X = n.X * knockback * c.GuardKnockbackMultiplier;
-                f.StunTicks = c.GuardStunTicks;
-                FighterCombat.EnterStun(ref f, ActionState.GuardStun);
-                f.HitstopTicks = SimMath.RoundToInt(hitstop * c.GuardHitstopMultiplier);
-                events.Add(new SimEvent(tick, SimEventType.GuardHit, index, point, n, chip));
-                return;
-            }
             int combo = f.IsLaunched ? f.ComboHits : 0;
             float scaled = knockback * SimMath.Pow(c.ComboKnockbackDecay, combo);
             f.Velocity = n * scaled;

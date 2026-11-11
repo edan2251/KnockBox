@@ -128,6 +128,7 @@ namespace Knockbox.Simulation
         public const int ArmorPiercing = 2;
         public const int EnergyRefund = 3;
 
+        /// <summary>폼 시대 증강 카탈로그. 폼 전투 제거 뒤에는 고를 경로가 없지만 설정 해시에 들어가므로 그대로 둔다(2단계에서 정리).</summary>
         public static AugmentDef[] CreateDefault() => new[]
         {
             new AugmentDef

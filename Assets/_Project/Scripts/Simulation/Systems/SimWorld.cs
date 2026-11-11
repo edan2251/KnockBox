@@ -126,13 +126,7 @@ namespace Knockbox.Simulation
                         else
                             s.Match.Rotation = ArenaRotation.Create(s.Rng.NextUInt(), s.Match.Rotation.Count);
                         SimState.StartNewMatch(ref s, Config, Arena);
-                        if (!Config.Rules.LegacyMatch && !Config.Match.CollectCardsOnly)
-                            Events.Add(new SimEvent(s.Tick, SimEventType.PickStart, SimEvent.NoFighter, Vec2.Zero, Vec2.Zero, Forms.PlayableCount));
                     }
-                    break;
-                case MatchPhase.FormSelect:
-                    MatchFlow.StepFormSelect(ref s, Config, InputFrame.Pressed(p1.Buttons, s.Fighter0.PrevButtons),
-                        InputFrame.Pressed(p2.Buttons, s.Fighter1.PrevButtons), Events);
                     break;
                 case MatchPhase.SetPick:
                     MatchFlow.StepSetPick(ref s, Config, InputFrame.Pressed(p1.Buttons, s.Fighter0.PrevButtons),
@@ -190,9 +184,6 @@ namespace Knockbox.Simulation
                 FighterMovement.ResolveContacts(ref s.Fighter1, s.Fighter0, scratch1, Config, Arena, 1, s.Tick, Events);
 
             FighterCombat.ResolveInteractions(ref s.Fighter0, ref s.Fighter1, frozen0, frozen1, contact, Config, Arena, s.Tick, Events);
-            // 투사체(CP19): 이번 틱의 발사를 넣고, 이동이 끝난 파이터와 지형에 대해 한 틱 움직인다.
-            Projectiles.SpawnPending(ref s, Config, s.Tick, Events);
-            Projectiles.Step(ref s, Arena, Config, prev0, prev1, s.Tick, Events);
             BrawlWeapons.AfterCombat(ref s, Config, Arena, frozen0, frozen1, prev0, prev1, Events);
             CheckKnockout(ref s);
         }
@@ -288,7 +279,7 @@ namespace Knockbox.Simulation
             m.Set++;
             int loser = 1 - winner;
             int options = m.GetPicks(loser) < Config.Match.MaxPicks
-                ? MatchFlow.BuildOptions(ref m, s.GetFighter(loser), Config, ref s.Rng)
+                ? MatchFlow.BuildOptions(ref m, s.GetFighter(loser), Config)
                 : 0;
             if (options == 0)
             {
