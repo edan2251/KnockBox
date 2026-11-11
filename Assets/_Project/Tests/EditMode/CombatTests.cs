@@ -5,25 +5,49 @@ using NUnit.Framework;
 namespace Knockbox.Tests.EditMode
 {
     /// <summary>
-    /// CP4-1~4: 전투 공통 규칙(03-combat.md 3절)을 테스트용 공격(AttackDef.TestJab)으로 확인한다.
-    /// 기본 배치: 평평한 맵에서 P1(-0.6)과 P2(0.6)가 서로 바라본다. P1이 첫 틱에 공격을 누르면
-    /// 시작 5틱 뒤 6번째 틱(ActionTick 5)에 첫 활성 판정이 P2 몸에 닿는다.
+    /// CP4-1~4: 전투 공통 규칙(03-combat.md 3절)을 현재 몸 폼 주먹으로 확인한다(2026-11-11 폼 전투 제거 전에는 TestJab).
+    /// 기본 배치: 평평한 맵에서 P1(-0.6)과 P2(0.6)가 서로 바라본다. 좌클릭 즉시 주먹(SeparateChargeInput, 현재 Main과 같은 조작).
+    /// P1이 첫 틱에 공격을 누르면 선딜(StartupTicks) 뒤 활성 판정이 P2 몸에 닿는다. 명중 틱(HitTick)은 같은 배치에서 잰다.
+    /// 수치 기대값은 주먹 데이터와 공통 공식(감쇠 0.85^n, 경직 공식)에서 계산한다.
     /// </summary>
     public class CombatTests
     {
         const InputButtons A = InputButtons.Attack;
-        const InputButtons G = InputButtons.Guard;
         const InputButtons J = InputButtons.Jump;
         const float Tolerance = 1e-4f;
         const float FloorY = -7.55f;
-        /// <summary>P1이 첫 틱에 공격하면 명중하는 틱.</summary>
-        const int HitTick = 6;
+        static int hitTick;
+        /// <summary>기본 배치에서 P1이 첫 틱에 주먹을 누르면 명중하는 틱(선딜 뒤). 같은 배치·같은 입력이라 늘 같다.</summary>
+        static int HitTick
+        {
+            get
+            {
+                if (hitTick > 0)
+                    return hitTick;
+                var w = Duel();
+                for (int t = 1; t <= 40; t++)
+                {
+                    w.Step(Btn(t == 1 ? A : InputButtons.None), default);
+                    if (Has(w, SimEventType.Hit, 1))
+                        return hitTick = t;
+                }
+                Assert.Fail("기본 배치에서 주먹이 맞지 않음");
+                return 0;
+            }
+        }
 
         static ArenaDef flat;
         static ArenaDef Flat => flat ??= MovementTests.Build("CombatFlat", (c, r) => '\0');
 
+        /// <summary>현재 몸 폼 전투 수치(BrawlParams.Combat: 좌클릭 즉시 주먹).</summary>
+        static CombatParams BodyCombat() => BrawlParams.Combat(CombatParams.Default);
+
+        /// <summary>기본 이동 수치 + 몸 폼 전투 + 현재 규칙(RuleSet.Brawl).</summary>
+        static SimConfig Config(CombatParams? combat = null) =>
+            new SimConfig(MovementParams.Default, MatchParams.Default, combat ?? BodyCombat(), RuleSet.Brawl);
+
         static SimWorld Duel(SimConfig config = null, float x0 = -0.6f, float x1 = 0.6f) =>
-            TestWorlds.CreateAt(new Vec2(x0, FloorY), new Vec2(x1, FloorY), config, Flat);
+            TestWorlds.CreateAt(new Vec2(x0, FloorY), new Vec2(x1, FloorY), config ?? Config(), Flat);
 
         static InputFrame Btn(InputButtons b) => new InputFrame(0, 0, b);
 
@@ -37,7 +61,7 @@ namespace Knockbox.Tests.EditMode
             return false;
         }
 
-        static AttackDef Jab => SimConfig.CreateDefault().GetAttack(0);
+        static AttackDef Punch => Config().GetAttack(AttackIds.Punch);
 
         // CP4-1 ---------------------------------------------------------------
 
@@ -45,8 +69,12 @@ namespace Knockbox.Tests.EditMode
         public void Hitstop_FreezesBothFighters_AndKeepsInputBuffer()
         {
             var w = Duel();
-            int hitstop = FighterCombat.HitstopFor(Jab.Damage, w.Config.Combat);
-            Assert.AreEqual(7, hitstop, "clamp(4 + 12 × 0.25, 4, 12) = 7");
+            var cp = w.Config.Combat;
+            int hitstop = FighterCombat.HitstopFor(Punch.Damage, cp);
+            Assert.AreEqual(SimMath.Clamp(SimMath.RoundToInt(cp.HitstopBase + Punch.Damage * cp.HitstopPerDamage), cp.HitstopMin, cp.HitstopMax), hitstop,
+                "clamp(round(기본 + 피해 × 계수), 최소, 최대)");
+            Assert.Greater(hitstop, 3, "히트스탑 셋째 틱에 버튼을 누르는 검사가 의미 있으려면 4틱 이상");
+            Assert.Greater(HitTick, Punch.StartupTicks, "선딜 동안에는 맞지 않음");
 
             for (int t = 1; t < HitTick; t++)
             {
@@ -55,7 +83,7 @@ namespace Knockbox.Tests.EditMode
                 Assert.IsFalse(Has(w, SimEventType.Hit, 1), $"틱 {t}에 너무 일찍 맞음");
             }
             w.Step(default, default);
-            Assert.IsTrue(Has(w, SimEventType.Hit, 1), "6번째 틱에 명중해야 함");
+            Assert.IsTrue(Has(w, SimEventType.Hit, 1), $"{HitTick}번째 틱에 명중해야 함");
             var hit = w.State;
             Assert.AreEqual(hitstop, hit.Fighter0.HitstopTicks);
             Assert.AreEqual(hitstop, hit.Fighter1.HitstopTicks);
@@ -92,33 +120,6 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(InputButtons.None, w.State.Fighter0.PendingPresses);
         }
 
-        [Test]
-        public void PressDuringParryHitstop_ActsOnFirstTickAfter()
-        {
-            // P2가 패링하고 히트스탑 동안 가드를 놓고 공격을 누른다 → 히트스탑이 끝난 첫 틱에 바로 공격.
-            var w = Duel();
-            int parryHitstop = w.Config.Combat.ParryHitstop;
-            for (int t = 1; t <= HitTick; t++)
-                w.Step(Btn(t == 1 ? A : InputButtons.None), Btn(t >= HitTick - 2 ? G : InputButtons.None));
-            Assert.IsTrue(Has(w, SimEventType.Parry, 1), "패링");
-
-            for (int i = 1; i <= parryHitstop; i++)
-                w.Step(default, Btn(i == 4 ? A : InputButtons.None));
-            Assert.AreEqual(ActionState.Guard, w.State.Fighter1.Action, "히트스탑 동안은 그대로");
-
-            w.Step(default, default);
-            Assert.AreEqual(ActionState.Attack, w.State.Fighter1.Action, "히트스탑 직후 첫 틱에 공격");
-            Assert.AreEqual(0, w.State.Fighter1.ActionTick);
-
-            bool punished = false;
-            for (int t = 0; t < Jab.TotalTicks && !punished; t++)
-            {
-                w.Step(default, default);
-                punished = Has(w, SimEventType.Hit, 0);
-            }
-            Assert.IsTrue(punished, "비틀거리는 P1을 맞혀야 함");
-        }
-
         // CP4-2 ---------------------------------------------------------------
 
         [Test]
@@ -133,11 +134,18 @@ namespace Knockbox.Tests.EditMode
                 hit = Has(w, SimEventType.Hit, 1);
             }
             Assert.IsTrue(hit, "명중하지 않음");
-            var dir = SimMath.Normalize(Jab.KnockbackDirection);
-            Assert.AreEqual(dir.X * Jab.KnockbackStrength, w.State.Fighter1.Velocity.X, Tolerance, "vx = 방향 × 넉백(앞쪽 = 오른쪽)");
-            Assert.AreEqual(dir.Y * Jab.KnockbackStrength, w.State.Fighter1.Velocity.Y, Tolerance, "vy = 방향 × 넉백");
+            var v = w.State.Fighter1.Velocity;
+            Assert.AreEqual(Punch.KnockbackStrength, SimMath.Sqrt(v.LengthSquared), Tolerance, "속도 크기 = 넉백(달려오던 속도는 남지 않음)");
+            Assert.Greater(v.X, 0f, "앞쪽(오른쪽)으로 밀림");
             Assert.AreEqual(ActionState.Hitstun, w.State.Fighter1.Action);
-            Assert.AreEqual(100 - Jab.Damage, w.State.Fighter1.Health);
+            Assert.AreEqual(100 - Punch.Damage, w.State.Fighter1.Health);
+            // 서 있던 상대를 같은 주먹으로 맞힌 결과와 같다(이전 속도와 무관).
+            var still = Duel();
+            for (int t = 1; t <= HitTick; t++)
+                still.Step(Btn(t == 1 ? A : InputButtons.None), default);
+            Assert.IsTrue(Has(still, SimEventType.Hit, 1));
+            Assert.AreEqual(still.State.Fighter1.Velocity.X, v.X, Tolerance, "vx는 이전 속도와 무관");
+            Assert.AreEqual(still.State.Fighter1.Velocity.Y, v.Y, Tolerance, "vy는 이전 속도와 무관");
         }
 
         [TestCase(14f, 0, 15)]   // round(15.4)
@@ -150,10 +158,10 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(expected, FighterCombat.HitstunFor(knockback, comboIndex, CombatParams.Default));
         }
 
-        [TestCase(0, 14f, 15)]
-        [TestCase(1, 11.9f, 10)]
-        [TestCase(2, 10.115f, 7)]
-        public void ComboDecay_InWorld(int previousHits, float expectedKnockback, int expectedStun)
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        public void ComboDecay_InWorld(int previousHits)
         {
             var w = Duel();
             if (previousHits > 0)
@@ -165,9 +173,11 @@ namespace Knockbox.Tests.EditMode
             for (int t = 1; t <= HitTick; t++)
                 w.Step(Btn(t == 1 ? A : InputButtons.None), default);
             Assert.IsTrue(Has(w, SimEventType.Hit, 1));
-            var dir = SimMath.Normalize(Jab.KnockbackDirection);
-            Assert.AreEqual(dir.X * expectedKnockback, w.State.Fighter1.Velocity.X, 1e-3f, "넉백 × 0.85^n");
-            Assert.AreEqual(expectedStun, w.State.Fighter1.StunTicks, "경직 × 0.8^n");
+            var c = w.Config.Combat;
+            float expectedKnockback = Punch.KnockbackStrength * (float)Math.Pow(c.ComboKnockbackDecay, previousHits);
+            Assert.AreEqual(0.85f, c.ComboKnockbackDecay, "감쇠 0.85");
+            Assert.AreEqual(expectedKnockback, SimMath.Sqrt(w.State.Fighter1.Velocity.LengthSquared), 1e-3f, "넉백 × 0.85^n");
+            Assert.AreEqual(FighterCombat.HitstunFor(expectedKnockback, previousHits, c), w.State.Fighter1.StunTicks, "경직 × 0.8^n(공식은 HitstunFormula가 고정)");
             Assert.AreEqual(previousHits + 1, w.State.Fighter1.ComboHits);
         }
 
@@ -178,7 +188,7 @@ namespace Knockbox.Tests.EditMode
             w.State.Fighter1.RestartAction(ActionState.Hitstun);
             w.State.Fighter1.StunTicks = 40;
             w.State.Fighter1.ComboHits = w.Config.Combat.MaxComboHits;
-            for (int t = 1; t <= Jab.TotalTicks; t++)
+            for (int t = 1; t <= Punch.TotalTicks; t++)
             {
                 w.Step(Btn(t == 1 ? A : InputButtons.None), default);
                 Assert.IsFalse(Has(w, SimEventType.Hit, 1), $"틱 {t}: 3회 맞은 상대에게 4번째가 들어감");
@@ -200,7 +210,7 @@ namespace Knockbox.Tests.EditMode
         {
             get
             {
-                var a = AttackDef.TestJab;
+                var a = BodyCombat().Body.Punch;
                 a.KnockbackStrength = 24f;
                 a.KnockbackDirection = new Vec2(1f, 0.15f);
                 return a;
@@ -210,7 +220,7 @@ namespace Knockbox.Tests.EditMode
         /// <summary>같은 공격을 여러 간격과 위치에서 반복해 한 번에 이어진 최대 연속 명중 수를 센다.</summary>
         static int MaxConsecutiveHits(CombatParams combat, out int runs)
         {
-            var config = new SimConfig(MovementParams.Default, MatchParams.Default, combat, CombatMode.Test);
+            var config = Config(combat);
             int max = 0;
             runs = 0;
             float[][] spots =
@@ -246,9 +256,9 @@ namespace Knockbox.Tests.EditMode
         [Test]
         public void SameAttackRepeated_NeverHitsFourTimesInARow()
         {
-            var jab = CombatParams.Default;
-            var heavy = CombatParams.Default;
-            heavy.TestAttack = Heavy;
+            var jab = BodyCombat();
+            var heavy = BodyCombat();
+            heavy.Body.Punch = Heavy;
             int jabMax = MaxConsecutiveHits(jab, out int runs);
             int heavyMax = MaxConsecutiveHits(heavy, out _);
 
@@ -260,7 +270,7 @@ namespace Knockbox.Tests.EditMode
             int jabDecayOnly = MaxConsecutiveHits(jabNoCap, out _);
             int heavyDecayOnly = MaxConsecutiveHits(heavyNoCap, out _);
 
-            string report = $"[Knockbox][CP4-2] 연속 명중 최대: 테스트 공격 {jabMax}, 강한 넉백 변형 {heavyMax} (각 {runs}가지). " +
+            string report = $"[Knockbox][CP4-2] 연속 명중 최대: 주먹 {jabMax}, 강한 넉백 변형 {heavyMax} (각 {runs}가지). " +
                             $"상한 없이 감쇠만: {jabDecayOnly}, {heavyDecayOnly}";
             TestContext.WriteLine(report);
             UnityEngine.Debug.Log(report);
@@ -289,8 +299,10 @@ namespace Knockbox.Tests.EditMode
             var f = w.State.Fighter1;
             Assert.AreEqual(splat, Has(w, SimEventType.WallSplat, 1), label + " 벽꽝 이벤트");
             Assert.AreEqual(!splat, Has(w, SimEventType.BounceRebound, 1), label + " 튕김 이벤트");
-            Assert.AreEqual(splat ? 100 - c.WallSplatDamage : 100, f.Health, label + " 데미지");
-            Assert.AreEqual(splat ? 29 + c.WallSplatHitstun : 29, f.StunTicks, label + " 경직(+18)");
+            // 몸 폼 벽꽝(CR-004 5.2): 피해 = 충돌 속도 × 계수(반올림, 상한), 경직은 고정값으로 맞춘다(누적하지 않음).
+            int damage = splat ? Math.Min(c.Body.SplatDamageMax, (int)(FindEvent(w, SimEventType.WallSplat).Strength * c.Body.SplatDamagePerSpeed + 0.5f)) : 0;
+            Assert.AreEqual(100 - damage, f.Health, label + " 데미지");
+            Assert.AreEqual(splat ? Math.Max(29, c.Body.SplatHitstun) : 29, f.StunTicks, label + " 경직");
             Assert.AreEqual(splat ? c.WallSplatHitstop : 0, f.HitstopTicks, label + " 히트스탑");
             Assert.AreEqual(expectedVelocity.X, f.Velocity.X, 1e-3f, label + " vx");
             Assert.AreEqual(expectedVelocity.Y, f.Velocity.Y, 1e-3f, label + " vy");
@@ -368,100 +380,6 @@ namespace Knockbox.Tests.EditMode
 
         // CP4-4 ---------------------------------------------------------------
 
-        /// <summary>
-        /// P1이 10번째 틱에 공격하고(15번째 틱 명중), P2가 명중 틱보다 lead틱 먼저 가드를 눌러 계속 누르고 있을 때.
-        /// 누른 틱을 1번째로 세면 명중은 lead + 1번째 틱이다.
-        /// </summary>
-        static SimWorld GuardWithLead(int lead)
-        {
-            var w = Duel();
-            const int attackTick = 10;
-            int hitTick = attackTick + HitTick - 1;
-            int pressTick = hitTick - lead;
-            for (int t = 1; t <= hitTick; t++)
-                w.Step(Btn(t == attackTick ? A : InputButtons.None), Btn(t >= pressTick ? G : InputButtons.None));
-            return w;
-        }
-
-        [Test]
-        public void ParryWindow_IsExactlySixTicks()
-        {
-            Assert.AreEqual(6, CombatParams.Default.ParryWindowTicks);
-            for (int lead = 0; lead <= 8; lead++)
-            {
-                var w = GuardWithLead(lead);
-                bool parry = lead < 6;
-                Assert.AreEqual(parry, Has(w, SimEventType.Parry, 1), $"누른 틱부터 {lead + 1}번째 틱에 맞음 → {(parry ? "패링" : "가드")}");
-                Assert.AreEqual(!parry, Has(w, SimEventType.GuardHit, 1), $"{lead + 1}번째 틱");
-            }
-        }
-
-        [TestCase(23, false)]
-        [TestCase(24, true)]
-        [TestCase(40, true)]
-        public void ParryCooldown_24TicksSincePreviousGuardPress(int gap, bool expectParry)
-        {
-            var w = Duel();
-            int secondPress = 1 + gap;
-            int attackPress = secondPress - (HitTick - 1);
-            for (int t = 1; t <= secondPress; t++)
-            {
-                var p1 = Btn(t == attackPress ? A : InputButtons.None);
-                var p2 = Btn(t == 1 || t >= secondPress ? G : InputButtons.None);
-                w.Step(p1, p2);
-            }
-            Assert.AreEqual(expectParry, Has(w, SimEventType.Parry, 1), $"간격 {gap}");
-            Assert.AreEqual(!expectParry, Has(w, SimEventType.GuardHit, 1), $"간격 {gap}");
-        }
-
-        [Test]
-        public void GuardHit_ReducesDamageAndKnockback()
-        {
-            var w = GuardWithLead(10);
-            var c = w.Config.Combat;
-            Assert.IsTrue(Has(w, SimEventType.GuardHit, 1));
-            var f = w.State.Fighter1;
-            Assert.AreEqual(100 - 2, f.Health, "데미지 12 × 0.2 = 2.4 → 2");
-            var dir = SimMath.Normalize(Jab.KnockbackDirection);
-            Assert.AreEqual(dir.X * Jab.KnockbackStrength * c.GuardKnockbackMultiplier, f.Velocity.X, Tolerance, "넉백 × 0.35");
-            Assert.AreEqual(0f, f.Velocity.Y, "수평만");
-            Assert.AreEqual(ActionState.GuardStun, f.Action);
-            Assert.AreEqual(c.GuardStunTicks, f.StunTicks);
-            Assert.AreEqual(4, f.HitstopTicks, "히트스탑 7의 절반(3.5 → 4)");
-            Assert.AreEqual(4, w.State.Fighter0.HitstopTicks);
-        }
-
-        [Test]
-        public void Parry_StaggersAttacker()
-        {
-            var w = GuardWithLead(2);
-            var c = w.Config.Combat;
-            Assert.IsTrue(Has(w, SimEventType.Parry, 1));
-            var attacker = w.State.Fighter0;
-            Assert.AreEqual(ActionState.Stagger, attacker.Action);
-            Assert.AreEqual(c.StaggerTicks, attacker.StunTicks);
-            Assert.AreEqual(-c.StaggerPushSpeed, attacker.Velocity.X, "P2 반대쪽(왼쪽)으로 8");
-            Assert.AreEqual(c.ParryHitstop, attacker.HitstopTicks);
-            Assert.AreEqual(c.ParryHitstop, w.State.Fighter1.HitstopTicks);
-            Assert.AreEqual(100, w.State.Fighter1.Health, "패링은 데미지 없음");
-            Assert.AreEqual(0, w.State.Fighter1.ParryTicks);
-        }
-
-        [Test]
-        public void Guard_LimitsSpeedAndBlocksJumpDashAttack()
-        {
-            var w = Duel(null, -6f, 6f);
-            for (int t = 0; t < 60; t++)
-            {
-                var buttons = G | (t % 2 == 0 ? J | InputButtons.Dash | A : InputButtons.None);
-                w.Step(new InputFrame(1, 0, buttons), default);
-                Assert.AreEqual(ActionState.Guard, w.State.Fighter0.Action, $"틱 {t}");
-                Assert.LessOrEqual(w.State.Fighter0.Velocity.X, w.Config.Combat.GuardMaxSpeed + Tolerance);
-                Assert.IsTrue(w.State.Fighter0.Grounded, "가드 중 점프 불가");
-            }
-            Assert.AreEqual(w.Config.Combat.GuardMaxSpeed, w.State.Fighter0.Velocity.X, Tolerance);
-        }
-
         // 클래시 --------------------------------------------------------------
 
         [Test]
@@ -469,9 +387,14 @@ namespace Knockbox.Tests.EditMode
         {
             var w = Duel();
             var c = w.Config.Combat;
-            for (int t = 1; t <= HitTick; t++)
+            // 두 주먹의 판정 원은 몸에 닿기 전에 서로 겹친다(명중 틱 이전). 클래시가 난 틱에서 멈춘다.
+            bool clash = false;
+            for (int t = 1; t <= HitTick && !clash; t++)
+            {
                 w.Step(Btn(t == 1 ? A : InputButtons.None), Btn(t == 1 ? A : InputButtons.None));
-            Assert.IsTrue(Has(w, SimEventType.Clash, SimEvent.NoFighter), "동시에 내민 공격은 클래시");
+                clash = Has(w, SimEventType.Clash, SimEvent.NoFighter);
+            }
+            Assert.IsTrue(clash, "동시에 내민 공격은 클래시");
             Assert.IsFalse(Has(w, SimEventType.Hit, 0) || Has(w, SimEventType.Hit, 1), "클래시는 피해 없음");
             foreach (int k in new[] { 0, 1 })
             {
@@ -483,6 +406,21 @@ namespace Knockbox.Tests.EditMode
             }
             Assert.AreEqual(-c.ClashSpeed, w.State.Fighter0.Velocity.X, Tolerance, "접촉 반대 방향으로 8");
             Assert.AreEqual(c.ClashSpeed, w.State.Fighter1.Velocity.X, Tolerance);
+        }
+
+        /// <summary>한 번 내민 공격은 활성 틱 동안 같은 상대를 한 번만 맞힌다(AttackHasHit, 2026-11-11 SwingModeTests에서 옮김).</summary>
+        [Test]
+        public void OnePunch_HitsSameOpponentOnce()
+        {
+            var w = Duel();
+            int hits = 0;
+            for (int t = 1; t <= Punch.TotalTicks; t++)
+            {
+                w.Step(Btn(t == 1 ? A : InputButtons.None), default);
+                hits += Has(w, SimEventType.Hit, 1) ? 1 : 0;
+            }
+            Assert.AreEqual(1, hits, "판정 원 두 개가 여러 틱 겹쳐도 한 번만");
+            Assert.AreEqual(100 - Punch.Damage, w.State.Fighter1.Health);
         }
     }
 }

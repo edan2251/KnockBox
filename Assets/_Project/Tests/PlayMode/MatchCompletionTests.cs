@@ -54,7 +54,7 @@ namespace Knockbox.Tests.PlayMode
         public IEnumerator PresentationPhysics_OnAndOff_SameChecksum()
         {
             yield return LoadSandbox();
-            var ko = ScenarioJson.LoadByName("showcase_cp8_ko");
+            var ko = ScenarioJson.LoadByName("showcase_body_ko");
             uint headless = ScenarioRun.Run(ko, ScenarioConfig.Create(ko), ArenaFiles.LoadByName(ko.Arena)).FinalChecksum;
 
             uint on = 0, off = 0;
@@ -126,7 +126,7 @@ namespace Knockbox.Tests.PlayMode
             presenter.PresentationPhysics = true;
             var target = new RenderTexture(1920, 1080, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
             camera.targetTexture = target;
-            var def = ScenarioJson.LoadByName("showcase_cp8_ko");
+            var def = ScenarioJson.LoadByName("showcase_body_ko");
             try
             {
                 // 실시간으로 KO 장면을 재생하며 KO 단계(파편, 고리, 파편 조각, 흔들림이 겹치는 구간)의 프레임 시간을 잰다.

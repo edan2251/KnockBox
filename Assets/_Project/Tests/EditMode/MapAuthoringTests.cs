@@ -227,7 +227,7 @@ namespace Knockbox.Tests.EditMode
             Assert.True(PrefabUtility.IsPartOfPrefabInstance(controller.View));
             foreach(var root in scene.GetRootGameObjects())foreach(var t in root.GetComponentsInChildren<Transform>(true))Assert.Zero(GameObjectUtility.GetMonoBehavioursWithMissingScriptCount(t.gameObject),t.name);
             var p=new SerializedObject(presenter);
-            foreach(string field in new[]{"runner","background","arenaView","fighter0","fighter1","cameraRig","hud","sfxPlayer","brawlWeaponView","projectileView","koShatter","postFx"})
+            foreach(string field in new[]{"runner","background","arenaView","fighter0","fighter1","cameraRig","hud","sfxPlayer","brawlWeaponView","koShatter","postFx"})
                 Assert.NotNull(p.FindProperty(field).objectReferenceValue,field);
             var runner=presenter.GetComponent<MatchRunner>();Assert.AreEqual(0x483E0206u,runner.ResolveArena("Brawl").ComputeChecksum());
             Assert.AreEqual(0x483E0206u,runner.ResolveRecordedArena("Brawl").ComputeChecksum());

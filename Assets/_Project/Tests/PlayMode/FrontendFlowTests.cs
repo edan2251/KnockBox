@@ -506,7 +506,7 @@ namespace Knockbox.Tests.PlayMode
             for(int i=0;i<25;i++)runner.StepOnce();yield return null;
             Assert.Greater(root.GetComponent<MatchPresenter>().KoShatter.PieceCountActive,0);
             Until(MatchPhase.SetPick);yield return null;
-            Assert.IsFalse(root.GetComponent<MatchPresenter>().PickPanel.gameObject.activeInHierarchy,"커튼 사이에 옛 PICK/WAIT 안내가 보이지 않아야 함");
+            Assert.IsNull(GameObject.Find("PickPanel"),"커튼 사이에 옛 PICK/WAIT 안내가 보이지 않아야 함(옛 선택 화면은 삭제됨)");
             Assert.IsFalse(root.GetComponent<MatchPresenter>().KoShatter.Active);
             Assert.IsNull(View.Stage.Find(Knockbox.Presentation.SceneObjectName.Path("Shared_VS_and_cards/Defeated pieces reassemble")),"카드 화면에서 파편을 재조립하지 않음");
             var portrait=View.Portrait(0);

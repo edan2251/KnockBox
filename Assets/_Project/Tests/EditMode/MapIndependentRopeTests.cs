@@ -105,9 +105,11 @@ namespace Knockbox.Tests.EditMode
         }
         [Test] public void RealChargeInputBreaksRope_AndReplayRollbackAgree()=>TestContext.WriteLine(InputTrial(MapRopeTools.DefaultBreakForce,true));
 
-        [TestCase(0,"D0B329C7","F9A4F4AA","F2346A75")]
-        [TestCase(8,"D8DE260E","5AD39E8B","5A827DED")]
-        [TestCase(100000,"D0B329C7","F9A4F4AA","E9F93BF8")]
+        // 2026-11-11 사용자 승인: 폼 전투 제거로 PropStage2Tests 설정이 가위 폼에서 몸 폼이 되어 파이터 상태의 폼 자리 값이 바뀌었다.
+        // 상자·로프 물리는 같다(지오메트리 체크섬 동일, Body 설정의 변경 전후 체크섬 동일). 이전 값: D0B329C7/F9A4F4AA, D8DE260E/5AD39E8B.
+        [TestCase(0,"680E5F51","4F92C36C","F2346A75")]
+        [TestCase(8,"97845734","D8144E61","5A827DED")]
+        [TestCase(100000,"680E5F51","4F92C36C","E9F93BF8")]
         public void LegacyRopeStreamMatchesPreCP3Baseline(float force,string stream,string final,string geometry)
         {
             var t=typeof(PropStage2Tests);var flags=BindingFlags.NonPublic|BindingFlags.Static;

@@ -318,7 +318,7 @@ namespace Knockbox.Tests.EditMode
 
             var loaded = InputRecording.FromBytes(recording.ToBytes());
             Assert.IsTrue(RuleSet.TryParse(loaded.Mode, out var rules));
-            Assert.AreEqual(FighterForm.Body, rules.StartForm);
+            StringAssert.StartsWith("Body ", loaded.Mode, "몸 폼 규칙 문자열");
             for (int t = 0; t < p1.Length; t++)
             {
                 Assert.AreEqual(p1[t], loaded.GetP1(t));

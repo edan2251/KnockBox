@@ -128,9 +128,20 @@ namespace Knockbox.Tests.EditMode
                 if (StateLeafIsActive(path, weaponsEnabled, throwEnabled, graphEnabled))
                     leafCount++;
             var recorded = StateDiff.Record(StateForChecksum(weaponsEnabled, throwEnabled, graphEnabled));
-            Assert.AreEqual(leafCount, recorded.Names.Count, string.Join(", ", recorded.Names));
+            // 필드가 없어진 폼 시대 자리도 기록 호환을 위해 고정값으로 해시에 남는다. 목록에 적은 것만 허용한다.
+            foreach (string slot in LegacyHashSlots)
+                CollectionAssert.Contains(recorded.Names, slot, "기록 호환용 고정값 자리가 해시에서 빠짐");
+            Assert.AreEqual(leafCount + LegacyHashSlots.Length, recorded.Names.Count, string.Join(", ", recorded.Names));
             Assert.AreEqual(recorded.Names.Count, new HashSet<string>(recorded.Names).Count, "이름이 겹치는 필드가 있음");
         }
+
+        /// <summary>2026-11-11 폼 전투 제거로 필드는 지웠지만 기존 기록의 체크섬을 지키려고 고정값을 해시에 남긴 자리(2단계에서 제거).</summary>
+        static readonly string[] LegacyHashSlots =
+        {
+            "Fighter0.ParryTicks", "Fighter0.Form", "Fighter0.OwnedForms", "Fighter0.EnergyRegenDelay", "Fighter0.ActionPaid", "Fighter0.ShotPending", "Fighter0.ShotDirection.X", "Fighter0.ShotDirection.Y",
+            "Fighter1.ParryTicks", "Fighter1.Form", "Fighter1.OwnedForms", "Fighter1.EnergyRegenDelay", "Fighter1.ActionPaid", "Fighter1.ShotPending", "Fighter1.ShotDirection.X", "Fighter1.ShotDirection.Y",
+            "Match.FormChoice0", "Match.FormChoice1",
+        };
 
         [TestCase(false, false, false)]
         [TestCase(true, false, false)]
@@ -155,7 +166,7 @@ namespace Knockbox.Tests.EditMode
                     missing.AppendLine(path);
             }
             // 레거시 생성자는 일부 값(Swing.ForwardOnly)을 고정하므로 규칙 생성자로 확인한다(CP20).
-            var rules = RuleSet.Legacy(CombatMode.Test, true);
+            var rules = RuleSet.Brawl;
             var combat = CombatParams.Default;
             combat.Props.SmoothBoxRelease = smoothBoxes;
             combat.Props.ReleasedBoxFrictionScale = .15f;

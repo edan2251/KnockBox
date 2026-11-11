@@ -8,7 +8,7 @@ namespace Knockbox.Tests.EditMode
     public class PropPhysicsTests
     {
         static SimConfig Config() =>
-            new SimConfig(MovementParams.Default, MatchParams.Default, CombatParams.Default, CombatMode.Charge, true);
+            new SimConfig(MovementParams.Default, MatchParams.Default, CombatParams.Default, RuleSet.Brawl);
 
         /// <summary>경계 튕김 빈 맵 + 가운데 매달린 블록(줄 고정점 (0, 8), 2 × 1, 몸 가운데 (0, 3)) + 오른쪽 회전 막대(축 (8, 0), 4 × 0.6) + 왼쪽 거울 회전 막대.</summary>
         static ArenaDef Lab()
@@ -130,8 +130,8 @@ namespace Knockbox.Tests.EditMode
 
         static void RunBots(SimWorld w, int ticks, uint seed)
         {
-            var p1 = new BotInputSource(() => w, 0, seed);
-            var p2 = new BotInputSource(() => w, 1, seed * 7u + 3u);
+            var p1 = new BrawlBot(() => w, 0, seed);
+            var p2 = new BrawlBot(() => w, 1, seed * 7u + 3u);
             for (int t = 0; t < ticks; t++)
             {
                 int tick = w.State.Tick;
@@ -162,8 +162,8 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(after, a.ComputeChecksum(), "저장·복원");
 
             var sync = new SyncTest<SimWorld>(b);
-            var p1 = new BotInputSource(() => b, 0, 5u);
-            var p2 = new BotInputSource(() => b, 1, 9u);
+            var p1 = new BrawlBot(() => b, 0, 5u);
+            var p2 = new BrawlBot(() => b, 1, 9u);
             int awake = 0;
             for (int t = 0; t < 1800; t++)
             {
@@ -301,39 +301,6 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(p.HitCooldownTicks, PropState.At(w.State.Props, 0).HitCooldown0);
         }
 
-        [Test]
-        public void Guard_And_Parry_AgainstBlock()
-        {
-            var arena = Lab();
-            var config = Config();
-            foreach (bool parry in new[] { false, true })
-            {
-                var w = World(arena, new Vec2(2.2f, 3f), new Vec2(14f, -8f));
-                Push(w, 0, new Vec2(16f, 0f), 0f);
-                var s = w.State;
-                s.Fighter0.SetAction(ActionState.Guard);
-                s.Fighter0.ParryTicks = parry ? 10 : 0;
-                // 가드 버튼을 이미 누르고 있던 것으로(새로 누르면 패링 구간이 열린다).
-                s.Fighter0.PrevButtons = InputButtons.Guard;
-                s.Fighter0.Grounded = false;
-                w.State = s;
-                var type = SimEventType.Jump;
-                for (int t = 0; t < 10 && type == SimEventType.Jump; t++)
-                {
-                    w.Step(new InputFrame(0, 0, InputButtons.Guard), default);
-                    for (int e = 0; e < w.Events.Count; e++)
-                    {
-                        var et = w.Events[e].Type;
-                        if (et == SimEventType.Parry || et == SimEventType.GuardHit || et == SimEventType.PropHit)
-                            type = et;
-                    }
-                }
-                Assert.AreEqual(parry ? SimEventType.Parry : SimEventType.GuardHit, type);
-                if (parry)
-                    Assert.Less(PropState.At(w.State.Props, 0).Velocity.X, 0f, "패링: 블록 속도 반사");
-            }
-        }
-
         /// <summary>던져진 캐릭터는 구조물과 운동량을 주고받고, 질량 4 이상 구조물에 세게 부딪히면 벽꽝.</summary>
         [Test]
         public void ThrownFighter_ExchangesMomentum_AndSplatsOnHeavyBlock()
@@ -407,8 +374,8 @@ namespace Knockbox.Tests.EditMode
             var config = Config();
             var arena = ArenaFiles.LoadByName(name);
             var w = new SimWorld(config, arena, SimState.CreateRound(config, arena, 7, MatchPhase.Fighting));
-            var bot1 = new BotInputSource(() => w, 0, 77u);
-            var bot2 = new BotInputSource(() => w, 1, 99u);
+            var bot1 = new BrawlBot(() => w, 0, 77u);
+            var bot2 = new BrawlBot(() => w, 1, 99u);
             const int ticks = 3600;
             var in1 = new InputFrame[ticks];
             var in2 = new InputFrame[ticks];

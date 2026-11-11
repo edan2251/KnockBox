@@ -13,15 +13,20 @@ namespace Knockbox.Tests.EditMode
     {
         const int MatchTicks = 7200;
 
-        static SimConfig Config(CombatMode mode, bool grab) =>
-            new SimConfig(MovementParams.Default, MatchParams.Default, CombatParams.Default, mode, grab);
+        /// <summary>현재 몸 폼 설정(2026-11-11 폼 전투 제거 전에는 가위 폼 Charge 설정과 폼 봇).</summary>
+        static SimConfig Config(bool grab)
+        {
+            var rules = RuleSet.Brawl;
+            rules.Switches.GrabEnabled = grab;
+            return new SimConfig(MovementParams.Default, MatchParams.Default, BrawlParams.Combat(CombatParams.Default), rules);
+        }
 
         // F-1 원인 단위 테스트 ---------------------------------------------------
 
         [Test]
         public void StackedFighter_RisingFromBelow_IsNotPushedIntoCeiling()
         {
-            var config = Config(CombatMode.Charge, true);
+            var config = Config(true);
             var arena = ArenaFiles.LoadByName("Box");
             float half = config.HalfBody;
             float size = config.Movement.BodySize;
@@ -78,16 +83,16 @@ namespace Knockbox.Tests.EditMode
             }
         }
 
-        /// <summary>모드별 봇 두 개로 2분 경기를 돌리며 불변식을 검사한다(QA 점검과 같은 시드 규칙).</summary>
-        static void RunMatch(CombatMode mode, bool grab, string map, uint seed, ref Violations v)
+        /// <summary>몸 폼 봇 두 개로 2분 경기를 돌리며 불변식을 검사한다(QA 점검과 같은 시드 규칙).</summary>
+        static void RunMatch(bool grab, string map, uint seed, ref Violations v)
         {
-            var config = Config(mode, grab);
+            var config = Config(grab);
             var arena = ArenaFiles.LoadByName(map);
             var world = TestWorlds.Create(MatchPhase.Countdown, seed, config, arena);
-            var p1 = new BotInputSource(() => world, 0, 300u + seed * 17u);
-            var p2 = new BotInputSource(() => world, 1, 700u + seed * 31u);
+            var p1 = new BrawlBot(() => world, 0, 300u + seed * 17u);
+            var p2 = new BrawlBot(() => world, 1, 700u + seed * 31u);
             int overlapRun = 0;
-            string where = $"{mode} grab {grab} {map} seed {seed}";
+            string where = $"Body grab {grab} {map} seed {seed}";
             for (int t = 0; t < MatchTicks; t++)
             {
                 int tick = world.State.Tick;
@@ -130,7 +135,7 @@ namespace Knockbox.Tests.EditMode
             if (f.ComboHits >= 4)
                 v.Add($"{where} t{t}: P{index + 1} 연속 명중 {f.ComboHits}");
             bool free = f.Action == ActionState.Idle || f.Action == ActionState.Run || f.Action == ActionState.Airborne
-                        || f.Action == ActionState.WallSlide || f.Action == ActionState.Guard || f.Action == ActionState.KO;
+                        || f.Action == ActionState.WallSlide || f.Action == ActionState.KO;
             if (!free && f.ActionTick == 300)
                 v.Add($"{where} t{t}: P{index + 1} {f.Action}에 300틱 갇힘");
             if (f.Action == ActionState.Held && other.Action != ActionState.Holding)
@@ -139,16 +144,16 @@ namespace Knockbox.Tests.EditMode
                 v.Add($"{where} t{t}: P{index + 1} 히트스탑 {f.HitstopTicks}");
         }
 
-        /// <summary>CP10-1: QA에서 순간이동이 재현된 경기(기본 · 모드 A · 잡기 켬 · Pit · 시드 4, 5274틱 부근)를 끝까지.</summary>
+        /// <summary>CP10-1: QA에서 순간이동이 재현된 경기(Pit · 잡기 켬 · 시드 4)를 몸 폼 봇으로 끝까지(원래 재현은 모드 A 폼 봇).</summary>
         [Test]
         public void QaReproductionMatch_NoOutOfBounds()
         {
             var v = new Violations();
-            RunMatch(CombatMode.Charge, true, "Pit", 4, ref v);
+            RunMatch(true, "Pit", 4, ref v);
             Assert.AreEqual(0, v.Count, v.First);
         }
 
-        /// <summary>CP10-2: 모드 A × 잡기 2 × 맵 3 × 시드 6 × 2분. CP12: 맵 v2 6개(잡기 켬).</summary>
+        /// <summary>CP10-2: 잡기 2 × 맵 3 × 시드 6 × 2분. CP12: 맵 v2 6개(잡기 켬). 2026-11-11부터 몸 폼 봇.</summary>
         [TestCase(false, "Box")]
         [TestCase(false, "Towers")]
         [TestCase(false, "Pit")]
@@ -161,12 +166,12 @@ namespace Knockbox.Tests.EditMode
         [TestCase(true, "Ruins")]
         [TestCase(true, "Scales")]
         [TestCase(true, "Totems")]
-        public void ChargeBotMatches_HaveNoInvariantViolations(bool grab, string map)
+        public void BotMatches_HaveNoInvariantViolations(bool grab, string map)
         {
             var v = new Violations();
             for (uint seed = 1; seed <= 6; seed++)
-                RunMatch(CombatMode.Charge, grab, map, seed, ref v);
-            string report = $"[Knockbox][CP10-2] A 잡기 {(grab ? "켬" : "끔")} {map}: 경기 6, 라운드 {v.Rounds}, 평균 {(v.Rounds > 0 ? v.FightingTicks / 60f / v.Rounds : 0f):F1}초, 위반 {v.Count}";
+                RunMatch(grab, map, seed, ref v);
+            string report = $"[Knockbox][CP10-2] 몸 폼 잡기 {(grab ? "켬" : "끔")} {map}: 경기 6, 라운드 {v.Rounds}, 평균 {(v.Rounds > 0 ? v.FightingTicks / 60f / v.Rounds : 0f):F1}초, 위반 {v.Count}";
             TestContext.WriteLine(report);
             UnityEngine.Debug.Log(report);
             Assert.AreEqual(0, v.Count, v.First);

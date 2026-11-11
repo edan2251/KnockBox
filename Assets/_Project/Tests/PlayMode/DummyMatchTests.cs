@@ -23,14 +23,13 @@ namespace Knockbox.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator RandomDummies_OneMinuteMatch([Values(CombatMode.Charge, CombatMode.Swing)] CombatMode mode)
+        public IEnumerator RandomDummies_OneMinuteMatch()
         {
             root = new GameObject("Match");
             var runner = root.AddComponent<MatchRunner>();
             root.AddComponent<MatchPresenter>();
             yield return null;
 
-            runner.Mode = mode;
             runner.StartNewMatch();
             runner.Player1Input = new DummyInputSource(DummyBehavior.Random, 0xA11Cu);
             runner.Player2Input = new DummyInputSource(DummyBehavior.Random, 0xB0B5u);
@@ -65,8 +64,7 @@ namespace Knockbox.Tests.PlayMode
 
             var s = runner.World.State;
             string average = rounds > 0 ? $"{roundTicks / (float)rounds / 60f:F1}초" : "끝난 라운드 없음";
-            string label = mode == CombatMode.Charge ? "CP5-9" : "CP6-8";
-            string report = $"[Knockbox][{label}] 무작위 허수아비 {mode} {Ticks}틱: 끝난 라운드 {rounds}(평균 {average}), 현재 {s.Match.Round}라운드 {s.Match.Phase}, " +
+            string report = $"[Knockbox][CP5-9] 무작위 허수아비 몸 폼 {Ticks}틱: 끝난 라운드 {rounds}(평균 {average}), 현재 {s.Match.Round}라운드 {s.Match.Phase}, " +
                             $"점수 {s.Match.Score0}:{s.Match.Score1}, 체력 {s.Fighter0.Health}/{s.Fighter1.Health}, 공격 {attacks}, 명중 {hits}, 클래시 {clashes}(분당 {clashes * 3600f / Ticks:F1})";
             Debug.Log(report);
             TestContext.WriteLine(report);

@@ -23,14 +23,17 @@ namespace Knockbox.Tests.EditMode
             return false;
         }
 
-        /// <summary>P1이 체력 hp2인 P2를 한 번 때려 KO시키는 Box 월드. 명중(KO) 틱까지 진행한 상태로 돌려준다.</summary>
+        /// <summary>
+        /// P1이 체력 hp2인 P2를 주먹 한 번(첫 틱 탭)으로 KO시키는 Box 월드. 명중(KO) 틱까지 진행한 상태로 돌려준다.
+        /// 2026-11-11 폼 전투 제거로 TestJab(6번째 틱 명중) 대신 몸 폼 주먹을 쓰며, 명중 틱은 KO 이벤트가 난 틱이다.
+        /// </summary>
         static SimWorld KnockOutP2(int hp2, SimConfig config = null)
         {
             var w = TestWorlds.CreateAt(new Vec2(-10.6f, FloorY), new Vec2(-9.4f, FloorY), config);
             w.State.Fighter1.Health = hp2;
-            for (int t = 1; t <= 6; t++)
+            for (int t = 1; t <= 30 && !Has(w, SimEventType.KO, 1); t++)
                 w.Step(new InputFrame(0, 0, t == 1 ? InputButtons.Attack : InputButtons.None), default);
-            Assert.IsTrue(Has(w, SimEventType.KO, 1), "6번째 틱에 KO");
+            Assert.IsTrue(Has(w, SimEventType.KO, 1), "주먹 한 번으로 KO");
             return w;
         }
 
@@ -147,9 +150,9 @@ namespace Knockbox.Tests.EditMode
         public void ReplaceConfig_OnlyAtRoundTransition_AppliesToNextRound()
         {
             var w = KnockOutP2(5);
-            var combat = CombatParams.Default;
+            var combat = BrawlParams.Combat(CombatParams.Default);
             combat.MaxHealth = 150;
-            var next = new SimConfig(MovementParams.Default, MatchParams.Default, combat, CombatMode.Test);
+            var next = new SimConfig(MovementParams.Default, MatchParams.Default, combat, RuleSet.Brawl);
             Assert.Throws<InvalidOperationException>(() => w.ReplaceConfig(next), "KO 중에는 바꿀 수 없음");
 
             while (w.State.Match.Phase != MatchPhase.RoundTransition)
@@ -164,20 +167,20 @@ namespace Knockbox.Tests.EditMode
         [Test]
         public void FullMatch_BetweenBots_ReachesMatchEnd()
         {
-            var combat = CombatParams.Default;
+            var combat = BrawlParams.Combat(CombatParams.Default);
             combat.MaxHealth = 30;
             var match = MatchParams.Default;
             match.RoundsToWin = 3;
-            var config = new SimConfig(MovementParams.Default, match, combat, CombatMode.Test);
-            var w = TestWorlds.Create(MatchPhase.Countdown, 5, config);
-            var bot0 = new CombatBot(101);
-            var bot1 = new CombatBot(202);
+            var config = new SimConfig(MovementParams.Default, match, combat, RuleSet.Brawl);
+            var w = TestWorlds.Create(MatchPhase.Countdown, 5, config, ArenaFiles.LoadByName(MatchRunner.BrawlArenaName));
+            var bot0 = new BrawlBot(() => w, 0, 101);
+            var bot1 = new BrawlBot(() => w, 1, 202);
             var counts = new CombatEventCounts();
             int rounds = 0;
             for (int t = 0; t < 20000 && w.State.Match.Phase != MatchPhase.MatchEnd; t++)
             {
-                var s = w.State;
-                w.Step(bot0.Next(s.Fighter0, s.Fighter1, t), bot1.Next(s.Fighter1, s.Fighter0, t));
+                int tick = w.State.Tick;
+                w.Step(bot0.Poll(tick), bot1.Poll(tick));
                 counts.Add(w.Events);
                 if (Has(w, SimEventType.RoundEnd))
                     rounds++;

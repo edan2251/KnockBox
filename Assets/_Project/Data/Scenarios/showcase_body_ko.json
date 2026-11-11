@@ -1,0 +1,19 @@
+{
+  "name": "showcase_body_ko",
+  "arena": "Box",
+  "ticks": 150,
+  "spawn": { "p1": [-6.6, -7.55], "p2": [-5.4, -7.55] },
+  "tuning": { "Combat.MaxHealth": 8 },
+  "p1": [
+    { "at": 10, "press": ["Attack"] }
+  ],
+  "p2": [],
+  "expect": [
+    { "tick": 30, "fighter": 1, "field": "action", "equals": "KO" },
+    { "tick": 30, "fighter": 0, "field": "phase", "equals": "KO" }
+  ],
+  "captures": [
+    { "tick": 16, "name": "punch" },
+    { "tick": 40, "name": "ko" }
+  ]
+}

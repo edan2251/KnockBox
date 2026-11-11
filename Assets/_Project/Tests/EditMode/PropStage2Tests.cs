@@ -10,7 +10,7 @@ namespace Knockbox.Tests.EditMode
         const int Hinge = 0, Seesaw = 1, Hammer = 2, Target = 3, Dropper = 4;
 
         static SimConfig Config() =>
-            new SimConfig(MovementParams.Default, MatchParams.Default, CombatParams.Default, CombatMode.Charge, true);
+            new SimConfig(MovementParams.Default, MatchParams.Default, CombatParams.Default, RuleSet.Brawl);
 
         /// <summary>
         /// 경계 튕김 빈 맵(가운데 발판 윗면 y −6) + 경첩 발판(축 (−11.5, 2)) + 시소(축 (10, −3), 8 × 0.5)
@@ -484,50 +484,6 @@ namespace Knockbox.Tests.EditMode
             }
             TestContext.WriteLine($"[Knockbox][CP15-4] {name}: 강체 {n}개, 거울 짝 {pairs}쌍, 3초 최대 거울 오차 {worst:F5}");
             Assert.Less(worst, 1e-3f, $"{name} 거울 오차");
-        }
-            // CP15-6 ----------------------------------------------------------------------
-
-        /// <summary>
-        /// 캡처 시나리오 showcase_cp15_chain: 돌진이 연결 구조의 아래 블록을 쳐 줄이 끊어지고(이벤트 하나),
-        /// 끊어진 블록은 시나리오 뒤 4초 안에 발판(윗면 −5) 또는 경계 바닥(−9)에 내려앉아 잠든다.
-        /// </summary>
-        [Test]
-        public void ChainShowcase_BreaksOnStrike_ThenBlockLands()
-        {
-            var def = ScenarioJson.LoadByName("showcase_cp15_chain");
-            var config = ScenarioConfig.Create(def);
-            var arena = ArenaFiles.LoadByName(def.Arena);
-            var p1 = ScenarioInputs.Build(def.P1, def.Ticks);
-            var p2 = ScenarioInputs.Build(def.P2, def.Ticks);
-            var w = new SimWorld(config, arena, ScenarioInputs.CreateInitialState(def, config, arena));
-            int breakTick = -1, breaks = 0, broken = -1;
-            for (int t = 0; t < def.Ticks; t++)
-            {
-                w.Step(p1[t], p2[t]);
-                for (int k = 0; k < w.Events.Count; k++)
-                {
-                    if (w.Events[k].Type != SimEventType.JointBreak)
-                        continue;
-                    breaks++;
-                    if (breakTick < 0)
-                        breakTick = w.State.Tick;
-                }
-            }
-            for (int t = 0; t < 240; t++)
-                w.Step(default, default);
-            for (int i = 0; i < w.State.Props.Count; i++)
-            {
-                if (At(w, i).Broken != 0)
-                    broken = i;
-            }
-            TestContext.WriteLine($"[Knockbox][CP15-6] {def.Name}: 끊어진 틱 {breakTick}(캡처 b_break 26), 끊어짐 {breaks}회, 끝 위치 {(broken >= 0 ? At(w, broken).Position.ToString() : "-")}");
-            Assert.AreEqual(1, breaks, "끊어짐 한 번");
-            Assert.That(breakTick, Is.InRange(20, 26), "캡처 a_strike(21)~b_break(26) 사이에 끊어짐");
-            var g = At(w, broken);
-            float bottom = g.Position.Y - Half(arena, broken).Y * System.Math.Abs(g.Rotation.X) - Half(arena, broken).X * System.Math.Abs(g.Rotation.Y);
-            float floor = System.Math.Abs(g.Position.X) < 10f ? -5f : -9f;
-            Assert.AreEqual(floor, bottom, 0.05f, "끊어진 블록이 발판이나 경계 바닥에 내려앉음");
-            Assert.IsTrue(PropPhysics.Asleep(g, config.Combat.Props), "내려앉은 뒤 잠듦");
         }
     }
 }

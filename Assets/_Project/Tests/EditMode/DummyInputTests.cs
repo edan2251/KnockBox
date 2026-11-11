@@ -13,10 +13,6 @@ namespace Knockbox.Tests.EditMode
             var dummy = new DummyInputSource(DummyBehavior.Idle);
             Assert.AreEqual(default(InputFrame), dummy.Poll(10));
 
-            dummy.Behavior = DummyBehavior.GuardHold;
-            Assert.IsTrue(dummy.Poll(0).Held(InputButtons.Guard));
-            Assert.IsTrue(dummy.Poll(999).Held(InputButtons.Guard));
-
             dummy.Behavior = DummyBehavior.AttackEvery40;
             int presses = 0;
             for (int t = 0; t < 400; t++)
@@ -50,24 +46,5 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(DummyBehavior.Idle, DummyInputSource.Cycle(DummyBehavior.Random, 1));
         }
 
-        [Test]
-        public void DummyFight_GuardingDummyBlocksAttacks()
-        {
-            // P2 허수아비가 가드를 유지하면 P1의 공격은 가드에 막힌다(가드 감쇠 데미지만).
-            var w = TestWorlds.CreateAt(new Vec2(-6.6f, -7.55f), new Vec2(-5.4f, -7.55f));
-            var dummy = new DummyInputSource(DummyBehavior.GuardHold);
-            int guarded = 0, hits = 0;
-            for (int t = 0; t < 200; t++)
-            {
-                w.Step(new InputFrame(0, 0, t % 30 == 10 ? InputButtons.Attack : InputButtons.None), dummy.Poll(w.State.Tick));
-                for (int i = 0; i < w.Events.Count; i++)
-                {
-                    guarded += w.Events[i].Type == SimEventType.GuardHit ? 1 : 0;
-                    hits += w.Events[i].Type == SimEventType.Hit ? 1 : 0;
-                }
-            }
-            Assert.Greater(guarded, 0);
-            Assert.AreEqual(0, hits);
-        }
     }
 }

@@ -436,14 +436,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e8c588e3c815b434b8e3625d02ee981d, type: 2}
   - {fileID: 11400000, guid: c9017ada75567184f92238157712e52d, type: 2}
   rules:
-    StartForm: 0
-    SeparateP2Form: 0
-    StartFormP2: 0
-    OwnedForms: 0
     Switches:
-      GuardEnabled: 0
       GrabEnabled: 0
-      EnergyEnabled: 1
     LegacyMatch: 0
   arenaFiles:
   - {fileID: 4900000, guid: 6e5e55105e542c54b86d1392e896a49d, type: 3}
@@ -516,9 +510,7 @@ MonoBehaviour:
   postFx: {fileID: 0}
   arenaView: {fileID: 0}
   propView: {fileID: 0}
-  projectileView: {fileID: 0}
   brawlWeaponView: {fileID: 0}
-  pickPanel: {fileID: 0}
   propShadows: {fileID: 0}
   fighterShadows: {fileID: 0}
   boundaryView: {fileID: 0}
@@ -529,6 +521,7 @@ MonoBehaviour:
   hud: {fileID: 0}
   sfxPlayer: {fileID: 0}
   cameraRig: {fileID: 0}
+  connectorImpact: 1
   labels: {fileID: 0}
   overlay: {fileID: 0}
   aimLine: {fileID: 0}

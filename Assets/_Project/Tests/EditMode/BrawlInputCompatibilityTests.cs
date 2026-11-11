@@ -142,31 +142,13 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(0xBD05880Eu, actual[actual.Length - 1]);
         }
 
-        [TestCase(FighterForm.Body, FighterForm.Body, true)]
-        [TestCase(FighterForm.Body, FighterForm.Scissors, false)]
-        [TestCase(FighterForm.Scissors, FighterForm.Body, false)]
-        public void CurrentConfig_DisablesWeaponsAndPreservesBodyControlScheme(FighterForm p0, FighterForm p1, bool expected)
+        [Test]
+        public void CurrentConfig_DisablesWeaponsAndPreservesBodyControlScheme()
         {
-            runner.Rules = RuleSet.Brawl.WithForms(p0, p1);
+            runner.Rules = RuleSet.Brawl;
             Assert.IsFalse(runner.CreateConfig().Combat.Weapons.Enabled);
             Assert.IsFalse(runner.CreateConfig().Combat.Weapons.ThrowEnabled);
-            Assert.AreEqual(expected, runner.CreateConfig().Combat.Body.CombinedAttackInput);
-            runner.Rules = RuleSet.Legacy(CombatMode.Charge, true);
-            Assert.IsFalse(runner.CreateConfig().Combat.Weapons.Enabled, "F1의 기존 폼에서는 무기를 생성하지 않는다");
-        }
-
-        [Test]
-        public void CP4MainEditModeConfig_PreservesCapturedChecksumWithWeaponsDisabled()
-        {
-            // CP5 컴파일 전 수집한 Main 값은 StartNewMatch 전의 에디터 상태였다.
-            // Brawl 튜닝과 별도 차징은 켜졌지만 Rules는 아직 기본 Scissors였다(실행 중 Body 규칙과 구분).
-            runner.Rules = RuleSet.Default;
-            var config = runner.CreateConfig();
-            Assert.IsTrue(config.Combat.Body.SeparateChargeInput);
-            Assert.IsFalse(config.Combat.Body.CombinedAttackInput);
-            Assert.IsFalse(config.Combat.Weapons.Enabled);
-            Assert.AreEqual(FighterForm.Scissors, config.Rules.StartForm);
-            Assert.AreEqual(0xAF5F150Du, config.ComputeChecksum(), "실제 수집한 CP4 에디터 설정 체크섬을 보존한다");
+            Assert.IsTrue(runner.CreateConfig().Combat.Body.CombinedAttackInput);
         }
 
         [Test]

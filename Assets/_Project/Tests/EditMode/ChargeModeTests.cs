@@ -4,6 +4,8 @@ using NUnit.Framework;
 
 namespace Knockbox.Tests.EditMode
 {
+    // 2026-11-11 폼 전투 제거: 가위 폼 입력(충전·발사)과 대시 몸통 공격 검사는 지웠다. 몸 폼의 충전·발사는 BrawlLungeTests·BrawlBodyTests·BrawlChargeInputTests가 맡고,
+    // 이 파일은 상태로 만든 돌진의 공통 판정(위력, 클래시, 피해, 넉백, 종료)을 몸 폼 규칙(RuleSet.Brawl)과 기본 돌진 수치로 확인한다.
     /// <summary>CP5-1~7: 모드 A 돌진 충돌(03-combat.md 4절).</summary>
     public class ChargeModeTests
     {
@@ -22,7 +24,7 @@ namespace Knockbox.Tests.EditMode
             var combat = CombatParams.Default;
             if (change != null)
                 combat = change(combat);
-            return new SimConfig(MovementParams.Default, MatchParams.Default, combat, CombatMode.Charge);
+            return new SimConfig(MovementParams.Default, MatchParams.Default, combat, RuleSet.Brawl);
         }
 
         static SimWorld World(float x0, float x1, SimConfig config = null, ArenaDef arena = null, float y0 = FloorY, float y1 = FloorY) =>
@@ -49,81 +51,6 @@ namespace Knockbox.Tests.EditMode
         }
 
         // CP5-1 ---------------------------------------------------------------
-
-        [TestCase(1)]
-        [TestCase(3)]
-        [TestCase(4)]
-        [TestCase(10)]
-        [TestCase(18)]
-        [TestCase(27)]
-        [TestCase(36)]
-        [TestCase(50)]
-        public void LaunchSpeed_IsLinearInChargeRatio(int heldTicks)
-        {
-            var w = World(-12f, 12f);
-            for (int t = 1; t <= heldTicks; t++)
-            {
-                w.Step(In(0, 0, A), default);
-                Assert.AreEqual(ActionState.Charge, w.State.Fighter0.Action, $"{t}틱째 충전 중");
-            }
-            w.Step(default, default);
-            Assert.AreEqual(ActionState.Lunge, w.State.Fighter0.Action, "떼면 발사");
-            float ratio = heldTicks < 4 ? 0f : System.Math.Min(heldTicks, 36) / 36f;
-            float expected = 18f + 16f * ratio;
-            Assert.AreEqual(expected, w.State.Fighter0.Velocity.X, Tolerance, $"{heldTicks}틱 충전 → {expected}");
-            Assert.AreEqual(0f, w.State.Fighter0.Velocity.Y, Tolerance);
-            Assert.That(w.State.Fighter0.Velocity.X, Is.InRange(18f - Tolerance, 34f + Tolerance));
-        }
-
-        [Test]
-        public void FullCharge_AutoLaunchesAfter24MoreTicks()
-        {
-            var w = World(-12f, 12f);
-            int auto = P.FullChargeTicks + P.FullChargeHoldTicks;
-            for (int t = 1; t <= auto; t++)
-            {
-                w.Step(In(0, 0, A), default);
-                Assert.AreEqual(ActionState.Charge, w.State.Fighter0.Action, $"{t}틱째");
-            }
-            w.Step(In(0, 0, A), default);
-            Assert.AreEqual(ActionState.Lunge, w.State.Fighter0.Action, "최대 충전 뒤 24틱이 지나면 누르고 있어도 발사");
-            Assert.AreEqual(P.LungeMaxSpeed, w.State.Fighter0.Velocity.X, Tolerance);
-        }
-
-        [Test]
-        public void Launch_UsesEightWayInput_NeutralUsesFacing()
-        {
-            var w = World(-12f, 12f);
-            for (int t = 0; t < 10; t++)
-                w.Step(In(0, 0, A), default);
-            w.Step(In(-1, 1, InputButtons.None), default);
-            float s = P.LungeSpeed(10) / SimMath.Sqrt(2f);
-            float gravity = MovementParams.Default.RiseGravity * P.LungeGravityMultiplier * SimConfig.Dt;
-            Assert.AreEqual(-s, w.State.Fighter0.Velocity.X, Tolerance, "왼쪽 위 대각선");
-            Assert.AreEqual(s - gravity, w.State.Fighter0.Velocity.Y, Tolerance, "공중이면 발사한 틱부터 중력 × 0.3");
-            Assert.AreEqual(-1, w.State.Fighter0.Facing, "발사 쪽을 바라봄");
-
-            var n = World(12f, -12f);
-            n.Step(In(0, 0, A), default);
-            n.Step(default, default);
-            Assert.AreEqual(-P.LungeMinSpeed, n.State.Fighter0.Velocity.X, Tolerance, "중립이면 바라보는 쪽(왼쪽)");
-        }
-
-        [Test]
-        public void Charging_LimitsSpeedAndFloatsInAir()
-        {
-            var w = World(-12f, 12f);
-            for (int t = 0; t < 40; t++)
-                w.Step(In(1, 0, A), default);
-            Assert.AreEqual(P.ChargeMoveMaxSpeed, w.State.Fighter0.Velocity.X, Tolerance, "충전 중 지상 최대 속도 3");
-
-            var air = World(-12f, 12f, null, null, 4f);
-            for (int t = 0; t < 40; t++)
-            {
-                air.Step(In(0, 0, A), default);
-                Assert.GreaterOrEqual(air.State.Fighter0.Velocity.Y, -P.ChargeFallMaxSpeed - Tolerance, "공중 낙하 최대 4");
-            }
-        }
 
         // CP5-2 ---------------------------------------------------------------
 
@@ -329,65 +256,7 @@ namespace Knockbox.Tests.EditMode
 
         // CP5-5 ---------------------------------------------------------------
 
-        [Test]
-        public void LungeIntoParry_ReflectsAndStaggers()
-        {
-            var w = World(-1.6f, 0.4f);
-            w.Step(default, In(0, 0, G));
-            SetLunge(ref w.State.Fighter0, new Vec2(20f, 0f));
-            bool parried = false;
-            for (int t = 0; t < 6 && !parried; t++)
-            {
-                w.Step(default, In(0, 0, G));
-                parried = Has(w, SimEventType.Parry, 1);
-            }
-            Assert.IsTrue(parried, "패링 구간 안에 부딪힘");
-            var c = CombatParams.Default;
-            Assert.AreEqual(ActionState.Stagger, w.State.Fighter0.Action);
-            Assert.AreEqual(-20f * P.ParryReflectScale, w.State.Fighter0.Velocity.X, Tolerance, "접촉 법선 기준 반사 × 0.8");
-            Assert.AreEqual(c.ParryHitstop, w.State.Fighter0.HitstopTicks);
-            Assert.AreEqual(100, w.State.Fighter1.Health);
-        }
-
-        [Test]
-        public void LungeIntoGuard_FollowsGuardRules()
-        {
-            var w = World(-1.6f, 0.4f);
-            for (int t = 0; t < 10; t++)
-                w.Step(default, In(0, 0, G));
-            SetLunge(ref w.State.Fighter0, new Vec2(20f, 0f));
-            bool guarded = false;
-            for (int t = 0; t < 6 && !guarded; t++)
-            {
-                w.Step(default, In(0, 0, G));
-                guarded = Has(w, SimEventType.GuardHit, 1);
-            }
-            Assert.IsTrue(guarded);
-            var c = CombatParams.Default;
-            Assert.AreEqual(100 - 2, w.State.Fighter1.Health, "위력 20 → 데미지 12 × 0.2 → 2");
-            Assert.AreEqual(18f * c.GuardKnockbackMultiplier, w.State.Fighter1.Velocity.X, Tolerance, "넉백 18 × 0.35 수평");
-            Assert.AreEqual(ActionState.GuardStun, w.State.Fighter1.Action);
-            Assert.AreEqual(4, w.State.Fighter1.HitstopTicks, "히트스탑 7의 절반");
-            Assert.AreEqual(-5f, w.State.Fighter0.Velocity.X, Tolerance, "이긴 쪽 반동 × -0.25");
-        }
-
         // CP5-6 ---------------------------------------------------------------
-
-        [Test]
-        public void DashIntoStandingOpponent_Damages()
-        {
-            // CR-003에서 대시 몸통 공격성 기본값이 0이 됐다(S-149). 가중치가 있을 때의 규칙은 CP16 값 0.6으로 확인한다.
-            var w = World(-2f, 0f, ChargeConfig(c => { c.Charge.DashAggression = 0.6f; return c; }));
-            bool hit = false;
-            for (int t = 0; t < 12 && !hit; t++)
-            {
-                w.Step(In(1, 0, t == 0 ? InputButtons.Dash : InputButtons.None), default);
-                hit = Has(w, SimEventType.Hit, 1);
-            }
-            Assert.IsTrue(hit, "대시(가중치 0.6)로 피해");
-            int expected = SimMath.Clamp(SimMath.RoundToInt(26f * 0.6f * 0.6f), 4, 24);
-            Assert.AreEqual(100 - expected, w.State.Fighter1.Health, "위력 15.6 → 데미지 9");
-        }
 
         [Test]
         public void OrdinaryMovement_NeverDamages()
@@ -403,55 +272,66 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(100, w.State.Fighter1.Health);
         }
 
-        [Test]
-        public void DashInTestMode_DoesNoDamage()
-        {
-            var w = World(-2f, 0f, SimConfig.CreateDefault());
-            for (int t = 0; t < 12; t++)
-                w.Step(In(1, 0, t == 0 ? InputButtons.Dash : InputButtons.None), default);
-            Assert.AreEqual(100, w.State.Fighter1.Health, "모드 A가 아니면 대시 가중치 0");
-        }
-
         // CP5-7 ---------------------------------------------------------------
 
-        [TestCase("Box", 21u)]
-        [TestCase("Towers", 22u)]
-        [TestCase("Pit", 23u)]
-        public void MirroredChargeFight_AndSyncTest(string map, uint seed)
+
+        // 돌진 대 주먹(2026-11-11 폼 전투 제거 전에는 가위 돌진 대 보 휘두르기, FormInteractionTests) ----------
+
+        /// <summary>P2가 pressTick에 주먹을 내밀고, P1은 처음부터 speed로 돌진 중. 활성 주먹과 돌진이 만난 결과를 센다.</summary>
+        static SimWorld LungeVsPunch(SimConfig config, int pressTick, float speed, out int interrupts1, out int hits0, out int hits1)
         {
-            var arena = ArenaFiles.LoadByName(map);
-            var combat = CombatParams.Default;
-            combat.MaxHealth = 50;
-            var config = new SimConfig(MovementParams.Default, MatchParams.Default, combat, CombatMode.Charge);
-            var normal = TestWorlds.Create(MatchPhase.Fighting, 7, config, arena);
-            var mirrored = TestWorlds.Create(MatchPhase.Fighting, 7, config, arena);
-            var synced = TestWorlds.Create(MatchPhase.Fighting, 7, config, arena);
-            var sync = new SyncTest<SimWorld>(synced);
-            var bot0 = new CombatBot(seed * 13u);
-            var bot1 = new CombatBot(seed * 29u);
-            var counts = new CombatEventCounts();
-            int lunges = 0;
-            for (int t = 0; t < 3600; t++)
+            var w = World(-2.5f, 0.5f, config);
+            var s = w.State;
+            SetLunge(ref s.Fighter0, new Vec2(speed, 0f));
+            w.State = s;
+            interrupts1 = hits0 = hits1 = 0;
+            for (int t = 0; t < 40; t++)
             {
-                var s = normal.State;
-                var p1 = bot0.Next(s.Fighter0, s.Fighter1, t);
-                var p2 = bot1.Next(s.Fighter1, s.Fighter0, t);
-                normal.Step(p1, p2);
-                mirrored.Step(SymmetryTests.Mirror(p2), SymmetryTests.Mirror(p1));
-                sync.Advance(p1, p2);
-                counts.Add(normal.Events);
-                for (int i = 0; i < normal.Events.Count; i++)
-                    lunges += normal.Events[i].Type == SimEventType.LungeStart ? 1 : 0;
-                SymmetryTests.AssertMirrored(normal.State.Fighter0, mirrored.State.Fighter1, t + 1, "P1↔P2'");
-                SymmetryTests.AssertMirrored(normal.State.Fighter1, mirrored.State.Fighter0, t + 1, "P2↔P1'");
+                w.Step(default, t == pressTick ? In(-1, 0, InputButtons.Attack) : default);
+                for (int i = 0; i < w.Events.Count; i++)
+                {
+                    var e = w.Events[i];
+                    if (e.Type == SimEventType.AttackInterrupted && e.Fighter == 1) interrupts1++;
+                    if (e.Type == SimEventType.Hit && e.Fighter == 0) hits0++;
+                    if (e.Type == SimEventType.Hit && e.Fighter == 1) hits1++;
+                }
             }
-            string report = $"[Knockbox][CP5-7] {map}: 돌진 {lunges}, {counts}, SyncTest 불일치 {sync.MismatchCount}";
-            TestContext.WriteLine(report);
-            UnityEngine.Debug.Log(report);
-            Assert.AreEqual(0, sync.MismatchCount, sync.FirstMismatch?.ToString());
-            Assert.AreEqual(normal.ComputeChecksum(), synced.ComputeChecksum());
-            Assert.Greater(lunges, 10);
-            Assert.Greater(counts.Hit, 0, "돌진·대시 명중이 나와야 함");
+            return w;
+        }
+
+        [Test]
+        public void Lunge_IntoActivePunch_AbovePowerThreshold_LungeWins_BelowThreshold_PunchHits()
+        {
+            foreach (bool strong in new[] { true, false })
+            {
+                var combat = BrawlParams.Combat(CombatParams.Default);
+                float speed = combat.Charge.LungeMaxSpeed;
+                // 약한 경우는 돌진 공격성을 낮춰 위력이 임계 아래가 되게 한다(데이터).
+                if (!strong)
+                    combat.Charge.LungeAggression = (combat.Charge.PowerThreshold - 1f) / speed;
+                var config = new SimConfig(MovementParams.Default, MatchParams.Default, combat, RuleSet.Brawl);
+                Assert.AreEqual(strong, speed * config.Combat.Charge.LungeAggression >= config.Combat.Charge.PowerThreshold);
+                bool found = false;
+                // 주먹을 누르는 틱을 바꿔 가며, 돌진이 활성 판정에 닿는 경기를 찾는다.
+                for (int press = 0; press < 14 && !found; press++)
+                {
+                    var w = LungeVsPunch(config, press, speed, out int interrupts1, out int hits0, out int hits1);
+                    if (strong && interrupts1 > 0)
+                    {
+                        found = true;
+                        Assert.AreEqual(1, hits1, $"누름 {press}: 주먹을 낸 쪽이 피해");
+                        Assert.AreEqual(0, hits0, $"누름 {press}: 돌진은 맞지 않음");
+                        Assert.AreEqual(config.Combat.MaxHealth, w.State.Fighter0.Health);
+                    }
+                    else if (!strong && hits0 > 0)
+                    {
+                        found = true;
+                        Assert.AreEqual(0, interrupts1, $"누름 {press}: 임계 미만이면 중단 없음");
+                        Assert.AreEqual(0, hits1, $"누름 {press}: 주먹을 낸 쪽은 맞지 않음");
+                    }
+                }
+                Assert.IsTrue(found, strong ? "돌진이 이기는 경기" : "주먹이 맞는 경기");
+            }
         }
     }
 }

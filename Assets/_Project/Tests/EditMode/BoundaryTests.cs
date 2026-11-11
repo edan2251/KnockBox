@@ -8,7 +8,7 @@ namespace Knockbox.Tests.EditMode
     public class BoundaryTests
     {
         static SimConfig Config() =>
-            new SimConfig(MovementParams.Default, MatchParams.Default, CombatParams.Default, CombatMode.Charge, true);
+            new SimConfig(MovementParams.Default, MatchParams.Default, CombatParams.Default, RuleSet.Brawl);
 
         /// <summary>테두리만 있는 36 × 20 경계 튕김 맵(가운데 아래에 발판 하나).</summary>
         public static ArenaDef Open()

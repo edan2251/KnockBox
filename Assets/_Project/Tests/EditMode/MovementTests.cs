@@ -10,6 +10,13 @@ namespace Knockbox.Tests.EditMode
     {
         const InputButtons J = InputButtons.Jump;
         const InputButtons D = InputButtons.Dash;
+
+        /// <summary>
+        /// 대시를 쓰는 몸 폼 조작(좌클릭 탭·홀드, Shift 대시). 현재 Main 조작(좌클릭 즉시 주먹)은 대시를 시작하지 않으므로
+        /// 대시 이동 검사는 이 조작으로 한다(구 몸 폼 기록과 같은 조작, 2026-11-11 Test 폼 대신).
+        /// </summary>
+        static SimConfig DashConfig() => new SimConfig(MovementParams.Default, MatchParams.Default,
+            BrawlParams.Combat(CombatParams.Default, separateChargeInput: false), RuleSet.Brawl);
         const float Tolerance = 1e-4f;
 
         static InputFrame In(int x, int y = 0, InputButtons b = InputButtons.None) => new InputFrame(x, y, b);
@@ -268,7 +275,7 @@ namespace Knockbox.Tests.EditMode
         [Test]
         public void GroundDash_DistanceAndNoVerticalMotion()
         {
-            var w = TestWorlds.Create();
+            var w = TestWorlds.Create(config: DashConfig());
             var start = P1(w).Position;
             Assert.IsTrue(Step(w, Btn(D), SimEventType.Dash));
             int dashTicks = w.Config.Movement.DashTicks;
@@ -290,7 +297,7 @@ namespace Knockbox.Tests.EditMode
         [Test]
         public void AirDash_HasNoGravity()
         {
-            var w = TestWorlds.CreateAt(new Vec2(-13.5f, 2f), FarAway);
+            var w = TestWorlds.CreateAt(new Vec2(-13.5f, 2f), FarAway, DashConfig());
             w.Step(default, default);
             Assert.IsTrue(Step(w, In(1, 0, D), SimEventType.Dash));
             float y = P1(w).Position.Y;
@@ -305,7 +312,7 @@ namespace Knockbox.Tests.EditMode
         [Test]
         public void DashCharge_RecoversOnLandingAndWallContact()
         {
-            var w = TestWorlds.CreateAt(new Vec2(-12f, 6f), FarAway);
+            var w = TestWorlds.CreateAt(new Vec2(-12f, 6f), FarAway, DashConfig());
             Assert.IsTrue(Step(w, In(1, 0, D), SimEventType.Dash));
             Assert.AreEqual(0, P1(w).DashCharges);
             for (int t = 0; t < w.Config.Movement.DashCooldownTicks + 1; t++)
@@ -320,7 +327,7 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(1, P1(w).DashCharges, "착지로 회복되지 않음");
 
             // 벽 접촉: 공중에서 왼쪽 벽으로 대시해 닿으면 회복된다.
-            var wall = TestWorlds.CreateAt(new Vec2(-12f, 6f), FarAway);
+            var wall = TestWorlds.CreateAt(new Vec2(-12f, 6f), FarAway, DashConfig());
             Assert.IsTrue(Step(wall, In(-1, 0, D), SimEventType.Dash));
             Assert.AreEqual(-1, P1(wall).Facing, "대시를 시작한 쪽을 바라봐야 함");
             Assert.AreEqual(0, P1(wall).DashCharges);
@@ -335,7 +342,7 @@ namespace Knockbox.Tests.EditMode
         [Test]
         public void DashJumpCancel_KeepsHorizontalSpeed()
         {
-            var w = TestWorlds.Create();
+            var w = TestWorlds.Create(config: DashConfig());
             Assert.IsTrue(Step(w, Btn(D), SimEventType.Dash));
             int minTicks = w.Config.Movement.DashJumpCancelMinTicks;
             for (int t = 1; t < minTicks; t++)
@@ -345,7 +352,7 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(w.Config.Movement.DashSpeed, P1(w).Velocity.X, Tolerance);
             Assert.Greater(P1(w).Velocity.Y, 0f);
 
-            var early = TestWorlds.Create();
+            var early = TestWorlds.Create(config: DashConfig());
             Step(early, Btn(D), SimEventType.Dash);
             Assert.IsFalse(Step(early, Btn(J), SimEventType.Jump), "대시 3틱 전에 캔슬됨");
         }
@@ -391,7 +398,7 @@ namespace Knockbox.Tests.EditMode
         public void BouncePad_LaunchesAndRecovers()
         {
             var arena = Build("Pad", (c, r) => r == 16 && c >= 14 && c <= 17 ? 'B' : '\0');
-            var w = TestWorlds.CreateAt(new Vec2(0f, 0f), FarAway, null, arena);
+            var w = TestWorlds.CreateAt(new Vec2(0f, 0f), FarAway, DashConfig(), arena);
             Assert.IsTrue(Step(w, Btn(J), SimEventType.AirJump));
             Assert.IsTrue(Step(w, In(0, -1, D), SimEventType.Dash), "아래로 대시");
             Assert.AreEqual(0, P1(w).AirJumpsLeft);

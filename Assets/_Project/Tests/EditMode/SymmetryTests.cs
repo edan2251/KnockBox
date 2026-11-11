@@ -13,7 +13,8 @@ namespace Knockbox.Tests.EditMode
     {
         const float Tolerance = 1e-4f;
 
-        internal static InputFrame Mirror(InputFrame f) => new InputFrame(-f.MoveX, f.MoveY, f.Buttons);
+        /// <summary>좌우로 뒤집은 입력(이동·조준). 몸 폼은 조준으로 주먹·잡기·던지기 방향을 정한다.</summary>
+        internal static InputFrame Mirror(InputFrame f) => new InputFrame(-f.MoveX, f.MoveY, f.Buttons, AimDirections.Mirror(f.Aim));
 
         internal static void AssertMirrored(in FighterState a, in FighterState b, int tick, string who)
         {
@@ -35,7 +36,6 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(a.ComboHits, b.ComboHits, at + " combo");
             Assert.AreEqual(a.AttackId, b.AttackId, at + " attack");
             Assert.AreEqual(a.AttackHasHit, b.AttackHasHit, at + " attackHasHit");
-            Assert.AreEqual(a.ParryTicks, b.ParryTicks, at + " parry");
             Assert.AreEqual(a.LungeBounces, b.LungeBounces, at + " lungeBounces");
             Assert.AreEqual(a.ContactCooldown, b.ContactCooldown, at + " contactCooldown");
             Assert.AreEqual(a.ThrowPending, b.ThrowPending, at + " throwPending");

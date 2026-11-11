@@ -23,7 +23,7 @@ namespace Knockbox.EditorTools
         const string PrefixKey = "Knockbox.ScenarioCapture.Prefix";
         const string ProgressPath = "docs/ai_docs/progress/PROGRESS.md";
         /// <summary>CP3-4: 여러 해상도에서 레이아웃과 HUD를 확인할 시나리오.</summary>
-        const string ResolutionScenario = "showcase_cp3_presentation";
+        const string ResolutionScenario = "showcase_cp1_mirror_run_jump";
         static readonly (int width, int height, string suffix)[] Resolutions =
         {
             (1280, 720, "_720p"),

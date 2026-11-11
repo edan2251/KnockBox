@@ -182,14 +182,6 @@ namespace Knockbox.EditorTools
                 runnerFlags.ApplyModifiedPropertiesWithoutUndo();
                 changed = true;
             }
-            // 직접 플레이하는 Main 씬은 시험 공격 폼 대신 가위 폼으로 시작한다(CR-003).
-            var formProperty = runnerFlags.FindProperty("rules.StartForm");
-            if (localPlay && formProperty.enumValueIndex == (int)FighterForm.Test)
-            {
-                formProperty.enumValueIndex = (int)FighterForm.Scissors;
-                runnerFlags.ApplyModifiedPropertiesWithoutUndo();
-                changed = true;
-            }
 
             var runnerSo = new SerializedObject(runner);
             changed |= FillArray(runnerSo, "arenaFiles", LoadArenaFiles(".txt"));

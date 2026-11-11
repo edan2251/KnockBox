@@ -219,54 +219,5 @@ namespace Knockbox.Tests.EditMode
             }
         }
 
-        // CP16-7 ----------------------------------------------------------------------
-
-        /// <summary>
-        /// 캡처 시나리오 showcase_cp16_collapse(PropLab, 기둥 몸 1~6): 공중 돌진이 넷째 상자(몸 4)만 쳐내고(24틱 근처, 쳐냄 한 번),
-        /// 위 두 상자는 그 높이(1.6)만큼 내려앉고, 아래 셋은 그대로 남는다. 그 뒤 4초 안에 기둥 상자는 모두 잠든다.
-        /// </summary>
-        [Test]
-        public void CollapseShowcase_KnocksOutOneBox()
-        {
-            var def = ScenarioJson.LoadByName("showcase_cp16_collapse");
-            var config = ScenarioConfig.Create(def);
-            var arena = ArenaFiles.LoadByName(def.Arena);
-            var p1 = ScenarioInputs.Build(def.P1, def.Ticks);
-            var p2 = ScenarioInputs.Build(def.P2, def.Ticks);
-            var w = new SimWorld(config, arena, ScenarioInputs.CreateInitialState(def, config, arena));
-            var start = new Vec2[w.State.Props.Count];
-            for (int i = 0; i < start.Length; i++)
-                start[i] = PropState.At(w.State.Props, i).Position;
-            int knockouts = 0, knockoutTick = -1;
-            float power = 0f;
-            for (int t = 0; t < def.Ticks; t++)
-            {
-                w.Step(p1[t], p2[t]);
-                for (int k = 0; k < w.Events.Count; k++)
-                {
-                    if (w.Events[k].Type != SimEventType.BoxKnockout)
-                        continue;
-                    knockouts++;
-                    knockoutTick = w.State.Tick;
-                    power = w.Events[k].Strength;
-                }
-            }
-            for (int t = 0; t < 240; t++)
-                w.Step(default, default);
-            string report = $"[Knockbox][CP16-7] {def.Name}: 쳐냄 {knockouts}회(틱 {knockoutTick}, 위력 {power:F1}),{Describe(w, start)}";
-            TestContext.WriteLine(report);
-            Assert.AreEqual(1, knockouts, report);
-            Assert.That(knockoutTick, Is.InRange(22, 26), "캡처 a_approach(22)~c_out(26) 사이 " + report);
-            for (int i = 1; i <= 3; i++)
-            {
-                Assert.Less(System.Math.Abs(PropState.At(w.State.Props, i).Position.X - start[i].X), 0.1f, $"아래 상자 몸 {i} " + report);
-                Assert.Less(System.Math.Abs(PropState.At(w.State.Props, i).Position.Y - start[i].Y), SagTolerance, $"아래 상자 몸 {i} " + report);
-            }
-            Assert.Greater(System.Math.Abs(PropState.At(w.State.Props, 4).Position.X - start[4].X), 1.5f, "넷째 상자가 빠짐 " + report);
-            for (int i = 5; i <= 6; i++)
-                Assert.AreEqual(start[i].Y - 1.6f, PropState.At(w.State.Props, i).Position.Y, 0.3f, $"위 상자 몸 {i}가 빠진 상자 높이만큼 내려옴 " + report);
-            for (int i = 1; i <= 6; i++)
-                Assert.IsTrue(PropPhysics.Asleep(PropState.At(w.State.Props, i), config.Combat.Props), $"몸 {i} 잠듦 " + report);
-        }
     }
 }

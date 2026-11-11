@@ -1728,50 +1728,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1419677610}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &450430482
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 450430484}
-  - component: {fileID: 450430483}
-  m_Layer: 0
-  m_Name: PickPanel
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &450430483
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 450430482}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4f0078b6d585f0a4fb5640c2a3ba9ab3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Knockbox.Game::Knockbox.Game.PickPanelView
---- !u!4 &450430484
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 450430482}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1419677610}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &486258061
 GameObject:
   m_ObjectHideFlags: 0
@@ -6395,14 +6351,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e8c588e3c815b434b8e3625d02ee981d, type: 2}
   - {fileID: 11400000, guid: c9017ada75567184f92238157712e52d, type: 2}
   rules:
-    StartForm: 4
-    SeparateP2Form: 0
-    StartFormP2: 0
-    OwnedForms: 0
     Switches:
-      GuardEnabled: 0
       GrabEnabled: 1
-      EnergyEnabled: 0
     LegacyMatch: 1
   arenaFiles:
   - {fileID: 4900000, guid: 6e5e55105e542c54b86d1392e896a49d, type: 3}
@@ -6460,13 +6410,11 @@ Transform:
   - {fileID: 2017423945}
   - {fileID: 1482660497}
   - {fileID: 1641635099}
-  - {fileID: 2089100040}
   - {fileID: 1735565284}
   - {fileID: 1391850601}
   - {fileID: 1696138300}
   - {fileID: 1042229596}
   - {fileID: 863705915}
-  - {fileID: 450430484}
   - {fileID: 1008362212}
   - {fileID: 1082694035}
   - {fileID: 119158227}
@@ -6520,9 +6468,7 @@ MonoBehaviour:
   postFx: {fileID: 1288086805}
   arenaView: {fileID: 2130580736}
   propView: {fileID: 1522905166}
-  projectileView: {fileID: 2089100039}
   brawlWeaponView: {fileID: 1735565283}
-  pickPanel: {fileID: 450430483}
   propShadows: {fileID: 435679778}
   fighterShadows: {fileID: 1284177095}
   boundaryView: {fileID: 1391850600}
@@ -6533,6 +6479,7 @@ MonoBehaviour:
   hud: {fileID: 863705914}
   sfxPlayer: {fileID: 1008362211}
   cameraRig: {fileID: 1689522034}
+  connectorImpact: 1
   labels: {fileID: 1082694034}
   overlay: {fileID: 119158226}
   aimLine: {fileID: 1231605961}
@@ -9940,50 +9887,6 @@ Transform:
   m_Children:
   - {fileID: 389231185}
   m_Father: {fileID: 2130580737}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &2089100038
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2089100040}
-  - component: {fileID: 2089100039}
-  m_Layer: 0
-  m_Name: Projectiles
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &2089100039
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2089100038}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4e415d67f61d7dd44aa96017fc8a3b8a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Knockbox.Presentation::Knockbox.Presentation.ProjectileView
---- !u!4 &2089100040
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2089100038}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1419677610}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2096500880
 GameObject:

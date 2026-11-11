@@ -26,7 +26,8 @@ namespace Knockbox.Tests.EditMode
             var combat = CombatParams.Default;
             if (sleepTicks > 0)
                 combat.Props.SleepTicks = sleepTicks;
-            return new SimConfig(MovementParams.Default, MatchParams.Default, combat, CombatMode.Charge, true);
+            // 2026-11-11 폼 전투 제거: 가위(Charge) 폼 대신 몸 폼 규칙. 돌진은 테스트가 상태로 직접 만든다.
+            return new SimConfig(MovementParams.Default, MatchParams.Default, combat, RuleSet.Brawl);
         }
 
         /// <summary>받침 윗면 가운데(base)에서 위로 쌓은 기둥(맵 파일의 "pillar"와 같은 배치).</summary>

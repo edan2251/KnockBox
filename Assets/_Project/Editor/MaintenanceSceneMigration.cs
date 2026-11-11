@@ -44,9 +44,9 @@ namespace Knockbox.EditorTools
                 ("background","Background",typeof(BackgroundView)),("arenaView","Arena",typeof(ArenaView)),
                 ("propView","Props",typeof(PropView)),("propShadows","PropShadows",typeof(PropShadowView)),
                 ("fighterShadows","FighterShadows",typeof(FighterShadowView)),("fighter0","Fighter_1",typeof(FighterView)),("fighter1","Fighter_2",typeof(FighterView)),
-                ("dust","Dust",typeof(DustPool)),("projectileView","Projectiles",typeof(ProjectileView)),("brawlWeaponView","Brawl_Weapon",typeof(BrawlWeaponView)),
+                ("dust","Dust",typeof(DustPool)),("brawlWeaponView","Brawl_Weapon",typeof(BrawlWeaponView)),
                 ("boundaryView","Boundary",typeof(BoundaryView)),("fx","Impact_Fx",typeof(ImpactFx)),("koShatter","KO_Shatter",typeof(KoShatter)),
-                ("hud","Hud",typeof(HudView)),("pickPanel","PickPanel",typeof(PickPanelView)),("sfxPlayer","Sfx",typeof(SfxPlayer)),
+                ("hud","Hud",typeof(HudView)),("sfxPlayer","Sfx",typeof(SfxPlayer)),
                 ("labels","Debug_Labels",typeof(DebugStateLabels)),("overlay","Hitbox_Overlay",typeof(HitboxOverlay)),("aimLine","Aim_Line",typeof(AimLineView)),
                 ("help","Help",typeof(HelpOverlay)),("postFx","Post_Fx",typeof(PostFx))};
             foreach(var o in owners){var go=new GameObject(o.name);go.transform.SetParent(runner.transform,false);Set(presenter,o.field,go.AddComponent(o.type));}

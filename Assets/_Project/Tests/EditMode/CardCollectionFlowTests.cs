@@ -63,8 +63,6 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(2,c.Match.RoundsToWinSet);Assert.AreEqual(5,c.Match.SetsToWinMatch);
             Assert.IsFalse(c.Rules.LegacyMatch);Assert.IsTrue(c.Match.CollectCardsOnly);
             Assert.AreEqual(MatchPhase.Countdown,w.State.Match.Phase);
-            Assert.AreEqual(FighterForm.Body,w.State.Fighter0.Form);
-            Assert.AreEqual(FighterForm.Body,w.State.Fighter1.Form);
             LoseRound(w,1);
             Assert.AreEqual(MatchPhase.RoundTransition,w.State.Match.Phase);
             Assert.AreEqual(1,w.State.Match.Score0);Assert.AreEqual(0,w.State.Match.SetScore0);
@@ -92,7 +90,6 @@ namespace Knockbox.Tests.EditMode
             Fighting(w);
             Assert.AreEqual(round+1,w.State.Match.Round);
             Assert.AreEqual(1,w.State.GetFighter(loser).Augments.Count);
-            Assert.AreEqual(FighterForm.Body,w.State.GetFighter(loser).Form);
             Assert.AreEqual(1,loser==1?w.State.Match.SetScore0:w.State.Match.SetScore1);
         }
 
@@ -112,7 +109,6 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(MatchPhase.Countdown,w.State.Match.Phase);
             Assert.AreEqual(0,w.State.Fighter0.Augments.Count+w.State.Fighter1.Augments.Count);
             Assert.AreEqual(0,w.State.Match.SetScore0+w.State.Match.SetScore1);
-            Assert.AreEqual(FighterForm.Body,w.State.Fighter0.Form);
         }
 
         [Test]

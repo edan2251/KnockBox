@@ -18,9 +18,10 @@ namespace Knockbox.Tests.EditMode
 
         static SimConfig Config(int maxHealth = 100)
         {
-            var combat = CombatParams.Default;
+            // 2026-11-11 폼 전투 제거: 보(Swing) 폼 대신 몸 폼 전투.
+            var combat = BrawlParams.Combat(CombatParams.Default);
             combat.MaxHealth = maxHealth;
-            return new SimConfig(MovementParams.Default, MatchParams.Default, combat, CombatMode.Swing);
+            return new SimConfig(MovementParams.Default, MatchParams.Default, combat, RuleSet.Brawl);
         }
 
         static bool Has(SimWorld w, SimEventType type, int fighter)

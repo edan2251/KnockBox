@@ -82,7 +82,7 @@ namespace Knockbox.Tests.PlayMode
         public IEnumerator TwoBodies_LuminanceDiffersByAtLeastQuarter()
         {
             yield return LoadSandbox();
-            yield return StepTo(ScenarioJson.LoadByName("showcase_cp3_presentation"), 50);
+            yield return StepTo(ScenarioJson.LoadByName("showcase_cp1_mirror_run_jump"), 50);
             yield return new WaitForEndOfFrame();
 
             const int width = 1920, height = 1080;
@@ -216,112 +216,6 @@ namespace Knockbox.Tests.PlayMode
             Debug.Log($"[Knockbox][CP3-6] 연출을 켠 Sandbox에서 showcase {played}개 재생, 최종 체크섬이 헤드리스 실행과 모두 같음");
         }
 
-        /// <summary>
-        /// CP21-5: 현재 폼 표시 세 방식 모두 시뮬레이션 체크섬에 영향이 없다(연출을 켠 재생 = 헤드리스 재생).
-        /// CP21-7: 렌더링 오류 확인용 캡처를 처음 방식에서만 960×540으로 남긴다(Captures/CP21, Git 제외).
-        /// </summary>
-        [UnityTest]
-        public IEnumerator FormDisplayModes_DoNotChangeChecksum()
-        {
-            yield return LoadSandbox();
-            var def = ScenarioJson.LoadByName("showcase_cp21_forms");
-            var headless = ScenarioRun.Run(def, ScenarioConfig.Create(def), ArenaFiles.LoadByName(def.Arena));
-            Directory.CreateDirectory(ScenarioPlayer.CaptureFolder("CP21"));
-            foreach (FormDisplayMode mode in Enum.GetValues(typeof(FormDisplayMode)))
-            {
-                presenter.FormDisplay = mode;
-                player.Play(def);
-                double deadline = Time.realtimeSinceStartupAsDouble + def.Ticks / 60.0 + 5.0;
-                bool captured0 = false, captured1 = false;
-                while (!player.Finished && Time.realtimeSinceStartupAsDouble < deadline)
-                {
-                    if (mode == FormDisplayMode.Always)
-                    {
-                        int tick = runner.World.State.Tick;
-                        if (!captured0 && tick >= def.Captures[0].Tick)
-                        {
-                            presenter.RenderFrame();
-                            ScenarioPlayer.SaveCameraImage(camera, Path.Combine(ScenarioPlayer.CaptureFolder("CP21"), $"{def.Captures[0].Name}.png"), 960, 540);
-                            captured0 = true;
-                        }
-                        if (!captured1 && tick >= def.Captures[1].Tick)
-                        {
-                            presenter.RenderFrame();
-                            ScenarioPlayer.SaveCameraImage(camera, Path.Combine(ScenarioPlayer.CaptureFolder("CP21"), $"{def.Captures[1].Name}.png"), 960, 540);
-                            captured1 = true;
-                        }
-                    }
-                    yield return null;
-                }
-                Assert.IsTrue(player.Finished, $"{mode}");
-                Assert.AreEqual(headless.FinalChecksum, runner.World.ComputeChecksum(), $"{mode}: 표시 방식이 시뮬레이션을 바꿈");
-            }
-            presenter.FormDisplay = FormDisplayMode.Always;
-            LogAssert.NoUnexpectedReceived();
-        }
-
-        /// <summary>
-        /// CP22-12·CP23-12: 선택 화면(초기 폼, 세트 패자)과 경기 종료 화면이 오류 없이 그려진다. 렌더링 확인용 캡처를 960×540으로 남긴다.
-        /// </summary>
-        [UnityTest]
-        public IEnumerator PickAndMatchEndScreens_Render()
-        {
-            yield return LoadSandbox();
-            var config = new SimConfig(MovementParams.Default, MatchParams.Default, CombatParams.Default,
-                new RuleSet { Switches = FeatureSwitches.Default }.WithForms(FighterForm.Scissors, FighterForm.Rock));
-            var arena = ArenaFiles.LoadByName("Ruins");
-            runner.Running = false;
-            runner.Begin(config, arena, SimState.CreateRound(config, arena, 3, MatchPhase.FormSelect));
-            string folder = ScenarioPlayer.CaptureFolder("CP23");
-            Directory.CreateDirectory(folder);
-
-            // 초기 폼 선택: P1은 아직, P2는 고름.
-            var s = runner.World.State;
-            s.Match.FormChoice1 = 1;
-            runner.World.State = s;
-            presenter.RenderFrame();
-            yield return null;
-            ScenarioPlayer.SaveCameraImage(camera, Path.Combine(folder, "form_select.png"), 960, 540);
-
-            // 세트 패자(P2) 선택: 폼 획득 둘과 증강 자리.
-            s = runner.World.State;
-            s.Match.SetPhase(MatchPhase.SetPick);
-            s.Match.SetScore0 = 1;
-            s.Match.Picker = 1;
-            s.Match.PickedAt = -1;
-            s.Match.Option0 = PickOption.Form(FighterForm.Scissors);
-            s.Match.Option1 = PickOption.Form(FighterForm.Paper);
-            s.Match.Option2 = PickOption.AugmentBase;
-            runner.World.State = s;
-            presenter.RenderFrame();
-            yield return null;
-            ScenarioPlayer.SaveCameraImage(camera, Path.Combine(folder, "set_pick.png"), 960, 540);
-            Assert.AreEqual("", presenter.Hud.Banner, "선택 목록을 가리지 않게 큰 문구 없음");
-            StringAssert.StartsWith("P2 LOST THE SET", presenter.Hud.SubText);
-
-            // 증강 발동 표시(CP23): 전투 중 머리 위에 이름이 잠깐.
-            s = runner.World.State;
-            s.Match.SetPhase(MatchPhase.Fighting);
-            s.Match.Picker = -1;
-            runner.World.State = s;
-            presenter.Hud.ShowAugment(0, "SPEED");
-            presenter.RenderFrame();
-            yield return null;
-            ScenarioPlayer.SaveCameraImage(camera, Path.Combine(folder, "augment_icon.png"), 960, 540);
-            Assert.AreEqual("SPEED", presenter.Hud.AugmentShown(0));
-
-            s = runner.World.State;
-            s.Match.SetPhase(MatchPhase.MatchEnd);
-            s.Match.SetScore0 = config.Match.SetsToWinMatch;
-            s.Match.SetScore1 = 2;
-            runner.World.State = s;
-            presenter.RenderFrame();
-            yield return null;
-            ScenarioPlayer.SaveCameraImage(camera, Path.Combine(folder, "match_end.png"), 960, 540);
-            Assert.AreEqual("P1 WINS", presenter.Hud.Banner);
-            LogAssert.NoUnexpectedReceived();
-        }
-
         [UnityTest]
         public IEnumerator FrameTimeAndPresentationAllocations()
         {
@@ -329,7 +223,7 @@ namespace Knockbox.Tests.PlayMode
             presenter.SetDebugLabels(false);
             var target = new RenderTexture(1920, 1080, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
             camera.targetTexture = target;
-            var def = ScenarioJson.LoadByName("showcase_cp3_presentation");
+            var def = ScenarioJson.LoadByName("showcase_cp1_mirror_run_jump");
             try
             {
                 // 1) 연출 계층 할당: 한 틱 + 한 프레임 연출을 직접 300번 부르고 이 스레드의 할당을 잰다.

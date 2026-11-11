@@ -44,7 +44,6 @@ namespace Knockbox.Tests.PlayMode
         {
             yield return LoadSandbox();
             runner.ArenaName = "Towers";
-            runner.Mode = CombatMode.Swing;
             runner.GrabEnabled = true;
             runner.CyclePreset();
             Assert.AreEqual("fast", runner.PresetName);
@@ -52,7 +51,7 @@ namespace Knockbox.Tests.PlayMode
             runner.Running = false;
             runner.Player1Input = new DummyInputSource(DummyBehavior.Random, 0x51u);
             runner.Player2Input = new DummyInputSource(DummyBehavior.Random, 0x52u);
-            runner.StartRecording(runner.Mode.ToString());
+            runner.StartRecording(runner.Rules.Format());
             Assert.IsNotNull(runner.Recording, "경기 시작 직후에는 기록을 시작할 수 있어야 함");
             yield return Step(1200);
             uint recorded = runner.World.ComputeChecksum();
@@ -60,16 +59,14 @@ namespace Knockbox.Tests.PlayMode
             Assert.AreEqual(1200, recording.Count);
             Assert.AreEqual(recorded, recording.FinalChecksum);
 
-            // 프리셋·모드·잡기·맵을 바꿔 둬도 기록과 같은 설정을 찾아 처음부터 재생한다.
+            // 프리셋·잡기·맵을 바꿔 둬도 기록과 같은 설정을 찾아 처음부터 재생한다.
             runner.CyclePreset();
             Assert.AreEqual("default", runner.PresetName);
-            runner.Mode = CombatMode.Charge;
             runner.GrabEnabled = false;
             runner.ArenaName = "Box";
             runner.StartNewMatch();
             Assert.IsTrue(runner.PlayRecording(recording));
             runner.Running = false;
-            Assert.AreEqual(CombatMode.Swing, runner.World.Config.Mode);
             Assert.IsTrue(runner.World.Config.GrabEnabled);
             Assert.AreEqual("Towers", runner.World.Arena.Name);
             Assert.AreEqual(recording.ConfigChecksum, runner.World.Config.ComputeChecksum());
@@ -120,14 +117,13 @@ namespace Knockbox.Tests.PlayMode
         public IEnumerator BotOpponent_FightsBackAsP2()
         {
             yield return LoadSandbox();
-            runner.Mode = CombatMode.Swing;
-            runner.ArenaName = "Box";
+            runner.ArenaName = MatchRunner.BrawlArenaName;
             runner.StartNewMatch();
             runner.Running = false;
-            var bot = new BotInputSource(() => runner.World, 1, 0xB07u);
+            var bot = new BrawlBot(() => runner.World, 1, 0xB07u);
             runner.Player1Input = new DummyInputSource(DummyBehavior.WalkBackAndForth);
             runner.Player2Input = bot;
-            Assert.AreEqual("bot", MatchPresenter.InputSourceName(bot));
+            Assert.AreEqual("brawl bot", MatchPresenter.InputSourceName(bot));
             int botAttacks = 0, hits = 0;
             for (int i = 0; i < 1200; i++)
             {
