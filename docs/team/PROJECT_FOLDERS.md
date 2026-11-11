@@ -11,7 +11,7 @@
 
 쓰임새: 실제 게임과 맵 작업·검증 씬
 
-처음 볼 곳: Main: 전체 게임 흐름, MapAuthoring: 맵 편집, Sandbox: 검증·재현. CharacterSample은 이전 외형 실험입니다.
+처음 볼 곳: Main: 전체 게임 흐름, MapAuthoring: 맵 편집, Sandbox: 검증·재현.
 
 
 [Assets/_Project/Prefabs](../../Assets/_Project/Prefabs/)

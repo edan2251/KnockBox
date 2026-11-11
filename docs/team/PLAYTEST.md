@@ -44,7 +44,7 @@ Shift
 현재 마우스·키보드 조작: Esc
 
 
-위 목록은 현재 `MouseAimInputSource`의 조작입니다. 옛 키보드 2인·폼 전투 안내나 리플레이 호환 입력과 혼동하지 마세요. 실제 코드 위치는 [입력 소스](../../Assets/_Project/Scripts/Game/Input/MouseAimInputSource.cs)입니다.
+위 목록은 현재 `MouseAimInputSource`의 조작입니다. 옛 키보드 2인 안내나 리플레이 호환 입력과 혼동하지 마세요(폼 전투는 2026-11-11 삭제). 실제 코드 위치는 [입력 소스](../../Assets/_Project/Scripts/Game/Input/MouseAimInputSource.cs)입니다.
 
 ## 2. 한 경기에서 볼 것
 

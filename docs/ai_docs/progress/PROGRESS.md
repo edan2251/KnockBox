@@ -2,7 +2,7 @@
 
 ## 현재 상태
 
-기준: 2026-11-11, D:/KnockBox, `main`, HEAD `1f16bb2`. CP1~CP5 맵 제작기 작업은 사용자 Unity 검수를 마치고 `0b2da59`(기능), `fd6f0a0`(작업용 맵), `60d605a`(문서)로 커밋되어 있고, `1f16bb2`에 작업용 사본 맵 `CP5_Integrated_Trial_Copy`가 추가되었습니다. 그 위의 문서 현행화·기준 맵 보호·구조 리팩터링(A·B·C안) 변경은 아래 2026-11-11 기록에 있으며 사용자 커밋 전입니다. 커밋 후에는 `git log`로 실제 커밋을 확인합니다. 실제 Player 빌드와 두 PC Relay는 미검증입니다. 아래 "이전 기록" 절의 대기·미커밋 문구는 각 회차 당시 상태입니다.
+기준: 2026-11-11, D:/KnockBox, `main`, HEAD `ac39c2b`(문서 현행화·기준 맵 보호·구조 리팩터링 A~C 커밋 완료). 그 위에 **폼 전투 제거 1단계**가 작업 트리에 있고 사용자 커밋 전입니다(아래 기록). 실제 Player 빌드와 두 PC Relay는 미검증입니다. 아래 "이전 기록" 절의 대기·미커밋 문구는 각 회차 당시 상태입니다.
 
 ## 현재 승인 범위
 
@@ -10,7 +10,29 @@
 
 2026-11-11 승인: 구조 리팩터링 A안 1~3(MatchRunner 맵 해석), C안(상자 충격 합산 구조 정리), B안 축소 범위(연결부 원 판정 함수 통합. `SegmentBox` 이동과 동시 타격 처리 차이는 제외).
 
-계속 유지하는 제품 결정: 무기·총알은 새 경기에서 보류하고 관련 자료와 과거 기록은 보존합니다([미사용 기능 보존](../INACTIVE_FEATURES.md)). 현재 기둥 설정을 유지합니다.
+2026-11-11 승인: 폼 전투와 캐릭터 후보 제거([A]~[D]). 폼 계열에 한해 과거 동작 호환 분기를 지워도 된다. 폼 시대 리플레이·입력 기록·시나리오·기대 체크섬은 폐기. 진행 방식은 사용자 선택으로 **1단계**(동작 제거, 체크섬 자리는 고정값 유지)와 일반 테스트의 Body 이전이다. 2단계(기록 v10)는 별도 승인. 대규모 재배치, asmdef 변경, 새 규칙·밸런스, 패키지, 커밋은 포함하지 않는다.
+
+계속 유지하는 제품 결정: 캐릭터는 사각형 캐릭터 하나, 폼 전투는 쓰지 않는다. 무기·총알은 새 경기에서 보류하고 관련 자료와 과거 기록은 보존합니다([미사용 기능 보존](../INACTIVE_FEATURES.md)). 현재 기둥 설정을 유지합니다.
+
+## 폼 전투와 캐릭터 후보 제거 1단계 · 2026-11-11
+
+사용자 승인 범위. Body(몸 폼) 경기 동작, 현재 기록(v5~v9 몸 폼 기록)과 온라인 설정 대조는 그대로 둔다는 조건으로 진행했다.
+
+- 백업·기준선: `D:/KnockBox_Backups/FormRemoval_20261111_222239`(1066개 파일, SHA-256 별도 복원 대조). `baseline/`에 Body 결정론 기준선 4묶음과 재현 스크립트를 두었다: ① 맵 전체 무작위 입력 144회 ② 연결부 펀치 528회 ③ 등록 맵 순환·Brawl 경기 흐름 12판(KO·라운드 전환·카드 선택) ④ 강제 KO로 경기 끝·재대결 반복 8판. 모두 매 틱 `SimState.ComputeChecksum` 해시.
+- 변경 전 검사: EditMode 1238 통과(3 명시 실행 전용 건너뜀), PlayMode 67 통과·1 건너뜀·2 실패(도움말 `~ close` 기존 불일치, `CheatKeysKillEachPlayer` — 다음 실행에서 통과해 흔들리는 검사로 분류).
+- [A] 캐릭터 후보 삭제: CharacterSample 씬, CharacterSampleScene·R4LimbWiggle·CharacterSampleMenu·R4SkinningProbe, Presentation/Sample(Doll* 4개), SdfDoll 셰이더, Art/Samples/R4Limb.png, CharacterSampleTests·R4SkinningTests. Palette·ShapeLibrary·TwoBoneIK는 공유라 유지.
+- [B] 주변부: PickPanelView(코드·Main 오브젝트·씬 보정 항목), SwitchMetrics, 디버그 키 F1 시작 폼·F4 가드·Insert 에너지·Home 폼 표시, 폼 봇 경로(F6·`-autobots`는 BrawlBot), 허수아비 GuardHold.
+- [C] 중심부(묶음마다 컴파일·기준선 4묶음 동일·관련 검사):
+  - C1 선택 흐름: FormSelect 단계(SetPick=7 번호 유지), FormChoice, 폼 획득·폼 증강 후보(BuildOptions는 카드만), CandidateList.
+  - C2 폼 전환. C3 가드·패링·에너지 로직(PropInteraction 패링 반사 포함).
+  - C4 폼 열거형 값(Scissors·Rock·Paper·Test, Body=4 유지), 폼 분기, 보 휘두르기·착지 경직, 바위 투사체 시스템(Projectiles는 SegmentBox만), CombatMode, RuleSet의 시작 폼·보유 폼·가드·에너지 항목, 폼 이벤트 8종, ActionState Guard·GuardStun·LandingLag·Shoot(남은 값에 번호 명시), 폼 봇(CombatBot/BotInputSource), 투사체 표시, HUD 폼 아이콘·에너지 줄(GameplayHud 프리팹 오브젝트 8개 포함), 보 막대 무기 표시, FormDisplayMode, 봇 영상 도구.
+  - 체크섬에 들어가던 자리는 고정값으로 남겼다(INACTIVE_FEATURES "제거한 기능", `StateChecksumTests.LegacyHashSlots`).
+- [D] 자료·문서: 시나리오 JSON 81개 삭제(폼 키가 있는 74개, 패링 1개, Body에서 기대값이 맞지 않는 옛 Test 폼 6개). 기대값 없이/그대로 통과하는 3개는 유지, 몸 폼 KO 시나리오 `showcase_body_ko` 추가(삭제한 KO 쇼케이스를 쓰던 PlayMode 검사용). 시나리오 틀은 몸 폼 규칙만 받는다(폼 키는 오류). 문서: INACTIVE_FEATURES, CURRENT_DEV_SPEC, ONLINE_CODE_MAP, HISTORY, ART_WORKFLOW, PROJECT_FOLDERS, TEAM_WORKFLOW, PLAYTEST, MONOLITH_CARD_PICK_PLAN.
+- 씬: Main(PickPanel·Projectiles 오브젝트 삭제, 폼 규칙 필드 정리), Sandbox(폼 규칙 필드·빈 참조 정리. `brawlExperiment`는 켜 보았다가 옛 테마 조명 검사가 깨져 원래대로 둠), GameplayHud 프리팹. `MatchRunner`는 Brawl 여부와 관계없이 몸 폼 전투 값(BrawlParams.Combat)을 쓴다(Sandbox도 실제 주먹·박치기·잡기).
+- 테스트 이전(사용자 선택: Body로 옮기고 바뀐 기대값 보고): 기본 설정(`SimConfig(movement, match)`)이 Test 폼 → 몸 폼 전투(BrawlParams.Combat)·RuleSet.Brawl. CombatTests는 주먹 기준(명중 틱은 같은 배치에서 측정, 넉백·감쇠·경직은 주먹 데이터와 공식에서 계산), 벽꽝은 몸 폼 규칙(속도 비례 피해·고정 경직), 대시 검사는 대시가 있는 구 몸 폼 조작 설정, 봇 대전은 BrawlBot·Brawl 맵(옛 맵에서는 봇이 거의 움직이지 않음), MatchStructureTests는 카드 흐름, GrabTests는 공통 규칙만 몸 폼으로 다시 작성, ChargeModeTests는 상태로 만든 돌진 규칙 + 돌진 대 주먹. 지운 폼 전용 테스트: FormEnergy·FormInteraction·FormSwitch·SwingMode·Projectile·Augment·FullFlow·M1Matrix·Bot·WeaponTests(PlayMode) 등.
+- 검사: 기준선 4묶음은 C1·C2·C3·C4 뒤와 마지막 MatchRunner 변경 뒤 모두 비트 단위 동일. 최종 전체 EditMode 1008개 중 1005 통과, 실패 3은 아래 승인 항목이며 갱신 뒤 해당 클래스 10개 통과. PlayMode 63개 중 60 통과·1 건너뜀·2 실패: 도움말 `~ close` 기존 불일치, 시각 검사 흔들림(`FrontendFlowTests.P2CardArea…` 4회 중 2회, `VisualDirectionTests.MainGoIlluminates…` 3회 중 1회 실패. 변경 전 2회는 통과라 관련성 미확정).
+- 기대값 갱신(2026-11-11 사용자 승인): `MapIndependentRopeTests.LegacyRopeStreamMatchesPreCP3Baseline`의 스트림·최종 체크섬은 옛 가위 폼(Charge) 설정 값이었다. PropStage2Tests 설정이 Body가 되어 파이터 상태의 폼 자리 값만 달라졌고, 지오메트리 체크섬은 그대로(F2346A75·5A827DED·E9F93BF8). 스트림 D0B329C7/D8DE260E → 680E5F51/97845734, 최종 F9A4F4AA/5AD39E8B → 4F92C36C/D8144E61.
+- 미실행·미확인: 사용자 Play, Player 빌드, 두 PC Relay.
 
 ## 연결부 원 판정 함수 통합 · 2026-11-11
 

@@ -249,6 +249,6 @@ PPU
 
 ## 7. 이전 실험 자료
 
-`CharacterSample`, `Presentation/Sample`, R1~R4 관련 자료는 옛 외형 실험·검증용입니다. ShapeLibrary, Palette, IK 코드와 테스트를 공유합니다. 현재 화면에 보이지 않는다는 이유로 일괄 삭제하지 않습니다.
+캐릭터는 사각형 캐릭터 하나만 씁니다. 옛 외형 후보(CharacterSample 씬, R1~R4 인형·SDF 셰이더·스키닝 샘플)는 2026-11-11에 삭제했습니다. ShapeLibrary, Palette, IK 코드는 사각형 캐릭터와 함께 쓰므로 남아 있습니다. 다른 실험 자료도 화면에 보이지 않는다는 이유만으로 일괄 삭제하지 않습니다.
 
 `LocalOnly`의 외부 3D 모델과 외부 게임 참고 이미지는 배포용 아트가 아닙니다. 구분과 제외 이유는 [권리 안내](../licenses/ASSET_RIGHTS.md)에 있습니다.

@@ -16,18 +16,26 @@ MatchRunner.PreviewConfig가 새 경기에서 weaponsEnabled를 false로 전달�
 
 라운드 생성·소유·공격·투척. 설정은 Data/BrawlWeaponParams.cs, 상태는 State/BrawlWeaponState.cs에 있습니다.
 
-[투사체 판정](../../Assets/_Project/Scripts/Simulation/Systems/Projectiles.cs)
+[선분-상자 교차](../../Assets/_Project/Scripts/Simulation/Systems/Projectiles.cs)
 
-State/ProjectileState.cs와 함께 보존합니다. 옛 Paper 폼과 리플레이도 사용하는 공유 코드입니다. 옛 디버그 모드까지 제거한 것은 아닙니다.
+무기 판정과 연결부 판정이 함께 쓰는 `SegmentBox`만 남아 있습니다. 바위 폼 투사체 시스템은 2026-11-11 폼 전투와 함께 제거했습니다(아래 "제거한 기능").
 
 [무기 표시](../../Assets/_Project/Scripts/Presentation/Fighter/BrawlWeaponView.cs)
 
-Presentation/Fx/ProjectileView.cs, Prefabs/Frontend/WeaponVisual.prefab 및 Main의 저장 참조를 보존합니다. 현재 비활성 상태를 읽어 표시하지 않으며 과거 기록에는 사용할 수 있습니다.
+Prefabs/Frontend/WeaponVisual.prefab 및 Main의 저장 참조를 보존합니다. 현재 비활성 상태를 읽어 표시하지 않으며 과거 기록에는 사용할 수 있습니다.
 
 [호환 검사](../../Assets/_Project/Tests/EditMode/BrawlInputCompatibilityTests.cs)
 
-BrawlWeaponTests·BrawlWeaponThrowTests·BrawlWeaponPresentationTests·ProjectileTests, Tools/ReplayCheck의 기존 기록·기대값도 보존합니다. 신규 무기 기능 개발과 구 동작 회귀 검사는 구분합니다.
+BrawlWeaponTests·BrawlWeaponThrowTests·BrawlWeaponPresentationTests, Tools/ReplayCheck의 기존 기록·기대값도 보존합니다. 신규 무기 기능 개발과 구 동작 회귀 검사는 구분합니다.
 
 ## 재활성화 조건
 
 다시 사용하려면 별도 승인 후 현재 맵 형상·입력·온라인·리플레이와의 호환성을 검증합니다. 이번 맵 확장에서 새 다각형용 총알·무기 판정을 추가하지 않습니다. 설정 한 줄만 켜면 모든 새 맵에서 안전하다고 보장하지 않습니다.
+
+## 제거한 기능 — 폼 전투 · 2026-11-11
+
+사용자 결정으로 가위·바위·보 폼 전투(초기 폼 선택, 폼 전환, 에너지, 가드·패링, 바위 투사체, 보 휘두르기, 시험 공격 폼)와 캐릭터 외형 후보(CharacterSample)를 **삭제**했습니다. 보류가 아니라 폐기이며, 폼 시대의 시나리오·입력 기록·기대 체크섬도 보존하지 않습니다.
+
+- **남긴 것:** 몸(Body) 폼의 주먹·차징 박치기·잡기·던지기, 현재 Brawl·카드 흐름, 맵 제작기, 온라인 락스텝, 현재 규칙의 기록(v5~v9 몸 폼 기록 포함)과 읽기 코드.
+- **기록 호환용 고정값(1단계):** 기존 몸 폼 기록과 온라인 설정 대조를 지키려고, 체크섬에 들어가던 폼 시대 자리는 같은 값으로 해시에 남겼습니다. 상태의 `Form`(4)·`OwnedForms`(16)·`ParryTicks`·`EnergyRegenDelay`·`ActionPaid`·`ShotPending`·`ShotDirection`·`FormChoice0/1`(−1), 설정의 시작 폼·가드·에너지 스위치, `CombatParams`의 `TestAttack`·`Swing`·`Energy`·`Rock`·가드 수치, 빈 투사체 풀, 증강 카탈로그, 열거형 번호(Body=4, SetPick=7, `ActionState`의 빈 번호 8·10·16·21), 입력 비트 Guard·SwitchForm입니다. 목록은 `StateChecksumTests.LegacyHashSlots`와 각 코드 주석에 있습니다.
+- **2단계(별도 승인):** 기록 형식 v10·온라인 프로토콜 10으로 올리면서 위 고정값을 걷어냅니다. 이때 기존 몸 폼 기록과 기준 리플레이는 더 이상 재생할 수 없습니다.

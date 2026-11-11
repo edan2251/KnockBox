@@ -13,7 +13,6 @@ Unity에서 게임 화면과 맵을 직접 편집할 때 보는 안내입니다.
 - **게임·UI:** `Assets/_Project/Scenes/Main.unity`
 - **맵 배치·저장·시험:** `Assets/_Project/Scenes/MapAuthoring.unity`
 - **자동 검사·문제 재현:** `Assets/_Project/Scenes/Sandbox.unity`
-- **옛 캐릭터 외형 비교:** `CharacterSample.unity`. 이번 유지보수에서 정리하지 않은 실험 씬입니다.
 
 팀이 여는 씬은 `Assets/_Project/Scenes/`에 있습니다. 초기 Unity 템플릿의 `Assets/Scenes/`는 사용자 삭제 후 기본 경로를 정리한 상태입니다. 기본 폴더와 렌더링·입력 설정의 용도는 [프로젝트 폴더 안내](PROJECT_FOLDERS.md)에 정리합니다.
 
@@ -213,7 +212,7 @@ MapAuthoring의 시험 사본도 저장·재열기·실행을 확인합니다. �
 - **씬·Prefab:** 컴파일 + `NamingConventionTests` + `AuthoredMainTests` + 사용자 Play.
 - **광범위한 변경, 주요 체크포인트 완료:** 전체 EditMode 한 번 + 관련 PlayMode.
 
-`Slow`와 `LegacyCombat` 카테고리는 이름만 보고 빼지 않습니다. 바뀐 코드가 옛 폼·투사체·무기 경로나 해당 측정에 닿으면 포함합니다. 기존 실패와 새 실패를 구분해야 할 때만 변경 전에 같은 관련 검사를 실행합니다.
+`Slow`와 `LegacyCombat` 카테고리는 이름만 보고 빼지 않습니다. 바뀐 코드가 무기 경로나 해당 측정에 닿으면 포함합니다(폼 전투는 2026-11-11 삭제). 기존 실패와 새 실패를 구분해야 할 때만 변경 전에 같은 관련 검사를 실행합니다.
 
 검사가 실패하면 기대값을 새 결과로 바꾸거나 조건을 약하게 하지 않습니다. 원인을 고치고, 의도한 동작 변경이라면 사용자 승인을 받은 뒤 같은 변경에서 기대값과 기록을 함께 고칩니다.
 
