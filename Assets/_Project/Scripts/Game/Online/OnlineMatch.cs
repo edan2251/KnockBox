@@ -1,44 +1,41 @@
 using System;
 using System.IO;
-using System.Threading.Tasks;
 using Knockbox.Simulation;
 using UnityEngine;
 
 namespace Knockbox.Game.Online
 {
     /// <summary>
-    /// 온라인 락스텝 경기(CR-004 온라인 2·3단계). 방 화면(OnlineLobby)이나 명령줄이 연결을 열어 StartSession을 부른다.
-    /// 명령줄(시험용):
-    ///   -host 포트 / -join 주소:포트      로컬 UDP(패키지 없음, 같은 PC·같은 망)
-    ///   -relayhost [-codefile 경로]        Unity Relay 방 만들기, 참가 코드를 파일에도 쓴다
-    ///   -relayjoin 코드 / -relayjoinfile 경로   Unity Relay 참가(파일이면 코드가 생길 때까지 기다림)
-    ///   -delay N                          입력 지연 틱(방장이 정함, 로컬 기본 3, Relay 기본 4)
+    /// Fusion 예측 경기. 방 화면(OnlineLobby)이 연결을 열어 StartSession을 부른다.
+    /// 메모리 전송 분기는 계정 없이 실행하는 기존 결정론·입력 순서 검사용이다.
+    /// Fusion 방에 접속한 실행에서도 사용할 수 있는 검사 인수:
     ///   -onlinebot                        내 자리를 봇이 친다(방장 추격 봇, 손님 BrawlBot). 경기 끝에는 잠깐 뒤 공격을 눌러 재대결 준비
     ///   -onlinematches N                  경기 N개가 끝나면 나간다(종료 코드 0 = 어긋남·오류 없음)
     ///   -netsim 편도ms,손실%              보내는 쪽 지연·잃음 흉내(왕복은 두 끝 합)
     /// 끝나면 입력 기록과 요약을 Replays/online_P슬롯_시각.*에 남긴다. 온라인 중에는 디버그 단축키를 끈다(설정을 바꾸면 두 PC가 어긋남).
     /// 화면 글자는 영문 짧은 단어(D-016).
     /// </summary>
-    [DefaultExecutionOrder(-10)]
+    // Fusion 기본 수신 처리 뒤, MatchRunner(-100)의 틱 처리 전에 입력을 비운다.
+    [DefaultExecutionOrder(-200)]
     [RequireComponent(typeof(MatchRunner))]
     public sealed class OnlineMatch : MonoBehaviour
     {
-        public const int DefaultPort = 7777;
-        public const int DefaultDelay = 3;
-        public const int DefaultRelayDelay = 4;
-
-        static readonly string[] CommandArgs = { "-host", "-join", "-relayhost", "-relayjoin", "-relayjoinfile" };
+        public const int DefaultOnlineDelay = FusionPredictionPolicy.DelayTicks;
 
         [SerializeField] MatchRunner runner;
         [SerializeField] MatchPresenter presenter;
         LockstepSession session;
-        ITransport transport;
         SimulatedLink link;
+        FusionTransport fusionTransport;
+        FusionPredictionSession prediction;
+        public FusionPredictionSession Prediction => prediction;
+        FusionTransport.ConnectionTiming connectionTiming = FusionTransport.ConnectionTiming.Unavailable;
+        /// <summary>HUD와 CSV가 공유하는 SDK RTT. 측정 전에는 -1이며 제어 메시지 RTT로 대체하지 않는다.</summary>
+        public double NetworkRttSeconds => connectionTiming.RttSeconds;
         [SerializeField] DebugHotkeys hotkeys;
         bool started;
         bool finished;
         bool bot;
-        bool commandLine;
         int targetMatches;
         int matches;
         double quitAt = -1;
@@ -58,21 +55,8 @@ namespace Knockbox.Game.Online
         /// <summary>방 화면이 보여 줄 짧은 상태(오류 등).</summary>
         public string Notice { get; private set; } = "";
 
-        public static bool CommandLineRequested
-        {
-            get
-            {
-                foreach (string a in CommandArgs)
-                {
-                    if (AutoPlayDebug.HasArg(a))
-                        return true;
-                }
-                return false;
-            }
-        }
-
         /// <summary>
-        /// 씬이 뜬 뒤: 온라인 명령줄이면 온라인 경기를, 일반 Brawl 실행/에디터 Play에는 공통 UI를 붙인다.
+        /// 씬이 뜬 뒤: 일반 Brawl 실행/에디터 Play에는 공통 UI를 붙인다.
         /// 배치 모드·재생 검사·자동 봇 실행에는 로비를 붙이지 않는다.
         /// </summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -81,85 +65,23 @@ namespace Knockbox.Game.Online
             var runner = FindFirstObjectByType<MatchRunner>();
             if (runner == null || runner.GetComponent<OnlineMatch>() != null)
                 return;
-            bool command = CommandLineRequested;
-            bool lobby = !command && runner.BrawlExperiment && !Application.isBatchMode
-                         && !AutoPlayDebug.HasArg(ReplayCheck.Arg) && !AutoPlayDebug.HasArg("-autobots");
-            if (!command && !lobby)
+            if (!runner.BrawlExperiment || !UI.FrontendController.UseFrontendForThisRun)
                 return;
             runner.gameObject.AddComponent<OnlineMatch>();
-            if (lobby)
-            {
-                runner.gameObject.AddComponent<OnlineLobby>();
-                runner.gameObject.AddComponent<UI.FrontendController>();
-            }
+            runner.gameObject.AddComponent<OnlineLobby>();
+            runner.gameObject.AddComponent<UI.FrontendController>();
         }
 
         void Awake()
         {
             runner ??= GetComponent<MatchRunner>();
-            if(CommandLineRequested || UI.FrontendController.UseFrontendForThisRun) runner.FrontendEnabled = runner.BrawlExperiment;
+            if(UI.FrontendController.UseFrontendForThisRun) runner.FrontendEnabled = runner.BrawlExperiment;
             presenter ??= GetComponent<MatchPresenter>();
             Application.runInBackground = true;
             bot = AutoPlayDebug.HasArg("-onlinebot");
             targetMatches = int.TryParse(ReplayCheck.StringArg("-onlinematches"), out int n) ? n : 0;
-            commandLine = CommandLineRequested;
             hotkeys ??= GetComponent<DebugHotkeys>();
         }
-
-        async void Start()
-        {
-            if (!commandLine || runner.IsAuthoringPreview)
-                return;
-            runner.Running = false;
-            try
-            {
-                if (AutoPlayDebug.HasArg("-host"))
-                {
-                    int port = int.TryParse(ReplayCheck.StringArg("-host"), out int p) ? p : DefaultPort;
-                    StartSession(UdpTransport.Host(port), true, DelayArg(DefaultDelay));
-                }
-                else if (AutoPlayDebug.HasArg("-join"))
-                {
-                    string target = ReplayCheck.StringArg("-join") ?? "127.0.0.1";
-                    int colon = target.LastIndexOf(':');
-                    string address = colon > 0 ? target.Substring(0, colon) : target;
-                    int port = colon > 0 && int.TryParse(target.Substring(colon + 1), out int p) ? p : DefaultPort;
-                    StartSession(UdpTransport.Join(address, port), false, 0);
-                }
-                else if (AutoPlayDebug.HasArg("-relayhost"))
-                {
-                    var (relay, code) = await RelayTransport.HostAsync();
-                    string file = ReplayCheck.StringArg("-codefile");
-                    if (!string.IsNullOrEmpty(file))
-                        File.WriteAllText(file, code);
-                    Debug.Log($"[Knockbox][online] Relay 방 코드: {code}");
-                    StartSession(relay, true, DelayArg(DefaultRelayDelay));
-                }
-                else
-                {
-                    string code = ReplayCheck.StringArg("-relayjoin");
-                    string file = ReplayCheck.StringArg("-relayjoinfile");
-                    for (int i = 0; i < 120 && string.IsNullOrEmpty(code) && !string.IsNullOrEmpty(file); i++)
-                    {
-                        if (File.Exists(file))
-                            code = File.ReadAllText(file).Trim();
-                        else
-                            await Task.Delay(500);
-                    }
-                    if (string.IsNullOrEmpty(code))
-                        throw new InvalidOperationException("Relay 참가 코드가 없음");
-                    StartSession(await RelayTransport.JoinAsync(code), false, 0);
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"[Knockbox][online] 연결을 열지 못함: {e.GetType().Name}: {e.Message}");
-                finished = true;
-                Quit(2);
-            }
-        }
-
-        static int DelayArg(int fallback) => int.TryParse(ReplayCheck.StringArg("-delay"), out int d) ? d : fallback;
 
         /// <summary>연결로 세션을 연다. 방장은 손님을 기다리고, 손님은 Hello를 보낸다. 연결이 되면 경기를 시작한다.</summary>
         public void StartSession(ITransport connection, bool host, int delay)
@@ -195,8 +117,12 @@ namespace Knockbox.Game.Online
             }
 
             string netsim = ReplayCheck.StringArg("-netsim");
+            fusionTransport = connection as FusionTransport;
+            bool usePrediction = fusionTransport != null;
+            if (usePrediction) delay = FusionPredictionPolicy.DelayTicks;
+            connectionTiming = FusionTransport.ConnectionTiming.Unavailable;
             link = null;
-            if (!string.IsNullOrEmpty(netsim))
+            if (!string.IsNullOrEmpty(netsim) && !usePrediction)
             {
                 var parts = netsim.Split(',');
                 double oneWay = parts.Length > 0 && double.TryParse(parts[0], out double ms) ? ms / 1000.0 : 0;
@@ -205,9 +131,9 @@ namespace Knockbox.Game.Online
                 connection = link;
                 Debug.Log($"[Knockbox][online] 망 흉내: 편도 {oneWay * 1000:0} ms(흔들림 25%), 잃음 {loss * 100:0.#}%, 중복 1%");
             }
-            transport = connection;
             uint seed = (uint)Environment.TickCount | 1u;
-            session = new LockstepSession(connection, host, configChecksum, arenaChecksum, seed, delay);
+            session = new LockstepSession(connection, host, configChecksum, arenaChecksum, seed, delay,
+                () => Time.realtimeSinceStartupAsDouble);
             started = false;
             finished = false;
             matches = 0;
@@ -238,10 +164,13 @@ namespace Knockbox.Game.Online
             if (!finished)
                 Finish();
             runner.Ticked -= OnTicked;
+            prediction?.Dispose();
+            prediction = null;
             runner.Lockstep = null;
             session.Dispose();
             session = null;
-            transport = null;
+            fusionTransport = null;
+            connectionTiming = FusionTransport.ConnectionTiming.Unavailable;
         }
 
         void Update()
@@ -252,6 +181,7 @@ namespace Knockbox.Game.Online
             session.Poll(now);
             if (!started && session.State == SessionState.Running)
                 BeginMatch();
+            prediction?.Pump();
             if (session.State == SessionState.Ended && !finished)
                 Finish();
             if (quitAt > 0 && now >= quitAt)
@@ -278,6 +208,29 @@ namespace Knockbox.Game.Online
                 local = new MouseAimInputSource(() => runner.World, slot);
             }
             local = runner.RouteFrontendInput(local, slot, bot);
+            if (fusionTransport != null)
+            {
+                // The common session carries agreement, heartbeat/RTT, checksums and termination.
+                // Combat input and state do not pass through TryGetInputs or the old delay queue.
+                session.Begin(runner.World.State.Tick, null);
+                runner.Ticked += OnTicked;
+                try
+                {
+                    prediction = new FusionPredictionSession(fusionTransport.Connection, runner,
+                        preparedConfig, preparedArenas, local, slot, session.DelayTicks);
+                }
+                catch (Exception e)
+                {
+                    runner.Running = false;
+                    fusionTransport.MarkEnded("Fusion 예측 경기 준비에 실패했습니다.", EndReason.ProtocolError);
+                    Debug.LogError($"[Knockbox][prediction] 경기 준비 실패: {e.GetType().Name}");
+                    return;
+                }
+                runner.Running = true;
+                Debug.Log($"[Knockbox][prediction] 기본 예측 시작: P{slot + 1}, 60Hz, SDK 입력 지연 {session.DelayTicks}틱, 진단 {prediction.DiagnosticPath}");
+                return;
+            }
+            // Offline MemoryTransport fixtures retain the lockstep scheduling/replay regression path.
             session.Begin(runner.World.State.Tick, local);
             runner.Lockstep = session;
             runner.StartRecording(runner.World.Config.Rules.Format());
@@ -286,9 +239,17 @@ namespace Knockbox.Game.Online
             Debug.Log($"[Knockbox][online] 경기 시작: 내 자리 P{slot + 1}, 시드 {session.Seed:X8}, 입력 지연 {session.DelayTicks}틱");
         }
 
+        // 경기 틱 이후 SDK RTT를 한 번 읽어 HUD와 진단에 함께 전달한다. CSV 쓰기는 초당으로 제한한다.
+        void LateUpdate()
+        {
+            if (!started || finished || prediction == null) return;
+            connectionTiming = fusionTransport.ReadConnectionTiming();
+            prediction.RecordFrame(session.RttSeconds, connectionTiming);
+        }
+
         void OnTicked(MatchRunner r)
         {
-            var w = r.World;
+            var w = r.EventWorld;
             int tick = w.State.Tick;
             if (LockstepSession.NeedsChecksum(tick))
                 session.ReportChecksum(tick, w.ComputeChecksum());
@@ -308,8 +269,9 @@ namespace Knockbox.Game.Online
         }
 
         string Stats() =>
-            $"왕복 {(session.RttSeconds < 0 ? "-" : (session.RttSeconds * 1000).ToString("0"))} ms(최대 {session.MaxRttSeconds * 1000:0}), " +
-            $"대기 {session.StallCount}회, 비교한 체크섬 {session.ChecksumsCompared}개, 중복 무시 {session.DuplicatesIgnored}, " +
+            $"SDK RTT {(NetworkRttSeconds < 0 ? "-" : (NetworkRttSeconds * 1000).ToString("0"))} ms, " +
+            $"제어 RTT {(session.RttSeconds < 0 ? "-" : (session.RttSeconds * 1000).ToString("0"))} ms(최대 {session.MaxRttSeconds * 1000:0}), " +
+            $"비교한 체크섬 {session.ChecksumsCompared}개, 중복 무시 {session.DuplicatesIgnored}, " +
             $"보냄 {session.PacketsSent}·받음 {session.PacketsReceived}" + (link != null ? $", 흉내 잃음 {link.Dropped}·중복 {link.Duplicated}" : "");
 
         void Finish()
@@ -328,13 +290,13 @@ namespace Knockbox.Game.Online
 
         void SaveRecords(string detail)
         {
-            var recording = runner.StopRecording();
+            var recording = prediction != null ? prediction.Finish() : runner.StopRecording();
             if (recording == null)
                 return;
             string name = $"online_P{session.LocalSlot + 1}_{DateTime.Now:yyyyMMdd_HHmmss}";
             string path = ReplayFiles.Save(recording, name);
             File.WriteAllText(Path.ChangeExtension(path, ".txt"),
-                $"끝: {detail}\n틱 {runner.World.State.Tick}, 경기 {matches}개, 최종 체크섬 {recording.FinalChecksum:X8}\n어긋난 틱 {session.DesyncTick}\n{Stats()}\n");
+                $"끝: {detail}\n틱 {recording.Count}, 경기 {matches}개, 최종 체크섬 {recording.FinalChecksum:X8}\n어긋난 틱 {session.DesyncTick}\n{Stats()}\n시간 진단: {prediction?.DiagnosticPath ?? "-"}\n");
             Debug.Log($"[Knockbox][online] 입력 기록 저장: {path} ({recording.Count}틱, 최종 {recording.FinalChecksum:X8})");
         }
 
@@ -396,8 +358,8 @@ namespace Knockbox.Game.Online
                 GUI.Label(new Rect(0, 230, width, 40), EndText(session), big);
                 return;
             }
-            string rtt = session.RttSeconds < 0 ? "-" : (session.RttSeconds * 1000).ToString("0");
-            string line = $"ONLINE   YOU = P{session.LocalSlot + 1}   PING {rtt} ms   DELAY {session.DelayTicks}   TAB: CONTROLS";
+            string rtt = NetworkRttSeconds < 0 ? "-" : (NetworkRttSeconds * 1000).ToString("0");
+            string line = $"ONLINE   YOU = P{session.LocalSlot + 1}   RTT {rtt} ms   DELAY {session.DelayTicks}   TAB: CONTROLS";
             if (session.Waiting && session.SecondsSinceReceive > 0.25)
                 line += $"\nWAITING FOR OPPONENT  {session.SecondsSinceReceive:0.0}s";
             GUI.Label(new Rect(0, 4, width, 40), line, top);

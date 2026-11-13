@@ -10,7 +10,7 @@ namespace Knockbox.Game
     ///   -autobots            두 선수를 몸 폼 봇(BrawlBot)으로. 카드 선택은 봇이 고르지 않고 선택 시간 초과 규칙으로 넘어간다
     ///   -ticksperframe N     프레임마다 N틱 더 진행(시뮬레이션 결과는 같고 화면만 빨리 감김)
     ///   -replaycheck 기록     입력 기록 재생 검사만 하고 끝냄(ReplayCheck, CR-004 온라인 1단계)
-    ///   (온라인 인수 -host/-join/-relayhost/-relayjoin은 Online.OnlineMatch가 직접 본다)
+    ///   (Fusion 접속 후의 -onlinebot/-onlinematches/-netsim 인수는 Online.OnlineMatch가 직접 본다)
     /// 로그 형식: "[Knockbox][flow] t=틱 단계 ..." (Player.log)
     /// </summary>
     [RequireComponent(typeof(MatchRunner))]

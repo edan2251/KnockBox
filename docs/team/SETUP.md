@@ -1,12 +1,12 @@
 # 기존 프로젝트 열기
 
-처음 합류한 팀원은 새 Unity 프로젝트를 만들지 않고 이 저장소를 엽니다. 현재 작업 위치는 `D:/KnockBox`입니다. 다른 PC에서는 저장소를 받은 폴더를 선택하면 됩니다.
+처음 합류한 팀원은 새 Unity 프로젝트를 만들지 않고 이 저장소를 엽니다. 각 PC에서 저장소를 받은 폴더를 선택합니다. Photon SDK는 저장소에 포함되며 App ID는 각 PC의 로컬 설정입니다.
 
 ## 처음 실행하는 순서
 
 1. [작업 규칙](../ai_docs/WORKING_RULES.md)을 읽고, 저장소에 `Assets`, `Packages`, `ProjectSettings`가 있는지 확인합니다. 에셋과 같은 이름의 `.meta`도 함께 받아야 합니다.
 2. [ProjectVersion.txt](../../ProjectSettings/ProjectVersion.txt)의 Unity 버전을 확인합니다. 현재는 **6000.3.23f1**입니다. Unity Hub에서 **기존 프로젝트 추가**로 저장소 폴더를 등록합니다.
-3. 프로젝트를 열고 패키지 복원과 임포트가 끝날 때까지 기다립니다. [manifest](../../Packages/manifest.json)와 [lock 파일](../../Packages/packages-lock.json)을 기준으로 복원하며, 열기 과정에서 임의로 버전을 올리지 않습니다.
+3. 프로젝트를 열고 패키지 복원과 임포트가 끝날 때까지 기다립니다. [manifest](../../Packages/manifest.json)와 [lock 파일](../../Packages/packages-lock.json)을 기준으로 복원하며, 열기 과정에서 임의로 버전을 올리지 않습니다. Photon SDK는 저장소에서 함께 받으므로 별도로 다운로드·설치하지 않습니다. [Photon 설정](../ai_docs/ONLINE_MULTIPLAYER.md#기본-접속과-새-pc-설정)을 따라 로컬 App ID만 입력합니다.
 4. [Main 씬](../../Assets/_Project/Scenes/Main.unity)을 엽니다. Play를 눌러 메인 화면과 연습 모드를 확인합니다. 실제 확인할 항목은 [플레이 검수 안내](PLAYTEST.md)에 있습니다.
 5. 맵을 만들 때는 [MapAuthoring 씬](../../Assets/_Project/Scenes/MapAuthoring.unity)을 사용합니다. 저장·등록·시험 순서는 [팀 작업 안내](TEAM_WORKFLOW.md)를 따릅니다.
 
@@ -19,6 +19,7 @@
 - **폴더의 역할과 보존 대상:** [프로젝트 폴더 안내](PROJECT_FOLDERS.md)
 - **AI에게 작업 요청:** [AI 참고 안내](../ai_docs/AI_GUIDE.md)
 - **커밋 양식:** [공통 커밋 규칙](COMMIT_RULES.md)
+- **온라인 설정과 접속:** [Photon Fusion 설정](../ai_docs/ONLINE_MULTIPLAYER.md#기본-접속과-새-pc-설정)
 
 <a id="mcp-없이도-플레이할-수-있나요"></a>
 

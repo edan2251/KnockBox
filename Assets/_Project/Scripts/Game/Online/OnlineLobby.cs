@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace Knockbox.Game.Online
@@ -20,6 +22,7 @@ namespace Knockbox.Game.Online
         string status = "";
         GUIStyle title, label, box, field;
         int requestVersion;
+        CancellationTokenSource connectionRequest;
         MatchRunner Runner => runner != null ? runner : (runner=GetComponent<MatchRunner>());
         public bool IsOpen => open;
         public bool Busy => busy;
@@ -29,6 +32,7 @@ namespace Knockbox.Game.Online
 
         public void StartPractice()
         {
+            CancelPendingConnection();
             if (online.Active) online.LeaveToPractice();
             else Runner.StartNewMatch();
             open=false;
@@ -38,7 +42,7 @@ namespace Knockbox.Game.Online
 
         public void CancelAndOpen()
         {
-            requestVersion++;
+            CancelPendingConnection();
             busy=false; status=""; code="";
             if (online.Active) online.LeaveToPractice();
             open=true;
@@ -71,68 +75,81 @@ namespace Knockbox.Game.Online
                 open = !open;
         }
 
-        public async void CreateRoom()
-        {
-            if (Runner.IsAuthoringPreview) { status="제작기 시험은 로컬 전용입니다. 시험 종료 후 Main에서 연결해주세요."; return; }
-            if (busy || online.Active) return;
-            int request=++requestVersion;
-            busy = true;
-            status = "방을 만드는 중…";
-            try
-            {
-                var (relay, newCode) = await RelayTransport.HostAsync();
-                if(this == null || request != requestVersion) { relay.Dispose(); return; }
-                code = newCode;
-                status = "";
-                online.StartSession(relay, true, OnlineMatch.DefaultRelayDelay);
-                Debug.Log($"[Knockbox][online] 방 만들기: 코드 {code}");
-            }
-            catch (Exception e)
-            {
-                if(this == null || request != requestVersion) return;
-                status = "방을 만들지 못했습니다. 연결을 확인하고 다시 시도해주세요.";
-                Debug.LogWarning($"[Knockbox][online] 방 만들기 실패: {Short(e)}");
-            }
-            if(this != null && request == requestVersion) busy = false;
-        }
+        public async void CreateRoom() => await ConnectAsync(true);
+        public async void Join() => await ConnectAsync(false);
 
-        public async void Join()
+        // UI commands converge here; only the connection layer knows Photon APIs.
+        async Task ConnectAsync(bool host)
         {
             if (Runner.IsAuthoringPreview) { status="제작기 시험은 로컬 전용입니다. 시험 종료 후 Main에서 연결해주세요."; return; }
             if (busy || online.Active) return;
-            if (string.IsNullOrWhiteSpace(joinCode))
+            if (!host && string.IsNullOrWhiteSpace(joinCode))
             {
                 status="방 코드를 입력해주세요.";
                 return;
             }
             int request=++requestVersion;
+            string submittedCode = joinCode;
+            var cancellation = new CancellationTokenSource();
+            connectionRequest = cancellation;
+            ITransport connection = null;
             busy = true;
-            status = "방에 참가하는 중…";
+            code = "";
+            status = host ? "방을 만드는 중…" : "방에 참가하는 중…";
             try
             {
-                var relay = await RelayTransport.JoinAsync(joinCode);
-                if(this == null || request != requestVersion) { relay.Dispose(); return; }
-                code = joinCode.Trim().ToUpperInvariant();
+                string roomCode;
+                if (host)
+                {
+                    var created = await FusionConnection.HostAsync(cancellation.Token);
+                    connection = created.transport;
+                    roomCode = created.code;
+                }
+                else
+                {
+                    connection = await FusionConnection.JoinAsync(submittedCode, cancellation.Token);
+                    roomCode = submittedCode.Trim().ToUpperInvariant();
+                }
+                if(this == null || request != requestVersion || cancellation.IsCancellationRequested) return;
+                online.StartSession(connection, host, host ? OnlineMatch.DefaultOnlineDelay : 0);
+                connection = null; // OnlineMatch owns this transport until the match is closed.
+                code = roomCode;
                 status = "";
-                online.StartSession(relay, false, 0);
-                Debug.Log($"[Knockbox][online] 참가: 코드 {code}");
+                Debug.Log(host ? "[Knockbox][online] Fusion 방 생성" : "[Knockbox][online] Fusion 방 참가");
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                // A newer request or returning to the menu owns the visible state.
             }
             catch (Exception e)
             {
                 if(this == null || request != requestVersion) return;
-                status = "참가하지 못했습니다. 방 코드와 연결을 확인해주세요.";
-                Debug.LogWarning($"[Knockbox][online] 참가 실패: {Short(e)}");
+                status = e is FusionSetupException ? e.Message : host
+                    ? "방을 만들지 못했습니다. 연결을 확인하고 다시 시도해주세요."
+                    : "참가하지 못했습니다. 방 코드와 연결을 확인해주세요.";
+                Debug.LogWarning($"[Knockbox][online] 연결 실패: {e.GetType().Name}");
             }
-            if(this != null && request == requestVersion) busy = false;
+            finally
+            {
+                connection?.Dispose();
+                if (this != null && request == requestVersion)
+                {
+                    busy = false;
+                    connectionRequest = null;
+                }
+                cancellation.Dispose();
+            }
         }
 
-        void OnDestroy() => requestVersion++;
-
-        static string Short(Exception e)
+        void CancelPendingConnection()
         {
-            string m = e.Message ?? e.GetType().Name;
-            return m.Length > 90 ? m.Substring(0, 90) + "..." : m;
+            requestVersion++;
+            connectionRequest?.Cancel();
+            connectionRequest = null;
+            busy = false;
         }
+
+        void OnDestroy() => CancelPendingConnection();
 
         void Styles()
         {

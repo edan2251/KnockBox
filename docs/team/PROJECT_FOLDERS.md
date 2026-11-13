@@ -2,7 +2,7 @@
 
 팀원의 게임·UI·맵 작업은 **Assets/_Project**에서 시작합니다. `Assets/Scenes`와 `Assets/Settings`는 이름이 일반적이지만 역할이 다릅니다. 특히 **Settings는 현재 게임이 참조하므로 통째로 삭제하면 안 됩니다.**
 
-2026-11-07에 사용자 삭제 상태와 설정 참조를 재확인했습니다. `Assets/Scenes`와 폴더 `.meta`는 이미 없는 상태였습니다. 작업 씬과 Settings는 유지되어 있습니다.
+2026-11-13에 씬·설정 참조를 재확인했습니다. 작업 씬 3개와 Settings의 렌더링·입력 에셋은 유지합니다. 게임에 쓰지 않는 Lit 2D 템플릿과 Fusion 실습 씬은 백업 후 정리했습니다. 현재 작업 상태는 [진행 현황](../ai_docs/progress/PROGRESS.md), 복원 자료는 [보관 안내](../ai_docs/HISTORY.md)를 참고하세요.
 
 ## 자주 여는 위치
 
@@ -46,7 +46,7 @@
 
 쓰임새: 게임 진행·표시·판정 코드
 
-처음 볼 곳: [아키텍처](../ai_docs/HISTORY.md)와 [온라인 코드 지도](../ai_docs/ONLINE_CODE_MAP.md)를 참고합니다.
+처음 볼 곳: [아키텍처](../ai_docs/HISTORY.md)와 [온라인 코드 지도](../ai_docs/ONLINE_MULTIPLAYER.md#코드-지도)를 참고합니다.
 
 
 [Assets/_Project/Editor](../../Assets/_Project/Editor/), [Tests](../../Assets/_Project/Tests/)
@@ -80,7 +80,7 @@
 
 실제 게임 씬은 Assets/_Project/Scenes/Main입니다. Main·Sandbox의 빌드 경로와 GUID, MapAuthoring 씬의 존재를 파일 기준으로 확인했습니다. 게임 코드에서 삭제된 샘플을 로드하는 참조는 발견하지 못했습니다.
 
-이 확인은 설정·참조 조사입니다. Unity에서 새 씬 생성과 Play·빌드를 직접 실행한 결과는 아닙니다. Settings/Scenes의 URP2DSceneTemplate은 별도로 남아 있는 Lit 2D 새 씬 템플릿 원본이므로 이번 삭제와 구분합니다.
+위 내용은 2026-11-07의 설정·참조 조사 기록입니다. 당시 남아 있던 Settings/Scenes의 URP2DSceneTemplate은 2026-11-13에 연결된 Lit 2D 템플릿과 함께 정리했습니다. 실제 게임 씬과 기본 렌더링 설정은 보존했습니다.
 
 <a id="assetssettings는-무엇에-쓰나요"></a>
 
@@ -122,18 +122,9 @@
 판단: 보존 우선. Input System이 빌드에 사전 로드하고 활성화합니다.
 
 
-[Lit2DSceneTemplate.scenetemplate](../../Assets/Settings/Lit2DSceneTemplate.scenetemplate)
+Lit2DSceneTemplate.scenetemplate / Scenes/URP2DSceneTemplate.unity
 
-확인된 연결: Unity의 새 씬 창에 표시되는 Lit 2D 템플릿
-
-판단: 선택적 정리 후보. 게임 화면은 아닙니다.
-
-
-[Scenes/URP2DSceneTemplate.unity](../../Assets/Settings/Scenes/URP2DSceneTemplate.unity)
-
-확인된 연결: 위 템플릿이 참조하는 원본 씬
-
-판단: 템플릿과 함께 검토합니다. 이것만 삭제하면 연결이 깨집니다.
+2026-11-13 정리: 새 씬 창의 프로젝트 제공 Lit 2D 템플릿과 원본 씬입니다. 서로의 참조 외에는 게임·테스트·ProjectSettings에서 사용하지 않아 두 파일과 `.meta`, 빈 Scenes 폴더를 함께 백업 후 제거했습니다. 이 프로젝트의 새 씬 창에서 해당 템플릿 항목이 사라집니다.
 
 
 렌더링 연결은 **ProjectSettings → UniversalRP → Renderer2D**, 그리고 **GraphicsSettings → URP 전역 설정 → DefaultVolumeProfile**입니다. `ProjectSetup.cs`에도 UniversalRP를 읽는 문자열 경로가 있어, GUID를 보존해 이동하더라도 이 경로를 함께 확인해야 합니다.
@@ -144,6 +135,6 @@
 
 ## 정리 범위와 확인 항목
 
-먼저 [작업 규칙](../ai_docs/WORKING_RULES.md)의 보존 범위를 확인합니다. 이후 승인을 받아 정리한다면 이미 정리된 SampleScene과 별개로 **Lit 2D 템플릿과 원본 씬**을 한 묶음으로 검토할 수 있습니다. 렌더링 설정과 전역 입력 에셋은 그 정리에서 제외하는 것을 권장합니다.
+먼저 [작업 규칙](../ai_docs/WORKING_RULES.md)의 보존 범위를 확인합니다. 씬의 GUID뿐 아니라 코드의 경로 문자열, Resources 로드, 자동 검사와 에디터 메뉴도 사용처입니다. 렌더링 설정·전역 입력·Sandbox·리플레이 자료를 단순히 현재 게임 화면에 보이지 않는다는 이유로 지우지 않습니다.
 
-정리 후에는 URP·Renderer2D 검사, Main 화면과 마우스·키보드·패드 입력, MapAuthoring 시험 실행, 새 씬 창, Windows 빌드를 확인합니다. 이번 조사에서는 삭제 후 영향, 개인 레이아웃·외부 도구의 참조까지 시험하지 않았습니다.
+Fusion의 가져온 실습 폴더 `Assets/Photon/FusionDemos/Fusion-Intro-Shared`와 Build Settings의 해당 씬 항목은 2026-11-13에 정리했습니다. SDK Hub가 참조하는 FusionDemos/FusionMenu의 `.unitypackage` 설치 원본은 SDK와 함께 버전 관리합니다. 설치 원본을 보관하는 것이 실습 씬을 다시 임포트한다는 뜻은 아닙니다. SDK 본체와 게임의 `Online/Fusion` 코드는 구분합니다. 실제 검증 범위는 [진행 현황](../ai_docs/progress/PROGRESS.md), 복원 위치는 [보관 안내](../ai_docs/HISTORY.md)에 있습니다.

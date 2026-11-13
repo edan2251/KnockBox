@@ -306,7 +306,7 @@ namespace Knockbox.Game
         /// <summary>틱마다 이벤트를 모아 두었다가 LateUpdate에서 연출로 소비한다.</summary>
         void OnTicked(MatchRunner r)
         {
-            var events = r.World.Events;
+            var events = r.EventWorld.Events;
             for (int i = 0; i < events.Count && queued < EventQueueCapacity; i++)
                 queue[queued++] = events[i];
         }

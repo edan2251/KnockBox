@@ -25,7 +25,7 @@ namespace Knockbox.Game.UI
         float practiceReadyAt;
         bool practiceReadySent;
         [field: SerializeField] public FrontendView View { get; private set; }
-        public static bool UseFrontendForThisRun => !Application.isBatchMode && !OnlineMatch.CommandLineRequested
+        public static bool UseFrontendForThisRun => !Application.isBatchMode
             && !AutoPlayDebug.HasArg(ReplayCheck.Arg) && !AutoPlayDebug.HasArg("-autobots");
 
         void Start()
@@ -82,10 +82,10 @@ namespace Knockbox.Game.UI
 
         void Choose(int index)
         {
-            if(submittedRound==runner.World.State.Match.Round)return;
+            if(submittedRound==runner.FrontendWorld.State.Match.Round)return;
             if(runner.RequestCardSelection(runner.LocalPlayerSlot,index))
             {
-                submittedRound=runner.World.State.Match.Round;
+                submittedRound=runner.FrontendWorld.State.Match.Round;
                 View.CanChoose=false;
                 View.BeginCardFeedback(index);
             }
@@ -103,7 +103,7 @@ namespace Knockbox.Game.UI
             if(joinEntry && keyboard!=null && keyboard.enterKey.wasPressedThisFrame && !lobby.Busy && !online.Active)Join();
             int slot=runner.LocalPlayerSlot;
             if(slot!=shownSlot){shownSlot=slot;View.SetLocalSlot(slot);}
-            var m=runner.World.State.Match;
+            var m=runner.FrontendWorld.State.Match;
             FrontendScreen desired;
             var session=online.Session;
             if(session!=null && session.State!=SessionState.Running) desired=FrontendScreen.Waiting;
@@ -124,7 +124,7 @@ namespace Knockbox.Game.UI
             bool oldReplay=!runner.World.Config.Match.CollectCardsOnly && !lobby.IsOpen;
             View.Canvas.enabled=!oldReplay;
             if(oldReplay) {View.Show(FrontendScreen.Hidden);previous=FrontendScreen.Hidden;return;}
-            View.Inventory(runner.World.State.Fighter0.Augments,runner.World.State.Fighter1.Augments);
+            View.Inventory(runner.FrontendWorld.State.Fighter0.Augments,runner.FrontendWorld.State.Fighter1.Augments);
             View.Score(m.SetScore0,m.SetScore1);
             if(desired==FrontendScreen.Join||desired==FrontendScreen.Waiting)
             {
@@ -141,7 +141,7 @@ namespace Knockbox.Game.UI
                 int index=-1;
                 if(m.PickedAt>=0)
                 {
-                    var owned=runner.World.State.GetFighter(m.Picker).Augments;
+                    var owned=runner.FrontendWorld.State.GetFighter(m.Picker).Augments;
                     if(owned.Count>0)index=CardCollectionRules.CardIndex(owned.Get(owned.Count-1));
                 }
                 View.Cards(m.Picker,m.Picker==slot && m.PickedAt<0 && submittedRound!=m.Round,index,
@@ -153,8 +153,8 @@ namespace Knockbox.Game.UI
             else {lastPickedAt=-1;lastPicker=-1;}
             if(desired==FrontendScreen.Result)
                 View.Result(m.SetScore0>=m.SetScore1?0:1,m.SetScore0,m.SetScore1,online.Active,
-                    (runner.World.State.Fighter0.PrevButtons&InputButtons.Attack)!=0 || (practiceReadyWorld!=null && slot==0),
-                    (runner.World.State.Fighter1.PrevButtons&InputButtons.Attack)!=0 || (practiceReadyWorld!=null && slot==1));
+                    (runner.FrontendWorld.State.Fighter0.PrevButtons&InputButtons.Attack)!=0 || (practiceReadyWorld!=null && slot==0),
+                    (runner.FrontendWorld.State.Fighter1.PrevButtons&InputButtons.Attack)!=0 || (practiceReadyWorld!=null && slot==1));
         }
 
         public static string EndMessage(LockstepSession session) =>

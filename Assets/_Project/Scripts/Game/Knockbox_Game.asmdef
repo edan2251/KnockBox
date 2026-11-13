@@ -2,19 +2,16 @@
   "name": "Knockbox.Game",
   "rootNamespace": "Knockbox.Game",
   "references": [
+    "Fusion.Unity",
+    "Photon.Realtime",
     "Knockbox.Simulation",
     "Knockbox.Presentation",
     "Unity.InputSystem",
-    "Unity.ugui",
-    "Unity.Networking.Transport",
-    "Unity.Collections",
-    "Unity.Services.Core",
-    "Unity.Services.Authentication",
-    "Unity.Services.Multiplayer"
+    "Unity.ugui"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],
-  "allowUnsafeCode": false,
+  "allowUnsafeCode": true,
   "overrideReferences": false,
   "precompiledReferences": [],
   "autoReferenced": true,

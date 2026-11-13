@@ -144,7 +144,19 @@ LocalOnly 외형은 `MatchPresenter.CreateTestModel()`이 에디터에서만 읽
 
 Unity 패키지는 패키지 자체의 라이선스와 고지를 따릅니다. 캐시 대신 `Packages/manifest.json`과 `packages-lock.json`으로 의존성을 보존합니다. 상용 에셋을 새로 도입하면 구매자·팀 이용 범위·소스 파일 재배포 조건을 확인합니다.
 
-## 5. 새 외부 자료를 추가할 때 남길 정보
+<a id="photon-sdk"></a>
+
+## 5. Photon Fusion SDK
+
+2026-11-13 확인: 현재 로컬 SDK는 Photon Fusion **2.1.4 Stable Build 2500**이다. [공식 약관](https://www.photonengine.com/terms/licenseterms)의 7.1·10.2와 로컬 패키지를 확인했지만 SDK 원본 전체를 공개 Git 저장소에 재배포해도 된다는 명시적 근거는 확인하지 못했다. 게임 개발·실행을 위한 SDK 이용과 공개 소스 재배포를 같은 허가로 단정하지 않는다.
+
+SDK를 Git에 넣는 것 자체가 기술적으로 금지되는 것은 아니다. [Photon 공식 SDK 안내](https://doc.photonengine.com/fusion/v2/getting-started/sdk-download)도 업데이트 전 전체 프로젝트의 소스 관리 백업을 권장한다. SDK 코드·DLL·meta를 포함하면 clone/pull로 같은 버전을 받아 PC마다 다시 임포트할 필요가 없다. 다만 권한 있는 팀원의 소스 관리와 불특정 다수에게 공개하는 원본 재배포는 구분하며, 이 문서에서 공개 배포가 허용되거나 금지된다고 단정하지 않는다.
+
+2026-11-13 사용자가 다른 PC에서 SDK를 다시 설치하지 않도록 **SDK 원본과 meta를 저장소에 포함하고 App ID는 제외**하라고 명시했다. 이에 기존 로컬 설치·Git 제외 정책을 바꾸고, 설치된 동일 버전의 코드·DLL·네이티브 플러그인·심볼·Hub 리소스·번들 설치 원본·고지를 함께 커밋 대상으로 관리한다. 프로젝트 NetworkProjectConfig도 공유하며 PhotonAppSettings.asset과 meta는 계속 로컬 설정이다. 새 PC는 clone/pull 후 [앱 연결 순서](../ai_docs/ONLINE_MULTIPLAYER.md#기본-접속과-새-pc-설정)를 따른다. SDK 원본은 변경하지 않았으며 스테이징·커밋·푸시·저장소 공개 범위 변경은 수행하지 않았다.
+
+SDK에 포함된 NanoSockets·WebSocket 등의 개별 MIT 고지가 SDK 전체에 대한 공개 재배포 허가를 대신하지 않는다. 해당 원본 고지는 SDK와 함께 포함하며 SDK 전체를 MIT로 분류하지 않는다. 버전·배포 범위를 변경할 때에도 제공사 약관과 개별 고지를 유지한다.
+
+## 6. 새 외부 자료를 추가할 때 남길 정보
 
 1. 이름·제작자·원본 URL·받은 날짜와 버전을 적습니다.
 2. 라이선스 원문을 보관하고, 수정 여부를 적습니다.

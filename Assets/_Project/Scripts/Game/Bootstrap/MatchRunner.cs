@@ -49,6 +49,13 @@ namespace Knockbox.Game
         bool configFromTuning;
 
         public SimWorld World { get; private set; }
+        /// <summary>Native prediction keeps UI decisions and one-shot effects on the confirmed timeline.</summary>
+        public SimWorld FrontendWorld => confirmedWorld ?? World;
+        public SimWorld EventWorld => confirmedWorld ?? World;
+        SimWorld confirmedWorld;
+        int predictionSlot;
+        float predictionAlpha;
+        public bool PredictionDriven { get; private set; }
         public SimState PreviousState { get; private set; }
         public float InterpolationAlpha => clock.Alpha;
         public FixedTickClock Clock => clock;
@@ -72,7 +79,7 @@ namespace Knockbox.Game
         public ILockstepInputs Lockstep { get; set; }
 
         /// <summary>온라인은 세션의 내 슬롯, 로컬 연습은 마우스를 쓰는 P1. 시뮬레이션 상태에는 저장하지 않는다.</summary>
-        public int LocalPlayerSlot => Lockstep?.LocalSlot ?? 0;
+        public int LocalPlayerSlot => PredictionDriven ? predictionSlot : Lockstep?.LocalSlot ?? 0;
         public bool FrontendEnabled { get; set; }
         public bool MenuInputBlocked { get; set; }
         public bool LiveTuningLocked => Lockstep != null || OnlineRematch || Recording != null || Playback != null;
@@ -81,7 +88,7 @@ namespace Knockbox.Game
         public IInputSource RouteFrontendInput(IInputSource input, int slot, bool automaticPick = false)
         {
             if (!FrontendEnabled) return input;
-            var routed = new FrontendInputSource(() => World, () => MenuInputBlocked, input, slot, automaticPick);
+            var routed = new FrontendInputSource(() => FrontendWorld, () => MenuInputBlocked, input, slot, automaticPick);
             frontendInputs[slot] = routed;
             return routed;
         }
@@ -130,7 +137,7 @@ namespace Knockbox.Game
         /// 멈춰 있으면 1(현재 상태를 그대로 그림), 진행 중이면 다음 틱까지의 비율.
         /// 히트스탑 중 보간 금지는 연출 쪽에서 처리한다(CP4).
         /// </summary>
-        public float RenderAlpha => Running ? clock.Alpha : 1f;
+        public float RenderAlpha => Running ? (PredictionDriven ? predictionAlpha : clock.Alpha) : 1f;
 
         /// <summary>arenaName이 이 값이면 순환 맵 전부를 라운드마다 바꿔 가며 쓴다(04-arena.md 6절).</summary>
         public const string RotationName = "Rotation";
@@ -429,6 +436,7 @@ namespace Knockbox.Game
 
         public void Begin(SimConfig config, ArenaDef[] arenas, in SimState initial)
         {
+            EndPrediction();
             World = new SimWorld(config, arenas, initial);
             PreviousState = initial;
             configFromTuning = false;
@@ -482,7 +490,7 @@ namespace Knockbox.Game
             double now = Time.realtimeSinceStartupAsDouble;
             double elapsed = now - lastRealtime;
             lastRealtime = now;
-            if (!Running || World == null)
+            if (!Running || World == null || PredictionDriven)
                 return;
 
             int ticks = clock.Advance(elapsed);
@@ -496,7 +504,7 @@ namespace Knockbox.Game
         /// <summary>한 틱 진행한다. 일시정지 중 한 틱 진행(Ctrl+O)에도 쓴다. 락스텝에서 상대 입력이 아직 없으면 진행하지 않고 false.</summary>
         public bool StepOnce()
         {
-            if (World == null)
+            if (World == null || PredictionDriven)
                 return false;
             int tick = World.State.Tick;
             InputFrame p1, p2;
@@ -550,6 +558,43 @@ namespace Knockbox.Game
             if (StopAtTick > 0 && World.State.Tick >= StopAtTick)
                 Running = false;
             return true;
+        }
+
+        public void BeginPrediction(int localSlot, SimWorld confirmed)
+        {
+            if (confirmed == null) throw new ArgumentNullException(nameof(confirmed));
+            predictionSlot = localSlot; confirmedWorld = confirmed; predictionAlpha = 1;
+            PredictionDriven = true;
+        }
+
+        public void StepPrediction(in SimState restored, InputFrame p1, InputFrame p2)
+        {
+            if (!PredictionDriven) throw new InvalidOperationException("Fusion 예측 경기가 시작되지 않았습니다.");
+            World.State = restored;
+            PreviousState = restored;
+            World.Step(p1, p2);
+        }
+
+        public void SetPredictionRenderState(in SimState state, float alpha)
+        {
+            if (!PredictionDriven) return;
+            if (World.State.Tick != state.Tick) PreviousState = World.State;
+            World.State = state;
+            predictionAlpha = Mathf.Clamp01(alpha);
+        }
+
+        public void PublishConfirmedTick()
+        {
+            if (!PredictionDriven) return;
+            TicksRun = confirmedWorld.State.Tick;
+            Ticked?.Invoke(this);
+        }
+
+        public void EndPrediction()
+        {
+            PredictionDriven = false;
+            confirmedWorld = null;
+            predictionSlot = 0;
         }
 
         /// <summary>

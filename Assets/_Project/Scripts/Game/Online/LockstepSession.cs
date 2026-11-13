@@ -53,7 +53,7 @@ namespace Knockbox.Game.Online
     ///   TimeoutSeconds 동안 아무것도 오지 않으면 Timeout으로 끝낸다(재접속·이어 하기 없음).
     /// - 확정 틱 체크섬을 ChecksumInterval틱마다 주고받아 비교한다. 다르면 Desync로 멈춘다(복구 아님).
     /// - 지연 수치는 왕복(RTT): 패킷에 실은 보낸 시각을 상대가 되돌려 준 값으로 잰다.
-    /// 시간은 Poll로 밖에서 받는다(테스트는 가짜 시계).
+    /// 런타임은 단조 시계를 주입해 실제 송수신 시각을 읽는다. 시계가 없는 검사는 Poll의 가짜 시간을 쓴다.
     /// </summary>
     public sealed class LockstepSession : ILockstepInputs, IDisposable
     {
@@ -72,6 +72,7 @@ namespace Knockbox.Game.Online
         enum PacketType : byte { Hello = 1, Welcome = 2, Reject = 3, Input = 4, Bye = 5 }
 
         readonly ITransport transport;
+        readonly Func<double> realtimeClock;
         readonly bool isHost;
         readonly uint configChecksum;
         readonly uint arenaChecksum;
@@ -80,6 +81,7 @@ namespace Knockbox.Game.Online
         // 입력: [슬롯, 링]. tag = 틱 + 1(0이면 비어 있음).
         readonly InputFrame[,] frames = new InputFrame[MaxPlayers, Ring];
         readonly int[,] tags = new int[MaxPlayers, Ring];
+        readonly double[,] inputTimes = new double[MaxPlayers, Ring];
         readonly int[] contiguous = new int[MaxPlayers];
         int localNext;
         int peerAck;
@@ -100,10 +102,15 @@ namespace Knockbox.Game.Online
         uint lastPeerStamp;
         double lastPeerStampAt;
         bool waiting;
+        bool polled;
+        double waitStarted, waitedSeconds;
+        int lastMeasuredInput = -1;
 
-        public LockstepSession(ITransport transport, bool isHost, uint configChecksum, uint arenaChecksum, uint seed, int delayTicks)
+        public LockstepSession(ITransport transport, bool isHost, uint configChecksum, uint arenaChecksum, uint seed, int delayTicks,
+            Func<double> realtimeClock = null)
         {
             this.transport = transport;
+            this.realtimeClock = realtimeClock;
             this.isHost = isHost;
             this.configChecksum = configChecksum;
             this.arenaChecksum = arenaChecksum;
@@ -142,12 +149,21 @@ namespace Knockbox.Game.Online
         public int PacketsReceived { get; private set; }
         public int DesyncTick { get; private set; } = -1;
         public double SecondsSinceReceive => now - lastReceive;
+        public double WaitingSeconds => waitedSeconds + (waiting ? Math.Max(0, CurrentTime - waitStarted) : 0);
+
+        // 진단 전용. 입력 내용·판정·패킷 형식에는 영향을 주지 않는다. 단위는 초.
+        public event Action<double> RttMeasured;
+        public event Action<double, double> InputAgesMeasured;
+        double CurrentTime => realtimeClock != null ? realtimeClock() : now;
 
         /// <summary>경기를 시작한다. 손님은 Running이 된 뒤(Welcome 받은 뒤) 부른다. 이 틱부터 입력을 주고받는다.</summary>
         public void Begin(int tick, IInputSource local)
         {
             startTick = tick;
             localSource = local;
+            waiting = false;
+            waitedSeconds = 0;
+            lastMeasuredInput = -1;
             for (int s = 0; s < MaxPlayers; s++)
             {
                 for (int i = 0; i < DelayTicks; i++)
@@ -165,13 +181,23 @@ namespace Knockbox.Game.Online
         public void Poll(double time)
         {
             now = time;
-            if (startedAt == 0)
+            now = CurrentTime;
+            if (State != SessionState.Ended && transport is ITransportLifetime lifetime && lifetime.Ended)
             {
-                startedAt = time;
-                lastReceive = time;
+                End(lifetime.Reason, lifetime.EndMessage);
+                return;
+            }
+            if (!polled)
+            {
+                polled = true;
+                startedAt = now;
+                lastReceive = now;
             }
             while (State != SessionState.Ended && transport.TryReceive(out var packet))
+            {
+                now = CurrentTime;
                 Handle(packet);
+            }
             if (State == SessionState.Ended)
                 return;
             if (State == SessionState.Connecting)
@@ -200,6 +226,7 @@ namespace Knockbox.Game.Online
             p2 = default;
             if (State != SessionState.Running || !Began)
                 return false;
+            now = CurrentTime;
             int index = tick - startTick;
             bool sampled = false;
             while (localNext <= index + DelayTicks)
@@ -208,6 +235,7 @@ namespace Knockbox.Game.Online
                 int r = localNext % Ring;
                 frames[LocalSlot, r] = f;
                 tags[LocalSlot, r] = localNext + 1;
+                inputTimes[LocalSlot, r] = CurrentTime;
                 contiguous[LocalSlot] = localNext;
                 localNext++;
                 sampled = true;
@@ -218,16 +246,30 @@ namespace Knockbox.Game.Online
             {
                 if (contiguous[s] < index)
                 {
+                    if (!waiting) waitStarted = CurrentTime;
                     waiting = true;
                     StallCount++;
                     return false;
                 }
             }
-            waiting = false;
+            StopWaiting();
             int at = index % Ring;
             p1 = frames[0, at];
             p2 = frames[1, at];
+            if (index >= DelayTicks && index > lastMeasuredInput)
+            {
+                double usedAt = CurrentTime;
+                InputAgesMeasured?.Invoke(Math.Max(0, usedAt - inputTimes[LocalSlot, at]),
+                    Math.Max(0, usedAt - inputTimes[1 - LocalSlot, at]));
+                lastMeasuredInput = index;
+            }
             return true;
+        }
+
+        void StopWaiting()
+        {
+            if (waiting) waitedSeconds += Math.Max(0, CurrentTime - waitStarted);
+            waiting = false;
         }
 
         /// <summary>틱 tick을 계산한 직후의 상태 체크섬(확정 틱). ChecksumInterval의 배수 틱만 쓴다.</summary>
@@ -277,6 +319,7 @@ namespace Knockbox.Game.Online
         {
             if (State == SessionState.Ended)
                 return;
+            StopWaiting();
             State = SessionState.Ended;
             Reason = reason;
             EndDetail = detail;
@@ -330,6 +373,8 @@ namespace Knockbox.Game.Online
 
         void SendInputs()
         {
+            // 입력 채취는 Poll 뒤에도 일어난다. 이전 Poll 시각을 송신 시각으로 재사용하지 않는다.
+            now = CurrentTime;
             int o = WriteHeader(PacketType.Input);
             WriteUInt(sendBuffer, ref o, Stamp(now));
             WriteUInt(sendBuffer, ref o, lastPeerStamp);
@@ -438,6 +483,7 @@ namespace Knockbox.Game.Online
                 LastRttSeconds = rtt;
                 MaxRttSeconds = Math.Max(MaxRttSeconds, rtt);
                 RttSeconds = RttSeconds < 0 ? rtt : RttSeconds * 0.9 + rtt * 0.1;
+                RttMeasured?.Invoke(rtt);
             }
             if (ack > peerAck)
                 peerAck = Math.Min(ack, localNext - 1);
@@ -469,6 +515,8 @@ namespace Knockbox.Game.Online
                     End(EndReason.ProtocolError, $"틱 {index + startTick}의 상대 입력이 다른 값으로 다시 옴");
                     return;
                 }
+                // 빠진 입력을 기다리는 동안 중복 패킷이 와도 최초 수신 시각은 보존한다.
+                if (tags[remote, r] != index + 1) inputTimes[remote, r] = CurrentTime;
                 frames[remote, r] = f;
                 tags[remote, r] = index + 1;
             }

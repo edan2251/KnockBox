@@ -2,6 +2,8 @@
   "name": "Knockbox.Editor",
   "rootNamespace": "Knockbox.EditorTools",
   "references": [
+    "Fusion.Unity",
+    "Fusion.Unity.Editor",
     "Knockbox.Simulation",
     "Knockbox.Presentation",
     "Knockbox.Game",

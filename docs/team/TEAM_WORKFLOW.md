@@ -4,7 +4,7 @@ Unity에서 게임 화면과 맵을 직접 편집할 때 보는 안내입니다.
 
 작업 위치·Git·보존·검증 원칙은 [현재 작업 규칙](../ai_docs/WORKING_RULES.md)을 따릅니다. 원본 프로젝트의 개발 브랜치는 `exp/brawl-v1`였습니다. 과거 작업의 통과 기록을 새 위치의 이관 검증 결과로 보지는 않습니다.
 
-[전체 문서 안내](../README.md) · [아트 작업](ART_WORKFLOW.md) · [온라인 코드 지도](../ai_docs/ONLINE_CODE_MAP.md) · [커밋 규칙](COMMIT_RULES.md) · [과거 검증 보관](../ai_docs/HISTORY.md)
+[전체 문서 안내](../README.md) · [아트 작업](ART_WORKFLOW.md) · [온라인 코드 지도](../ai_docs/ONLINE_MULTIPLAYER.md#코드-지도) · [커밋 규칙](COMMIT_RULES.md) · [과거 검증 보관](../ai_docs/HISTORY.md)
 
 <a id="1-작업할-씬을-고르세요"></a>
 
@@ -174,7 +174,7 @@ Main의 지형 자식은 이 데이터로 만든 결과물입니다. 지형은 M
 - 무기 상태·탄약·발사체·카드 획득 판정은 Simulation에 있습니다. 무기 표시는 배치된 WeaponVisual을 재사용합니다.
 - 투사체·충돌 효과·먼지·KO 조각은 정해진 최대 수의 풀에서 재사용하거나 필요할 때 만드는 일시적 표현입니다. 담당 컴포넌트는 Main에 배치되어 있고 ShapeLibrary/Palette 참조를 볼 수 있습니다. 모든 개별 조각을 프리팹으로 만든 것은 아닙니다.
 - 맵별 투영 그림자 메시와 KO 전용 충돌체는 정의에 따라 만듭니다. KO의 Unity 물리는 시각 효과 전용입니다.
-- 네트워크 세션·Relay 전송은 방 생성·참가 때 만듭니다. OnlineMatch/OnlineLobby 담당은 미리 배치되어 있습니다.
+- Fusion Runner·전송과 락스텝 세션은 방 생성·참가 때 만듭니다. OnlineMatch/OnlineLobby 담당은 미리 배치되어 있습니다.
 - Sandbox와 자동 테스트는 기존 절차식 생성 경로를 유지합니다. Main에서 별도 UI 복제본을 사용하는 것은 아닙니다.
 
 <a id="8-저장한-변경을-검수하세요"></a>
@@ -185,7 +185,7 @@ Main은 다음 순서로 확인합니다.
 
 **메인 → 코드 참가/복귀 → 연습 → 첫 VS → O/P 테스트 KO → 카드 획득 → 다음 라운드 → 결과/O/X**
 
-MapAuthoring의 시험 사본도 저장·재열기·실행을 확인합니다. 실제 두 PC Relay와 사람이 느끼는 연출감은 자동 검사만으로 완료 판정하지 않습니다.
+MapAuthoring의 시험 사본도 저장·재열기·실행을 확인합니다. 실제 두 PC Fusion 연결과 사람이 느끼는 연출감은 자동 검사만으로 완료 판정하지 않습니다.
 
 `Window → General → Test Runner`에서는 다음 검사를 우선 확인합니다.
 
@@ -215,6 +215,8 @@ MapAuthoring의 시험 사본도 저장·재열기·실행을 확인합니다. �
 `Slow`와 `LegacyCombat` 카테고리는 이름만 보고 빼지 않습니다. 바뀐 코드가 무기 경로나 해당 측정에 닿으면 포함합니다(폼 전투는 2026-11-11 삭제). 기존 실패와 새 실패를 구분해야 할 때만 변경 전에 같은 관련 검사를 실행합니다.
 
 검사가 실패하면 기대값을 새 결과로 바꾸거나 조건을 약하게 하지 않습니다. 원인을 고치고, 의도한 동작 변경이라면 사용자 승인을 받은 뒤 같은 변경에서 기대값과 기록을 함께 고칩니다.
+
+`AuthoredMainTests`·`FrontendFlowTests`의 화면 검사는 일반 에디터에서 실행합니다. 배치 모드는 UI를 숨기며 `WaitForEndOfFrame`을 지원하지 않아 해당 검사에 적합하지 않습니다. `MatchRunnerTests.TenSecondsOfRealTime_Runs600Ticks`는 주석의 실행 조건대로 Unity 창을 전면에 두고 확인합니다. 백그라운드에서 틱이 누락된 결과를 결정론 실패나 정상 환경의 통과로 바꾸어 기록하지 않습니다.
 
 <a id="9-이름과-복구-자료를-보존하세요"></a>
 

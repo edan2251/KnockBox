@@ -36,6 +36,10 @@
 
    외부 자료의 출처·필수 고지·공유 제외 대상입니다.
 
+9. [Photon Fusion 설정](ai_docs/ONLINE_MULTIPLAYER.md#기본-접속과-새-pc-설정)
+
+   온라인 구현 문서의 접속 설정 절입니다. 새 개발 PC의 App ID 설정과 같은 빌드로 접속하는 조건을 확인합니다.
+
 ## 개발 기준
 
 [현행 개발 명세](ai_docs/CURRENT_DEV_SPEC.md)
@@ -49,6 +53,10 @@
 [개발·AI 안내](ai_docs/README.md)
 
 작업 규칙과 온라인 코드 지도, AI 참고 순서를 찾습니다.
+
+[온라인 멀티플레이 구현 기준](ai_docs/ONLINE_MULTIPLAYER.md)
+
+서버를 수정하는 AI와 개발자를 위한 현재 Host/Client 구조, 3틱 정책, 코드 지도, 예측·확정 경계와 카드 확장 계약입니다.
 
 ## 보관과 문서 관리
 

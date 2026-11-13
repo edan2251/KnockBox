@@ -139,3 +139,15 @@ Desktop.ini
 .DS_Store
 .dirstamp
 tmpinst-dir.stamp
+
+# Share the complete installed Photon SDK, including its vendor symbols and
+# bundled optional installers referenced by Fusion Hub. Other build outputs
+# and exported unitypackages remain ignored by the rules above.
+!/Assets/Photon/**/*.pdb
+!/Assets/Photon/**/*.pdb.meta
+!/Assets/Photon/**/*.unitypackage
+!/Assets/Photon/**/*.unitypackage.meta
+
+# Local Photon application identity (created by Fusion Hub on each machine).
+/Assets/Photon/Fusion/Resources/PhotonAppSettings.asset
+/Assets/Photon/Fusion/Resources/PhotonAppSettings.asset.meta

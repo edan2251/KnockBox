@@ -1,6 +1,6 @@
 # 현행 개발 명세
 
-main `ac39c2b`(2026-11-11)에 폼 전투 제거(작업 트리, 커밋 전)를 반영한 현재 동작입니다. 승인과 진행 상태는 [PROGRESS](progress/PROGRESS.md)에 둡니다. Main의 Brawl 흐름을 설명합니다. 게임 규칙을 새로 바꾸는 문서가 아닙니다.
+폼 전투 제거까지 반영한 main `2523cec`를 기준으로, Fusion 연결 이전과 2026-11-13 기본 예측 시험을 온라인 절에 구분해 설명합니다. 승인과 실제 구현·검증 상태는 [PROGRESS](progress/PROGRESS.md)에 둡니다. Main의 Brawl 흐름을 설명하며 게임 규칙을 새로 바꾸는 문서가 아닙니다.
 
 **폼 전투는 없습니다.** 가위·바위·보 폼, 초기 폼 선택, 폼 전환, 에너지, 가드·패링, 바위 투사체, 보 휘두르기, 시험 공격 폼은 2026-11-11 삭제했습니다. 파이터는 늘 몸(Body) 폼이고 `RuleSet`은 잡기 스위치와 경기 흐름(`LegacyMatch`)만 가집니다. 기존 몸 폼 기록과 온라인 설정 대조를 위해 체크섬에 남긴 고정값 자리는 [미사용 기능 보존](INACTIVE_FEATURES.md#제거한-기능--폼-전투--2026-11-11)에 정리했습니다. `MatchRunner`는 Brawl 여부(`brawlExperiment`)와 관계없이 몸 폼 전투 값(`BrawlParams.Combat`)을 씁니다. Sandbox는 이동·경기 수치와 표시만 옛 기본값을 유지합니다.
 
@@ -25,7 +25,7 @@ SimWorld.Step의 고정 틱은 60Hz입니다. 같은 설정·맵·시드·양쪽
 - Game/Bootstrap/MatchPresenter.cs: 저장 참조와 표시 연결
 - Game/UI/Frontend/: 화면 전환·입력·편집 구조
 - Simulation/Systems/FighterCombat.cs: 전투·잡기·차징·무기 판정
-- Game/Online/: Relay·세션·입력 전송
+- Game/Online/: 경기 세션·입력 전송, Photon Fusion 연결, 자동 검사용 메모리·모의 전송
 
 ## 현재 입력과 전투
 
@@ -41,6 +41,8 @@ CardCollectionRules가 현재 Main 경기 설정에 적용됩니다. 라운드 2
 
 최종 승리 전 세트 패자가 한 방·맷집·멀리 던지기 중 하나를 선택해 획득 목록에 쌓습니다. CollectCardsOnly가 켜져 있으며 실제 능력 수정자는 적용하지 않습니다. 카드를 골랐다고 전투 능력이 증가하는 구현은 아직 아닙니다.
 
+카드 클릭은 FrontendInputSource의 공통 선택 입력으로 전달되고, 확정된 입력을 MatchFlow가 보유 카드 상태에 적용합니다. UI의 즉시 피드백은 획득 확정과 구분합니다. Fusion 연결 이전은 이 규칙과 연출을 바꾸지 않습니다. 후속 능력·연출 작업의 경계와 세 장 전제는 [온라인·카드 확장 안내](ONLINE_MULTIPLAYER.md#카드-능력과-연출-확장)에 정리합니다.
+
 FrontendController가 결과와 O/X 준비를 처리합니다. 로컬 연습과 양쪽 준비가 필요한 온라인 재대결을 구분합니다. O/P 즉사는 로컬 검수용이며 온라인·녹화·재생·동기화 검사에서는 차단합니다. 현재 실제 조작은 [플레이 검수](../team/PLAYTEST.md)에 있습니다.
 
 ## 무기·총알 보류
@@ -49,7 +51,7 @@ FrontendController가 결과와 O/X 준비를 처리합니다. 로컬 연습과 
 
 ## 맵 정의와 제작
 
-MapDefinition 에셋이 지형·스폰·테마의 원본입니다. MapAuthoring은 이를 씬에서 배치·저장·재열기·등록·시험합니다. 씬 저장만으로 정의 에셋 저장을 대신하지 않습니다. 현재 사각/볼록 고정 지형, 물리 상자, 독립 로프를 지원합니다. 두 점 절단과 로프 제작은 [맵 제작기 계획](MAP_AUTHORING_PLAN.md)의 CP3·CP4 구현입니다. 검수와 미검증 범위는 PROGRESS에서 구분합니다. 사용법은 [맵 제작 안내](../team/MAP_AUTHORING.md)를 따릅니다. 제작기의 맵 저장은 `Data/Maps/Validation/`의 기준 맵과 보호된 BrawlOriginal을 덮어쓰지 않으며, 작업은 사본에서 합니다.
+MapDefinition 에셋이 지형·스폰·테마의 원본입니다. MapAuthoring은 이를 씬에서 배치·저장·재열기·등록·시험합니다. 씬 저장만으로 정의 에셋 저장을 대신하지 않습니다. 사각/볼록 고정 지형과 두 점 절단, 물리 상자, 독립 로프를 지원합니다. 맵 제작기 CP1~CP5 구현과 사용자 검수는 완료했으며 과거 계획은 [보관 안내](HISTORY.md)에서 찾습니다. 사용법은 [맵 제작 안내](../team/MAP_AUTHORING.md)를 따릅니다. 제작기의 맵 저장은 `Data/Maps/Validation/`의 기준 맵과 보호된 BrawlOriginal을 덮어쓰지 않으며, 작업은 사본에서 합니다.
 
 정의의 같은 순서와 좌표가 ArenaDef 판정과 표시로 전달됩니다. 좌표는 float이며 수정하지 않은 좌표 비트를 보존합니다. 강제 반올림 없이 선택적 격자 스냅을 사용하고, 판정 순서는 명시적인 Order입니다. 제작기의 **도형 순서 정리**는 삭제 뒤 남은 도형을 기존 Order 순으로 연속 번호화하고, 중복 번호는 Hierarchy 순서로 정합니다. 위치·크기·질량·ID는 보존하며 정의 저장은 별도입니다. 이름만 정리할 때 기존 맵 체크섬은 바뀌지 않습니다. ID·Order 중복, 유효하지 않은 시작 위치와 미저장 편집을 검사합니다. 보호된 BrawlOriginal은 보존하고 별도 사본으로 작업합니다.
 
@@ -87,7 +89,13 @@ Main의 mapCatalog와 selectedMap은 맵 선택에 관여합니다. 등록 목�
 
 ## 온라인과 리플레이
 
-현재 온라인은 Unity Relay 전송과 LockstepSession입니다. 온라인 롤백 구현이 완료된 상태가 아닙니다. 프로토콜은 9이며 OnlineMapManifest로 정렬된 맵 목록·전체 지형과 시작 설정을 비교합니다.
+방 생성·코드 참가는 Fusion 2 Host/Client이며 에디터와 일반 빌드 모두 기본 예측·재시뮬레이션을 사용합니다. SDK 처리·송신·전투는 60Hz, SDK 최소 입력 지연은 **3틱**입니다. 입력 자동 추가 지연과 앱 지연 큐의 중복 적용은 끕니다. 2/4틱·64/128회 비교 경로는 정리했습니다. Host가 판정을 확정하고 Client가 전체 SimState를 복원·재실행하며 Host 자체는 롤백하지 않습니다.
+
+LockstepSession은 프로토콜 9·설정·정렬된 맵 목록/전체 지형·시드 합의, 연결 상태·확정 체크섬·종료에 사용합니다. 실제 Photon 전투 입력은 Fusion 입력 버퍼를 사용합니다. ITransport·메모리/모의 전송과 비-Fusion 실행 분기는 오프라인 회귀 검사용으로 유지합니다. 과거 Relay·직접 UDP 접속은 제거했습니다.
+
+기존 UI 배치·P1/P2 표시·최대 2인·Host 이탈 시 종료를 유지하며 이름 입력은 후속 기능입니다. 전투 그림은 예측 World, 카드·결과·일회성 사건과 입력 기록은 검증한 확정 World를 사용합니다. Simulation의 판정·60Hz·랜덤 소비와 입력 리플레이 v8/v9·과거 기대 체크섬은 바꾸지 않습니다.
+
+HUD의 RTT는 Fusion SDK 관측값이며 제어 메시지 RTT는 예측 CSV에 따로 남깁니다. 어느 값도 순수 회선 Ping이나 버튼-화면 총 지연으로 단정하지 않습니다. SDK 상태·확정 입력 계약, 카드 확장, App ID 설정·검증 범위는 [온라인 개발 기준](ONLINE_MULTIPLAYER.md)을 봅니다. 현재 승인과 남은 검수는 [PROGRESS](progress/PROGRESS.md)에 있습니다.
 
 새 연결망 또는 독립 연결 상자가 있는 맵은 **geometry schema 8**을 사용합니다. 기존 geometry 해시에 몸체 역할/감속, 순서 있는 로프 ID·양끝 몸체 번호·연결점·길이를 추가합니다. 기존 schema 2~7 값은 보존합니다. 입력 기록 v9와 온라인 프로토콜 9의 바이트 형식은 그대로이며 새 맵을 이해하지 못하는 실행 파일은 맵 해시 불일치로 거절합니다.
 
@@ -104,10 +112,10 @@ Main의 mapCatalog와 selectedMap은 맵 선택에 관여합니다. 등록 목�
 
 접촉 안정화는 설정 체크섬으로 구분합니다. 꺼진 과거 설정은 새 필드를 해시하지 않으며 FindRecordedConfig가 안정화 이전/이후 후보를 모두 비교합니다. 기록 v8/v9·맵 schema·온라인 프로토콜 9의 바이트 형식과 과거 기대 체크섬은 변경하지 않습니다. 온라인 양쪽의 안정화 설정이 다르면 시작 전에 거절합니다. 이전 연결 상자 기록을 재생할 때는 당시 떨림/피해도 원래 결과대로 재현합니다.
 
-연결 담당 파일과 경계는 [온라인 코드 지도](ONLINE_CODE_MAP.md), 도구 사용은 Tools/ReplayCheck/README.txt를 봅니다. Editor와 Player 사이의 과거 중간 틱 float 차이는 해결 완료로 표현하지 않습니다.
+연결 담당 파일과 경계는 [온라인 코드 지도](ONLINE_MULTIPLAYER.md#코드-지도), 도구 사용은 Tools/ReplayCheck/README.txt를 봅니다. Editor와 Player 사이의 과거 중간 틱 float 차이는 해결 완료로 표현하지 않습니다.
 
 ## 검증 상태와 한계
 
-CP2·CP2-1 및 CP3·CP4의 컴파일·EditMode 자동 검사 결과는 [PROGRESS](progress/PROGRESS.md)에 기록합니다. 사용자 Play 검수·빌드·2PC Relay는 별도이며 과거 이관 결과와 합산하지 않습니다.
+현재 변경의 컴파일·자동 검사·빌드·사용자 확인 결과는 [PROGRESS](progress/PROGRESS.md)에 기록합니다. 완료된 단계별 계획과 상세 실행 로그는 [보관 안내](HISTORY.md)에서 찾습니다. 서로 다른 버전·회차의 통과 수치를 합산하지 않습니다.
 
-실제 온라인 손맛, 에디터 자체 오류, 새 clone의 실행·빌드, 다른 PC와의 새 Relay 대전은 완료로 간주하지 않습니다. 현재 우선 확인 항목은 [진행 현황](progress/PROGRESS.md)에 있습니다.
+실제 온라인 손맛, 에디터 자체 오류, 새 clone의 실행·빌드, 다른 PC와의 Fusion 대전은 코드 이전만으로 완료로 간주하지 않습니다. 현재 우선 확인 항목은 [진행 현황](progress/PROGRESS.md)에 있습니다.
