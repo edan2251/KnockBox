@@ -76,7 +76,7 @@
 
 현재 Main의 세 카드(한 방·맷집·멀리 던지기)는 **획득 목록에 쌓이는 단계이며 실제 능력은 아직 미구현**이다. 과거 Augments 계산 코드가 있다는 이유로 활성화 완료로 판단하지 않는다. 닉네임도 후속 기능이며 Fusion 식별자·P1/P2 슬롯과 구분한다.
 
-선택은 `CardClicked → FrontendController.Choose → MatchRunner.RequestCardSelection → FrontendInputSource → FusionInputCollector → MatchFlow.StepSetPick` 순서다. 선택 단계·선택자·선택지·중복을 검사하고, 클릭 의도는 확정까지 유지하며 라운드 번호로 오래된 요청을 막는다. UI의 `BeginCardFeedback`은 즉시 피드백이고 실제 `PickedAt`·보유 상태와 다르다.
+선택은 `CardClicked → FrontendController.Choose → MatchRunner.RequestCardSelection → FrontendInputSource → FusionInputCollector → MatchFlow.StepSetPick` 순서다. Main의 모놀리스 선택 무대(`CardPickStage`)도 `FrontendController.ChooseCard`로 같은 `Choose`에 들어가며, 확정 월드만 읽고 시뮬레이션에 쓰지 않는다. 선택 중 호버는 표시 전용 비신뢰 RPC(`FusionConnection.Rpc_CardHover`, 규칙은 `CardHoverRelay`)로만 상대에게 보내며 입력·확정 기록·체크섬·리플레이에 넣지 않는다. 이 RPC 때문에 접속 버전 문자열에 `-hover1`이 붙는다. 카드 확정 대기(`PickHoldTicks`)를 144틱으로 늘린 설정(2026-11-14)끼리만 접속하도록 `-hold144`도 붙는다. 선택 단계·선택자·선택지·중복을 검사하고, 클릭 의도는 확정까지 유지하며 라운드 번호로 오래된 요청을 막는다. UI의 `BeginCardFeedback`은 즉시 피드백이고 실제 `PickedAt`·보유 상태와 다르다.
 
 - **능력:** 설정과 보유 카드에서 Simulation이 계산한다. UI 클릭·애니메이션 종료·별도 RPC에서 체력이나 카드를 증감하지 않는다. 타이머·스택·쿨다운·소환물·결과에 관여하는 난수는 복원 가능한 SimState에 둔다.
 - **규칙:** 중첩 상한·적용 순서·반올림·상충 효과 우선순위를 먼저 정한다. 경기 RNG의 소비 순서를 보존하고 프레임 시각이나 UI 랜덤으로 판정하지 않는다. 새 밸런스는 사용자와 확정한다.

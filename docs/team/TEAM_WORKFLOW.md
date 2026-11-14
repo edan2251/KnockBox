@@ -20,6 +20,16 @@ Main의 `Match`에는 경기 실행, 화면 표시, 온라인·로비·화면 �
 
 `Frontend___edit_these_screens`는 **실제 실행에도 사용하는 UI 프리팹 인스턴스**입니다. Main에 참조가 빠졌다고 코드가 별도 UI를 새로 만들어 대신하지 않습니다.
 
+`Match/Card_Pick_Stage`는 세트 패자의 모놀리스 카드 선택 무대입니다. 편집 위치는 다음과 같습니다.
+
+- 바닥·비석 모양과 자리·패자 자리·장면 값(광원·원근·점등 시간·대기 캐릭터·HUD·진입 연출 시간과 세기): MapAuthoring에서 보상 맵 `Data/Maps/CardPick/CardPick_Stage`를 불러와 편집하고 맵 저장합니다. GameMaps에는 등록하지 않습니다. 비석은 `Reward_Steles` 아래 상자를 크기 조절·두점자르기로 만들고, P1이 고르는 배치로 둡니다. 비석 위에 저장되지 않는 모놀리스 미리보기가 겹쳐 보입니다. 자세한 규칙은 [기획서](../ai_docs/MONOLITH_CARD_PICK_PLAN.md#보상-맵-편집mapauthoring)를 봅니다.
+- 카드 면·패널 여백·글자·점등·어두워짐 색: `Prefabs/CardPick/Monolith`
+- 선택 중 표시의 위치·크기·떠다님·남은 초 크기·급함 기준: `Prefabs/CardPick/Pick_Banner`
+- 카드 문구: `Data/Cards/CardFaceCatalog`
+- `Card_Pick_Stage`에는 참조만 있습니다. 모놀리스는 실행 때 프리팹에서 비석마다 만듭니다.
+
+`모놀리스 선택 사용`을 끄면 기존 카드 선택 화면을 씁니다.
+
 같은 씬·프리팹은 한 번에 한 사람이 맡도록 작업 대상을 나누는 방식을 권장합니다. 기능별 브랜치 운영도 팀 합의가 필요한 권장안입니다. 에셋 전달과 충돌 회피 절차는 아트 안내를 참고하세요.
 
 <a id="2-ui를-편집하고-저장하세요"></a>
