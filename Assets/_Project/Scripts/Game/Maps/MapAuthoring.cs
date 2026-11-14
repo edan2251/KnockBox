@@ -21,10 +21,27 @@ namespace Knockbox.Game.Maps
         [Min(.01f)] public float boxTopSnapDistance = .6f;
         public bool spawnEdgeSnap = true;
         [Min(.01f)] public float spawnSnapDistance = .6f;
+        [Header("보상 맵(카드 선택)")]
+        [Tooltip("비석 상자 묶음. 보상 맵을 불러오면 자동으로 만듭니다.")] public Transform rewardRoot;
+        [Tooltip("패자 자리(발 위치) 표시. 보상 맵을 불러오면 자동으로 만듭니다.")] public Transform rewardStand;
+        [Tooltip("비석 위에 실제 모놀리스 모습을 겹쳐 보여 줍니다(저장되지 않음).")] public bool rewardPreview = true;
+        [Range(-1, 2), Tooltip("미리보기에서 켤 선택지(화면 왼쪽부터 0, 1, 2). -1이면 모두 꺼짐")] public int rewardPreviewHover = -1;
+        [Tooltip("P2가 고를 때처럼 좌우를 뒤집어 봅니다.")] public bool rewardPreviewMirror;
         [SerializeField] string loadedId;
         [SerializeField] uint loadedGeometry;
+        [SerializeField] bool loadedReward;
         public string LoadedId=>loadedId;
         public uint LoadedGeometry=>loadedGeometry;
+        /// <summary>지금 씬에 보상 맵 비석·패자 자리를 불러왔는지. 이때만 맵 저장이 비석을 함께 저장한다.</summary>
+        public bool LoadedReward=>loadedReward;
+        public MapBoxHandle[] RewardHandles()=>rewardRoot==null?Array.Empty<MapBoxHandle>():rewardRoot.GetComponentsInChildren<MapBoxHandle>(true);
+        /// <summary>비석 상자 핸들을 보상 맵 비석으로 읽는다. 순서는 저장할 때 화면 왼쪽부터 정한다.</summary>
+        public RewardStele[] ReadSteles()
+        {
+            var handles=RewardHandles();var steles=new RewardStele[handles.Length];
+            for(int i=0;i<handles.Length;i++)steles[i]=RewardStele.From(handles[i].Read());
+            return steles;
+        }
         public List<string> ValidatePlacement()
         {
             var errors=new List<string>();
@@ -75,6 +92,20 @@ namespace Knockbox.Game.Maps
                         errors.Add("로프 고정점은 회전·크기 변경 없이 XY로 이동해주세요: "+rope.name);
                 }
             }
+            if(loadedReward)
+            {
+                if(rewardRoot==null||rewardStand==null)errors.Add("보상 맵 비석 묶음·패자 자리가 없습니다. 맵을 다시 불러와주세요.");
+                else
+                {
+                    if(rewardRoot==terrainRoot||rewardRoot==physicsRoot||rewardRoot==ropeRoot||rewardRoot.IsChildOf(terrainRoot)
+                        ||rewardRoot.position!=Vector3.zero||rewardRoot.rotation!=Quaternion.identity||rewardRoot.lossyScale!=Vector3.one)
+                        errors.Add("비석 묶음은 지형과 별도로 위치 0·회전 0·크기 1을 유지해주세요.");
+                    foreach(Transform child in rewardRoot)if(child.GetComponent<MapBoxHandle>()==null)errors.Add("등록되지 않은 비석: "+child.name+" — 비석 추가 버튼을 사용해주세요.");
+                    foreach(var h in RewardHandles())
+                        if(h.transform.parent!=rewardRoot||Quaternion.Angle(h.transform.localRotation,Quaternion.identity)>.001f||h.transform.localPosition.z!=0||h.transform.localScale.z!=1)
+                            errors.Add("비석은 비석 묶음 바로 아래, 회전 없이 XY 평면에 배치해주세요: "+h.name);
+                }
+            }
             if(definition.Id!=loadedId)errors.Add("선택한 맵과 현재 배치가 다릅니다. 맵 불러오기를 눌러주세요.");
             return errors;
         }
@@ -101,6 +132,7 @@ namespace Knockbox.Game.Maps
         }
 #if UNITY_EDITOR
         public void MarkLoaded(){loadedId=definition.Id;loadedGeometry=definition.ToArena().ComputeGeometryChecksum();}
+        public void MarkRewardLoaded(bool loaded)=>loadedReward=loaded;
 #endif
     }
 }

@@ -105,6 +105,72 @@ namespace Knockbox.Tests.PlayMode
             UnityEngine.Object.Destroy(sceneSentinel);
         }
 
+        [UnityTest, Explicit("Uses the locally configured Photon app and two real NetworkRunners.")]
+        public IEnumerator RealHostClient_CardHoverTravelsBothWays_WithoutTouchingConfirmedRecording()
+        {
+            Assert.IsTrue(AutoPlayDebug.HasArg("-onlinebot"), "Pass -onlinebot.");
+            yield return PlayModeSceneScope.OpenEmpty();
+            var a = new GameObject("HoverTest_Host");
+            var b = new GameObject("HoverTest_Client");
+            FusionTransport hostWire = null, clientWire = null;
+            try
+            {
+                var hr = a.AddComponent<MatchRunner>(); hr.BrawlExperiment = true; hr.FrontendEnabled = true;
+                var cr = b.AddComponent<MatchRunner>(); cr.BrawlExperiment = true; cr.FrontendEnabled = true;
+                var host = a.AddComponent<OnlineMatch>(); var client = b.AddComponent<OnlineMatch>();
+                var hosting = FusionConnection.HostAsync();
+                yield return Await(hosting, 45);
+                var room = hosting.GetAwaiter().GetResult(); hostWire = room.transport;
+                host.StartSession(hostWire, true, FusionPredictionPolicy.DelayTicks);
+                var joining = FusionConnection.JoinAsync(room.code);
+                yield return Await(joining, 45);
+                clientWire = joining.GetAwaiter().GetResult();
+                client.StartSession(clientWire, false, FusionPredictionPolicy.DelayTicks);
+                double deadline = Time.realtimeSinceStartupAsDouble + 60;
+                while ((client.Prediction == null || client.Prediction.Journal.World.State.Tick < 120) && Time.realtimeSinceStartupAsDouble < deadline)
+                    yield return null;
+                Assert.IsNotNull(host.CardHover, "Fusion 경기에는 호버 전송이 있다");
+                Assert.IsNotNull(client.CardHover);
+                // 호스트(패자) → 클라이언트(승자), 이어서 반대 방향. 실제로는 고르는 쪽만 보낸다.
+                for (int direction = 0; direction < 2; direction++)
+                {
+                    var from = direction == 0 ? host.CardHover : client.CardHover;
+                    var to = direction == 0 ? client.CardHover : host.CardHover;
+                    int round = 40 + direction, option = 2 - direction;
+                    double until = Time.realtimeSinceStartupAsDouble + 1.5;
+                    bool arrived = false;
+                    while (Time.realtimeSinceStartupAsDouble < until && !arrived)
+                    {
+                        double now = Time.realtimeSinceStartupAsDouble;
+                        from.Publish(now, round, option);
+                        arrived = to.RemoteOption(now, round) == option;
+                        yield return null;
+                    }
+                    from.StopPublishing();
+                    Assert.IsTrue(arrived, "호버가 상대에게 도착해야 함(방향 " + direction + ")");
+                    TestContext.WriteLine($"hover direction {direction}: sent={from.Sent}, received={to.Received}, dropped={to.Dropped}");
+                }
+                Assert.IsFalse(host.Ended, host.Session?.EndDetail);
+                Assert.IsFalse(client.Ended, client.Session?.EndDetail);
+                // 호버는 확정 기록에 들어가지 않는다: 양쪽 확정 입력이 같고 체크섬이 그대로 재생된다.
+                var hp = host.Prediction; var cp = client.Prediction;
+                int count = Mathf.Min(hp.Journal.Recording.Count, cp.Journal.Recording.Count);
+                for (int i = 0; i < count; i++)
+                {
+                    Assert.AreEqual(hp.Journal.Recording.GetP1(i), cp.Journal.Recording.GetP1(i), "P1 tick " + i);
+                    Assert.AreEqual(hp.Journal.Recording.GetP2(i), cp.Journal.Recording.GetP2(i), "P2 tick " + i);
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(a); UnityEngine.Object.Destroy(b);
+                hostWire?.Dispose(); clientWire?.Dispose();
+            }
+            double cleanup = Time.realtimeSinceStartupAsDouble + 10;
+            while (UnityEngine.Object.FindObjectsByType<NetworkRunner>(FindObjectsSortMode.None).Length > 0
+                && Time.realtimeSinceStartupAsDouble < cleanup) yield return null;
+        }
+
         static IEnumerator Await(Task task, int seconds)
         {
             double end = Time.realtimeSinceStartupAsDouble + seconds;

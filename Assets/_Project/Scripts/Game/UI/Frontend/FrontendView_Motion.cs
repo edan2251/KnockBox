@@ -27,7 +27,12 @@ namespace Knockbox.Game.UI
         int pendingCard = -1;
         float cardClickedAt, cardFeedbackOffset;
         int VisualCard => acquired >= 0 ? acquired : pendingCard;
-        float CardFeedbackTime => Mathf.Max(acquiredProgress * motionRunner.World.Config.Match.PickHoldTicks / 60f,
+        /// <summary>
+        /// 기존 카드 화면의 획득·퇴장 연출 길이(틱). 2026-11-14 모놀리스 확정 연출을 위해 확정 대기가 144틱으로 늘었지만,
+        /// 기존 카드 화면은 예전 84틱 박자를 그대로 쓰고 남는 시간은 기다린다.
+        /// </summary>
+        public static int CardUiHoldTicks(in MatchParams match) => Mathf.Min(match.PickHoldTicks, 84);
+        float CardFeedbackTime => Mathf.Max(acquiredProgress * CardUiHoldTicks(motionRunner.World.Config.Match) / 60f,
             pendingCard < 0 ? 0 : Mathf.Min(.40f, Time.unscaledTime - cardClickedAt));
         float CardFeedbackSeconds => Mathf.Max(0, CardFeedbackTime - cardFeedbackOffset);
         float CardActorLeave => acquired < 0 ? 0 : In(Range(acquiredProgress, .30f, .80f));
@@ -383,6 +388,25 @@ namespace Knockbox.Game.UI
             ((RectTransform)resultBack.transform).anchoredPosition = new Vector2(1000, -530 - (1 - question) * 120);
         }
 
+        /// <summary>
+        /// 라운드 조명 밝기(0~1). 조명은 KO 퇴장 중 옛 배경이 아직 보일 때 서서히 꺼지고(이징), 라운드 사이와 재구성 동안 꺼져 있다가
+        /// GO에서 한 번에 켜진다. 그래서 새 맵은 처음부터 어두운 채 나타난다(켜졌다 꺼지는 깜빡임 없음).
+        /// 기존 카드 화면처럼 배경을 유지할 때는 조명도 유지한다.
+        /// </summary>
+        public static float RoundLight(MatchPhase phase, bool countIn, bool roundLightOn, float exit, bool keepBackdrop)
+        {
+            if (!countIn || keepBackdrop) return roundLightOn ? 1 : 0;
+            switch (phase)
+            {
+                case MatchPhase.Countdown: return roundLightOn ? 1 : 0;
+                case MatchPhase.KO: return 1 - Smooth(Range(exit, 0, .55f));
+                case MatchPhase.RoundEnd:
+                case MatchPhase.RoundTransition:
+                case MatchPhase.SetPick: return 0;
+                default: return 1;
+            }
+        }
+
         /// <summary>MatchPresenter가 IK 렌더링 뒤 호출한다. 두 선수의 재등장에는 같은 진행도를 쓴다.</summary>
         public void PresentMatchFrame()
         {
@@ -403,7 +427,10 @@ namespace Knockbox.Game.UI
                 && m.GetScore(winner) + (ko ? 1 : 0) >= w.Config.Match.RoundsToWinSet
                 && m.GetSetScore(winner) + 1 < w.Config.Match.SetsToWinMatch
                 && m.GetPicks(1 - winner) < w.Config.Match.MaxPicks;
-            if (goingToCards || m.Phase == MatchPhase.SetPick) keepCardBackdrop = true;
+            // 기존 카드 화면은 배경을 유지한다. 모놀리스 선택 무대는 전투 맵끼리 바뀔 때처럼 퇴장에서 배경을 서서히 끄고,
+            // 무대가 재구성될 때 새 배경을 서서히 켠다(색이 한 프레임에 바뀌지 않는다).
+            bool monolithStage = motionPresenter.CardPickStage != null && motionPresenter.CardPickStage.UsesMonoliths;
+            if (!monolithStage && (goingToCards || m.Phase == MatchPhase.SetPick)) keepCardBackdrop = true;
             float tick = m.PhaseTick + motionRunner.RenderAlpha;
             bool countIn = CardCollectionRules.HasCountIn(w.Config.Match);
             float t = ko ? Range(tick, countIn ? 84 : 0, w.Config.Match.KoTicks) : 0;
@@ -415,6 +442,7 @@ namespace Knockbox.Game.UI
             float spawn = countdown ? Pop(Range(build, .38f, .84f)) : fighting || ko ? 1 : 0;
             float shrink = 1 - Out(Range(t, .18f, .38f));
             float exit = ko ? Range(t, .48f, 1) : fighting || countdown ? 0 : 1;
+            float roundLight = RoundLight(m.Phase, countIn, roundLightOn, exit, keepCardBackdrop);
             float opacity = countdown ? Out(build) : 1 - Smooth(exit);
             Vector2 origin = Vector2.zero;
             if (ko && m.RoundWinner >= 0 && Camera.main != null)
@@ -427,7 +455,7 @@ namespace Knockbox.Game.UI
             float s0 = ko && m.RoundWinner == 0 ? shrink : spawn;
             float s1 = ko && m.RoundWinner == 1 ? shrink : spawn;
             motionPresenter.PresentFrontendStage(countdown ? build : exit, countdown, opacity, s0, s1,
-                countdown ? (1 - Out(Range(build, .38f, .84f))) * 2.2f : 0, fighting, roundLightOn, keepCardBackdrop);
+                countdown ? (1 - Out(Range(build, .38f, .84f))) * 2.2f : 0, fighting, roundLight, keepCardBackdrop);
             motionPresenter.Background.SetRoundLightPulse(countdown && countIn
                 ? (tick - buildEnd - CardCollectionRules.CountBeatTicks * 3) / 60f : -1);
             bool cue = countdown && (countIn ? tick >= buildEnd : build >= .86f) && Screen == FrontendScreen.Hidden;

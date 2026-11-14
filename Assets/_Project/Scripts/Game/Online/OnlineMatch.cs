@@ -29,6 +29,9 @@ namespace Knockbox.Game.Online
         FusionTransport fusionTransport;
         FusionPredictionSession prediction;
         public FusionPredictionSession Prediction => prediction;
+        CardHoverRelay cardHover;
+        /// <summary>카드 선택 무대의 표시 전용 호버 전송(Fusion 경기에서만). 시뮬레이션·확정 기록과 무관하다.</summary>
+        public CardHoverRelay CardHover => cardHover;
         FusionTransport.ConnectionTiming connectionTiming = FusionTransport.ConnectionTiming.Unavailable;
         /// <summary>HUD와 CSV가 공유하는 SDK RTT. 측정 전에는 -1이며 제어 메시지 RTT로 대체하지 않는다.</summary>
         public double NetworkRttSeconds => connectionTiming.RttSeconds;
@@ -119,6 +122,12 @@ namespace Knockbox.Game.Online
             string netsim = ReplayCheck.StringArg("-netsim");
             fusionTransport = connection as FusionTransport;
             bool usePrediction = fusionTransport != null;
+            if (usePrediction)
+            {
+                var wire = fusionTransport;
+                cardHover = new CardHoverRelay((round, sequence, option) => wire.Connection?.SendCardHover(round, sequence, option));
+                if (wire.Connection != null) wire.Connection.CardHover = cardHover;
+            }
             if (usePrediction) delay = FusionPredictionPolicy.DelayTicks;
             connectionTiming = FusionTransport.ConnectionTiming.Unavailable;
             link = null;
@@ -169,7 +178,9 @@ namespace Knockbox.Game.Online
             runner.Lockstep = null;
             session.Dispose();
             session = null;
+            if (fusionTransport != null && fusionTransport.Connection != null) fusionTransport.Connection.CardHover = null;
             fusionTransport = null;
+            cardHover = null;
             connectionTiming = FusionTransport.ConnectionTiming.Unavailable;
         }
 

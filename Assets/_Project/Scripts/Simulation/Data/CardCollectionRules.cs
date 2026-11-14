@@ -12,9 +12,15 @@ namespace Knockbox.Simulation
         public const int CountBeatTicks = 60;
         public const int GoTicks = 24;
         public const int CountInTicks = CountBeatTicks * 3 + GoTicks;
+        /// <summary>연출 모드의 확정 대기(2026-11-14~, 2.4초).</summary>
+        public const int LongPickHoldTicks = 144;
         public static bool HasCountIn(in MatchParams match) => match.CollectCardsOnly && match.CountdownTicks >= RebuildTicks + CountInTicks;
 
-        public static SimConfig Apply(SimConfig source, bool motion = true, bool cinematic = true, bool extendedIntro = true)
+        /// <param name="longPickHold">
+        /// 2026-11-14부터 모놀리스 카드 선택의 확정 연출(충전·곡선 도약·내리찍기·흡수) 시간을 위해 확정 대기를 84틱에서 144틱으로 늘렸다.
+        /// 그 전 기록은 false(84틱)로 재현한다.
+        /// </param>
+        public static SimConfig Apply(SimConfig source, bool motion = true, bool cinematic = true, bool extendedIntro = true, bool longPickHold = true)
         {
             var match = source.Match;
             match.CollectCardsOnly = true;
@@ -37,7 +43,7 @@ namespace Knockbox.Simulation
                     // 기존 v8 리플레이의 90틱 소개도 같은 입력/상태 형식으로 재현한다.
                     match.IntroCountdownTicks = (extendedIntro ? IntroVsTicks : 90) + match.CountdownTicks;
                     match.KoTicks = 156;
-                    match.PickHoldTicks = 84;
+                    match.PickHoldTicks = longPickHold ? LongPickHoldTicks : 84;
                 }
             }
             var rules = source.Rules;

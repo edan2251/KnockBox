@@ -35,6 +35,8 @@ namespace Knockbox.Game.Online
         internal PlayerRef Peer => peer;
         public FusionPredictionSession Prediction { get; private set; }
         internal bool PredictionPeerReady { get; private set; }
+        /// <summary>받은 카드 호버를 넘길 곳(OnlineMatch가 경기마다 연결). 없으면 버린다.</summary>
+        internal CardHoverRelay CardHover { get; set; }
 
         internal bool CanSend => !stopping && transport != null && !transport.Ended && hasPeer && network != null && network.IsRunning;
 
@@ -210,6 +212,8 @@ namespace Knockbox.Game.Online
         internal void FailPrediction(string message) => transport.MarkEnded(message, EndReason.Desync);
         internal void SendPredictionBatch(byte[] batch)
         { if (CanSend) Rpc_PredictionBatch(network, peer, batch); }
+        internal void SendCardHover(ushort round, ushort sequence, sbyte option)
+        { if (CanSend) Rpc_CardHover(network, peer, round, sequence, option); }
 
         [Rpc(Channel = RpcChannel.Reliable, TickAligned = false, InvokeLocal = false, HostMode = RpcHostMode.SourceIsHostPlayer)]
         public static void Rpc_PredictionReady(NetworkRunner runner, [RpcTarget] PlayerRef target, RpcInfo info = default)
@@ -236,6 +240,16 @@ namespace Knockbox.Game.Online
             var connection = runner.GetComponent<FusionConnection>();
             if (connection == null || connection.stopping || !connection.hasPeer || info.Source != connection.peer) return;
             connection.transport.Receive(fragment, Time.realtimeSinceStartupAsDouble);
+        }
+
+        // 카드 선택 무대의 호버(표시 전용). 잃어도 0.25초마다 다시 오므로 비신뢰 채널을 쓴다.
+        // 시뮬레이션 입력·확정 기록·체크섬·리플레이에는 들어가지 않는다.
+        [Rpc(Channel = RpcChannel.Unreliable, TickAligned = false, InvokeLocal = false, HostMode = RpcHostMode.SourceIsHostPlayer)]
+        public static void Rpc_CardHover(NetworkRunner runner, [RpcTarget] PlayerRef target, ushort round, ushort sequence, sbyte option, RpcInfo info = default)
+        {
+            var connection = runner.GetComponent<FusionConnection>();
+            if (connection == null || connection.stopping || !connection.hasPeer || info.Source != connection.peer) return;
+            connection.CardHover?.Receive(round, sequence, option, Time.realtimeSinceStartupAsDouble);
         }
 
         internal void RequestShutdown() => _ = ShutdownAsync();

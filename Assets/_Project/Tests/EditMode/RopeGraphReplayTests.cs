@@ -148,7 +148,8 @@ namespace Knockbox.Tests.EditMode
             CollectionAssert.AreEqual(first,second,"같은 입력의 두 실행이 같아야 합니다.");
             TestContext.WriteLine($"config={c.ComputeChecksum():X8} broken={broken} stretch={stretch} drop={drop} idleDrop={idleDrop} t299={first[299]:X8} t599={first[599]:X8}");
             string actual=$"config={c.ComputeChecksum():X8} broken={broken} t299={first[299]:X8} t599={first[599]:X8}";
-            Assert.AreEqual(0xB1E12A79u.ToString("X8"),c.ComputeChecksum().ToString("X8"),"튜닝/실행 설정이 바뀌었습니다. 의도한 변경인지 확인하세요. "+actual);
+            // 2026-11-14: 사용자 승인(4b)으로 카드 선택 확정 대기 PickHoldTicks 84→144틱. 설정 해시만 B1E12A79→D99CF165로 바뀌고 아래 물리 기준값은 그대로다.
+            Assert.AreEqual(0xD99CF165u.ToString("X8"),c.ComputeChecksum().ToString("X8"),"튜닝/실행 설정이 바뀌었습니다. 의도한 변경인지 확인하세요. "+actual);
             Assert.AreEqual(4,broken,actual);
             Assert.AreEqual(0x41814349u.ToString("X8"),first[299].ToString("X8"),"물리 결과가 기준과 다릅니다. "+actual);
             Assert.AreEqual(0x863FA985u.ToString("X8"),first[599].ToString("X8"),"물리 결과가 기준과 다릅니다. "+actual);

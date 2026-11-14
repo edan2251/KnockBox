@@ -112,6 +112,16 @@ namespace Knockbox.Presentation
         /// <summary>이긴 쪽이 통통 튀며 기뻐한다(KO 연출, 연출 전용 오프셋).</summary>
         public bool Celebrating { get; set; }
 
+        /// <summary>
+        /// 표시 전용 대기 연출(카드 선택 무대): 바라볼 월드 지점, 기울기(도, 양수는 반시계), 숨쉬기 크기(세로 비율).
+        /// 시뮬레이션 상태가 아니며 ResetPose에서 지운다.
+        /// </summary>
+        public Vector2? LookTarget { get; set; }
+        public float StageLean { get; set; }
+        public float StageBreath { get; set; }
+        float stageLean, breathTime;
+        Vector2 look;
+
         /// <summary>몸 전체 흰색 번쩍임(초).</summary>
         public void Flash(float duration) => flashLeft = Mathf.Max(flashLeft, duration);
 
@@ -196,6 +206,10 @@ namespace Knockbox.Presentation
             trailTimer = 0f;
             celebrateTime = 0f;
             Celebrating = false;
+            LookTarget = null;
+            StageLean = stageLean = 0f;
+            StageBreath = breathTime = 0f;
+            look = Vector2.zero;
             SetShattered(false);
             for (int i = 0; i < GhostCount; i++)
             {
@@ -320,8 +334,15 @@ namespace Knockbox.Presentation
             gravityAngle = Mathf.LerpAngle(gravityAngle, up, frozen ? 0f : 1f - Mathf.Exp(-25f * dt));
             var foot = Quaternion.Euler(0f, 0f, gravityAngle) * new Vector3(wallShift + jitter.x, (VisualLift - BodySize * 0.5f + jitter.y + hop) * size, 0f);
             pose.localPosition = foot;
-            pose.localScale = new Vector3(scale.x * size, scale.y * size, 1f);
-            pose.localRotation = Quaternion.Euler(0f, 0f, gravityAngle + tilt + spin);
+            stageLean = Mathf.Lerp(stageLean, StageLean, 1f - Mathf.Exp(-8f * dt));
+            float breath = 0f;
+            if (StageBreath > 0f)
+            {
+                breathTime += dt;
+                breath = Mathf.Sin(breathTime * Mathf.PI * 2f / 2.6f) * StageBreath;
+            }
+            pose.localScale = new Vector3(scale.x * size * (1f - breath * .5f), scale.y * size * (1f + breath), 1f);
+            pose.localRotation = Quaternion.Euler(0f, 0f, gravityAngle + tilt + spin + stageLean);
 
             UpdateColors(current, dt, config);
             UpdateEyes(current, dt);
@@ -618,6 +639,15 @@ namespace Knockbox.Presentation
             // 바라보는 쪽과 속도 쪽을 본다.
             float lookX = f.Facing * 0.08f + Mathf.Clamp(f.Velocity.X * 0.004f, -0.04f, 0.04f);
             float lookY = Mathf.Clamp(f.Velocity.Y * 0.004f, -0.06f, 0.06f);
+            if (LookTarget.HasValue)
+            {
+                // 표시 전용 시선: 목표 쪽으로 눈동자를 옮기고 부드럽게 따라간다.
+                var toward = (LookTarget.Value - (Vector2)pose.TransformPoint(new Vector3(0f, 0.6f, 0f))).normalized;
+                look = Vector2.Lerp(look, new Vector2(toward.x * 0.1f, toward.y * 0.07f), 1f - Mathf.Exp(-12f * dt));
+                lookX = look.x;
+                lookY = look.y;
+            }
+            else look = new Vector2(lookX, lookY);
             for (int i = 0; i < 2; i++)
             {
                 float side = i == 0 ? -0.17f : 0.17f;

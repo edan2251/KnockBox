@@ -41,6 +41,72 @@ namespace Knockbox.EditorTools
             for(int i=0;i<a.definition.RopeCount;i++)MapRopeTools.Create(a,a.definition.Rope(i),i);
             Undo.RecordObjects(new UnityEngine.Object[]{a,a.spawn0,a.spawn1},"맵 불러오기");
             a.spawn0.position=a.definition.Spawn(0);a.spawn1.position=a.definition.Spawn(1);a.MarkLoaded();
+            LoadReward(a);
+            EditorSceneManager.MarkSceneDirty(a.gameObject.scene);
+        }
+        /// <summary>보상 맵 비석 상자 색(지형과 구별되는 모놀리스 몸체색).</summary>
+        public static Color SteleColor=>PaletteAsset.MonolithDefaults.Body;
+        /// <summary>
+        /// 보상 맵이면 비석을 비석 묶음의 상자 핸들로, 패자 자리를 표시 오브젝트로 불러온다. 보상 맵이 아니면 비석 핸들을 치운다.
+        /// 비석이 하나도 없는 보상 맵이면 기본 비석 3개를 만든다(맵 저장 전까지 파일은 그대로).
+        /// </summary>
+        public static void LoadReward(MapAuthoring a)
+        {
+            foreach(var h in a.RewardHandles())Undo.DestroyObjectImmediate(h.gameObject);
+            Undo.RecordObject(a,"보상 맵 불러오기");
+            if(a.definition==null||!a.definition.IsRewardMap)
+            {
+                a.MarkRewardLoaded(false);
+                if(a.rewardStand!=null){Undo.RecordObject(a.rewardStand.gameObject,"보상 맵 불러오기");a.rewardStand.gameObject.SetActive(false);}
+                return;
+            }
+            EnsureRewardObjects(a);
+            a.shapes.Activate();
+            if(a.definition.SteleCount==0)
+                for(int i=0;i<MapDefinition.RewardSteleCount;i++)CreateStele(a,DefaultStele(-4.5f+i*7.5f,a.definition.LoserStand.y),i);
+            else
+                for(int i=0;i<a.definition.SteleCount;i++)CreateStele(a,a.definition.Stele(i).ToBox(),i);
+            Undo.RecordObjects(new UnityEngine.Object[]{a.rewardStand,a.rewardStand.gameObject},"보상 맵 불러오기");
+            a.rewardStand.position=a.definition.LoserStand;a.rewardStand.gameObject.SetActive(true);
+            a.MarkRewardLoaded(true);
+        }
+        static MapBox DefaultStele(float minX,float floorY)=>new MapBox
+        {
+            id="stele_"+Guid.NewGuid().ToString("N"),kind=Knockbox.Simulation.TerrainKind.Solid,minX=minX,maxX=minX+6,minY=floorY,maxY=floorY+15,
+            vertices=new[]{new Vector2(minX,floorY),new Vector2(minX+6,floorY),new Vector2(minX+6,floorY+15),new Vector2(minX,floorY+15)},
+        };
+        static void EnsureRewardObjects(MapAuthoring a)
+        {
+            if(a.rewardRoot==null)
+            {
+                var go=new GameObject("Reward_Steles");Undo.RegisterCreatedObjectUndo(go,"보상 맵 비석 묶음");
+                go.transform.SetParent(a.terrainRoot.parent,false);go.transform.position=Vector3.zero;a.rewardRoot=go.transform;
+            }
+            if(a.rewardStand==null)
+            {
+                var go=new GameObject("Reward_Loser_Stand");Undo.RegisterCreatedObjectUndo(go,"보상 맵 패자 자리");
+                go.transform.SetParent(a.spawn0.parent,false);a.rewardStand=go.transform;
+                if(EditorGUIUtility.IconContent("sv_label_4").image is Texture2D icon)EditorGUIUtility.SetIconForObject(go,icon);
+            }
+        }
+        static MapBoxHandle CreateStele(MapAuthoring a,MapBox box,int index)
+        {
+            var sr=ShapeLibrary.Create(a.rewardRoot,MapBoxHandle.SteleName(index),a.shapes.Square,SortingLayers.Terrain,0,SteleColor);
+            // 만든 오브젝트를 먼저 Undo에 등록해야 되돌릴 때 컴포넌트 없는 빈 오브젝트가 남지 않는다.
+            Undo.RegisterCreatedObjectUndo(sr.gameObject,"보상 맵 비석");
+            var handle=sr.gameObject.AddComponent<MapBoxHandle>();handle.MarkRewardStele();handle.Initialize(box,index);
+            return handle;
+        }
+        /// <summary>비석 하나를 오른쪽 끝에 더한다(폭 6·높이 15 직사각형). 크기 조절·두점자르기로 모양을 만든다.</summary>
+        public static void AddStele(MapAuthoring a)
+        {
+            if(a.definition==null||a.LoadedId!=a.definition.Id||!a.definition.IsRewardMap)throw new InvalidOperationException("보상 맵을 불러온 뒤 비석을 추가해주세요.");
+            if(!a.LoadedReward)LoadReward(a);
+            var handles=a.RewardHandles();
+            float right=handles.Length==0?-3:handles.Max(h=>h.Read().maxX)+1.5f;
+            a.shapes.Activate();
+            var created=CreateStele(a,DefaultStele(right,a.rewardStand.position.y),handles.Length);
+            Selection.activeGameObject=created.gameObject;
             EditorSceneManager.MarkSceneDirty(a.gameObject.scene);
         }
         public static MapDefinition Draft(MapAuthoring a)
@@ -51,6 +117,7 @@ namespace Knockbox.EditorTools
             {
                 trial.MakeEditableCopy(a.definition.Id,a.definition.DisplayName);
                 trial.SaveLayout(ordered,a.ReadOrderedPhysicalBoxes(),a.ReadOrderedRopes(),a.spawn0.position,a.spawn1.position);
+                if(a.LoadedReward)trial.SaveReward(trial.IsRewardMap,a.ReadSteles(),a.rewardStand.position);
                 return trial;
             }
             catch { UnityEngine.Object.DestroyImmediate(trial); throw; }
@@ -121,6 +188,8 @@ namespace Knockbox.EditorTools
                     return "현재 배치가 아직 맵에 저장되지 않았습니다. 맵 저장을 눌러주세요.";
                 if(a.definition.ToArena().ComputeGeometryChecksum()!=a.LoadedGeometry)
                     return "원본 맵 설정이 바뀌었습니다. 현재 배치를 유지하려면 맵 저장, 원본을 다시 열려면 맵 불러오기를 사용하세요.";
+                if(a.LoadedReward&&!draft.SameReward(a.definition))
+                    return "보상 맵 비석·패자 자리가 아직 맵에 저장되지 않았습니다. 맵 저장을 눌러주세요.";
                 return EditorUtility.IsDirty(a.definition)?"맵 설정 변경이 아직 저장되지 않았습니다. 맵 저장을 눌러주세요.":null;
             }
             catch(Exception e){return "저장 상태를 확인할 수 없습니다.\n"+e.Message;}
@@ -151,6 +220,18 @@ namespace Knockbox.EditorTools
                 foreach(var handle in a.terrainRoot.GetComponentsInChildren<MapBoxHandle>(true))handle.Initialize(a.definition.Box(handle.Order),handle.Order);
                 if(a.physicsRoot!=null)foreach(var handle in a.physicsRoot.GetComponentsInChildren<MapPhysicalBoxHandle>(true))handle.Initialize(a.definition.PhysicalBox(handle.Order),handle.Order);
                 foreach(var handle in MapRopeTools.Handles(a))handle.Initialize(a.definition.Rope(handle.Order),handle.Order,handle.Target,handle.Source);
+                if(a.LoadedReward)
+                {
+                    a.definition.SaveReward(a.definition.IsRewardMap,a.ReadSteles(),a.rewardStand.position);
+                    EditorUtility.SetDirty(a.definition);AssetDatabase.SaveAssetIfDirty(a.definition);
+                    // 저장 순서(화면 왼쪽부터)대로 번호를 다시 매기고 정확한 기준값을 다시 읽는다.
+                    var steles=a.RewardHandles().OrderBy(h=>h.Read().minX+h.Read().maxX).ToArray();
+                    for(int i=0;i<steles.Length&&i<a.definition.SteleCount;i++)
+                    {
+                        Undo.RecordObjects(new UnityEngine.Object[]{steles[i],steles[i].transform,steles[i].gameObject},"맵 저장");
+                        steles[i].Initialize(a.definition.Stele(i).ToBox(),i);
+                    }
+                }
                 EditorSceneManager.MarkSceneDirty(a.gameObject.scene);
             }
             finally{UnityEngine.Object.DestroyImmediate(draft);}
@@ -158,6 +239,7 @@ namespace Knockbox.EditorTools
         public static void Register(MapAuthoring a)
         {
             if(HasUnsavedPlacement(a))throw new InvalidOperationException("배치를 먼저 저장한 뒤 등록해주세요.");
+            if(a.definition.IsRewardMap)throw new InvalidOperationException("보상 맵은 경기 맵 목록에 등록하지 않습니다.");
             Undo.RecordObject(a.catalog,"맵 등록");a.catalog.Register(a.definition);
             EditorUtility.SetDirty(a.catalog);AssetDatabase.SaveAssetIfDirty(a.catalog);
         }
@@ -232,6 +314,7 @@ namespace Knockbox.EditorTools
         {
             if(a==null || a.definition==null || a.LoadedId!=a.definition.Id)
                 throw new InvalidOperationException("시험할 맵 정의를 먼저 불러와주세요.");
+            if(a.definition.IsRewardMap)throw new InvalidOperationException("보상 맵은 경기 맵으로 시험하지 않습니다. Main에서 연습을 시작해 세트를 진 뒤 확인하세요. 편집 중에는 미리보기를 사용하세요.");
             string pending=PendingSaveReason(a);
             if(!string.IsNullOrEmpty(pending))throw new InvalidOperationException(pending);
             var errors=a.definition.Validate();
@@ -369,6 +452,7 @@ namespace Knockbox.EditorTools
                 if(a.catalog!=null)foreach(var map in a.catalog.Maps)if(map!=null)EditorGUILayout.ObjectField(map.DisplayName,map,typeof(MapDefinition),false);
                 EditorGUILayout.HelpBox("최대 8개. 두 맵 이상이면 직전 라운드와 다른 맵을 고릅니다. 목록은 다음 경기부터 적용합니다.",MessageType.None);
             }
+            RewardSection(a,loaded);
             theme=EditorGUILayout.Foldout(theme,"맵 테마",true);
             if(theme&&a.definition!=null)
             {
@@ -391,6 +475,52 @@ namespace Knockbox.EditorTools
             MapInspectorLayout.Guide();
         }
         void Field(string name,string label)=>EditorGUILayout.PropertyField(serializedObject.FindProperty(name),new GUIContent(label));
+        bool reward=true,rewardValues=true;
+        /// <summary>보상(카드 선택) 맵: 보상 맵 여부, 비석·패자 자리, 장면 값(광원·원근·점등·대기 캐릭터·HUD), 미리보기.</summary>
+        void RewardSection(MapAuthoring a,bool loaded)
+        {
+            if(a.definition==null)return;
+            reward=EditorGUILayout.Foldout(reward,"보상 맵 · 카드 선택 장면",true);
+            if(!reward)return;
+            var settings=new SerializedObject(a.definition);settings.Update();
+            using(new EditorGUI.DisabledScope(a.definition.PreservedBaseline))
+            {
+                EditorGUI.BeginChangeCheck();
+                EditorGUILayout.PropertyField(settings.FindProperty("rewardMap"),new GUIContent("보상 맵으로 사용"));
+                bool toggled=EditorGUI.EndChangeCheck();
+                settings.ApplyModifiedProperties();
+                if(toggled&&loaded)Run(()=>MapAuthoringOperations.LoadReward(a),a.definition.IsRewardMap?"비석·패자 자리를 불러왔습니다. 맵 저장으로 반영하세요.":"보상 맵을 껐습니다. 맵 저장으로 반영하세요.");
+            }
+            if(!a.definition.IsRewardMap)
+            {
+                EditorGUILayout.HelpBox("카드 선택 장면용 맵에서만 켭니다. 일반 경기 맵에는 쓰지 않습니다.",MessageType.None);
+                return;
+            }
+            int count=a.LoadedReward?a.RewardHandles().Length:a.definition.SteleCount;
+            EditorGUILayout.HelpBox($"비석 {count}/{MapDefinition.RewardSteleCount}개. 비석은 Reward_Steles 아래 상자입니다. 상자 크기 조절과 두점자르기로 모양을 만들고, 바닥 위에 세웁니다.\n"
+                +"P1이 고를 때(패자 왼쪽, 비석 오른쪽) 배치로 만듭니다. P2가 고르면 좌우를 뒤집습니다. 선택지 순서는 화면 왼쪽부터입니다.\n"
+                +"패자 자리는 Reward_Loser_Stand(발 위치)를 옮깁니다. 바닥·비석·패자 자리·아래 값은 모두 맵 저장으로 이 맵 파일에 저장됩니다.",MessageType.None);
+            using(new EditorGUI.DisabledScope(!loaded||a.definition.PreservedBaseline))
+            {
+                if(GUILayout.Button("비석 추가"))Run(()=>MapAuthoringOperations.AddStele(a),"비석을 추가했습니다. 크기 조절·두점자르기 뒤 맵 저장을 누르세요.");
+                using(new EditorGUI.DisabledScope(a.rewardStand==null))
+                    if(GUILayout.Button("패자 자리 선택"))Selection.activeTransform=a.rewardStand;
+            }
+            rewardValues=EditorGUILayout.Foldout(rewardValues,"장면 값 · 광원 / 원근 / 점등 / 대기 캐릭터 / HUD",true);
+            if(rewardValues)
+            {
+                settings.Update();
+                using(new EditorGUI.DisabledScope(a.definition.PreservedBaseline))
+                    EditorGUILayout.PropertyField(settings.FindProperty("reward"),new GUIContent("장면 값"),true);
+                settings.ApplyModifiedProperties();
+                EditorGUILayout.HelpBox("값을 바꾼 뒤에도 맵 저장을 누르세요. 비석 색·카드 면 배치는 Prefabs/CardPick/Monolith 프리팹에서 바꿉니다.",MessageType.None);
+            }
+            serializedObject.Update();
+            Field("rewardPreview","모놀리스 미리보기");
+            if(a.rewardPreview){Field("rewardPreviewHover","켤 선택지 (-1 모두 꺼짐)");Field("rewardPreviewMirror","P2 선택처럼 좌우 반전");}
+            serializedObject.ApplyModifiedProperties();
+            if(a.rewardPreview)EditorGUILayout.HelpBox("미리보기는 저장되지 않는 화면 표시입니다. 샘플 카드로 그리고, 광원 위치와 패자 자리를 씬 뷰에 표시합니다. 그림자와 대기 캐릭터는 Play에서 확인하세요.",MessageType.None);
+        }
         void OnSceneGUI()=>MapPlacementSnap.DrawGrid((MapAuthoring)target);
         void Run(Action action,string done){try{action();message=done;messageType=MessageType.Info;}catch(Exception e){message=e.Message;messageType=MessageType.Error;}Repaint();}
     }
@@ -410,6 +540,8 @@ namespace Knockbox.EditorTools
                 Field("boundary","경계 반동");Field("spawn0","P1 발 위치");Field("spawn1","P2 발 위치");
                 Field("mapTheme","맵 테마");Field("theme","기존 테마 번호");Field("light","광원 위치");
                 Field("ceiling","천장 표시");Field("shadow","그림자 농도");
+                Field("rewardMap","보상 맵(카드 선택)");
+                if(d.IsRewardMap){Field("loserStand","패자 자리(P1 배치 발 위치)");Field("reward","보상 장면 값");}
             }
             serializedObject.ApplyModifiedProperties();
             MapAuthoringOperations.RefreshLoadedThemePreviews(d);
@@ -433,6 +565,12 @@ namespace Knockbox.EditorTools
             serializedObject.ApplyModifiedProperties();
             var box=(MapBoxHandle)target;var a=box.GetComponentInParent<MapAuthoring>();
             if(targets.Length==1)MapTerrainCut.Inspector(box);
+            if(box.IsRewardStele)
+            {
+                EditorGUILayout.HelpBox("보상 맵 비석입니다(지형 아님). Transform 위치는 중심, Scale X/Y는 폭·높이입니다. 두점자르기로 옆변을 기울이고 위 모서리를 깎습니다. 선택지 순서는 저장할 때 화면 왼쪽부터 정합니다.",MessageType.Info);
+                if(a!=null)MapInspectorLayout.Navigation(a);
+                return;
+            }
             EditorGUILayout.HelpBox("Transform 위치는 중심, Scale X/Y는 폭·높이입니다. 직접 삭제한 뒤에는 도형 순서 정리로 빈 번호를 메울 수 있습니다. 번호는 자동 관리합니다.",MessageType.Info);
             if(a==null)return;
             if(GUILayout.Button("도형 순서 정리"))

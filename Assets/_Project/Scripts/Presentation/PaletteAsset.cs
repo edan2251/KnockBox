@@ -90,6 +90,39 @@ namespace Knockbox.Presentation
             public static Color InactiveLeft => Hex(0x100D09);
             public static Color InactiveRight => Hex(0x0D0813);
         }
+        /// <summary>모놀리스 카드 선택(꺼진 상태)의 기본 색. 에셋 필드가 아니므로 팔레트 버전과 무관하다.</summary>
+        public static class MonolithDefaults
+        {
+            public static Color Body => Hex(0x272C42);
+            public static Color BodyLit => Hex(0x5A5238);
+            public static Color Rim => Hex(0x737CA0);
+            public static Color RimLit => Hex(0xFFE08A);
+            public static Color Face => Hex(0x323851);
+            public static Color FaceLit => Hex(0x6E6440);
+            public static Color IconFill => Hex(0xF4C64E);
+            public static Color Stripe => new Color32(255, 236, 170, 90);
+            public static Color Icon => Hex(0xC9CED8);
+            public static Color IconOnFill => Hex(0x2A2210);
+            public static Color NameBand => Hex(0x141726);
+            public static Color NameText => Hex(0xE8EAED);
+            public static Color NameLit => Hex(0xFFD54A);
+            public static Color Panel => Hex(0x0A0C15);
+            public static Color Positive => Hex(0xA6E35F);
+            public static Color Negative => Hex(0xFF5A63);
+            /// <summary>급한 남은 초가 바뀌는 순간의 번쩍임.</summary>
+            public static Color NegativeFlash => Hex(0xFFE3E5);
+            public static Color NeutralText => Hex(0xF2F3F5);
+            public static Color DimText => Hex(0xC5C9D3);
+            public static Color Silhouette => Hex(0x06070B);
+            public static Color SilhouetteRim => Hex(0x2B3044);
+            public static Color SilhouetteText => Hex(0x5E6475);
+            public static Color HitArea => Color.clear;
+            public static Color LabelOutline => new Color32(5, 6, 12, 220);
+            /// <summary>진입 기운의 밝은 쪽(플레이어 색과 섞어 카드 면 발광에 쓴다).</summary>
+            public static Color EnergyHighlight => Hex(0xFFFFFF);
+            /// <summary>진입 기운이 찬 동안 그림 영역 사선 무늬(옅게).</summary>
+            public static Color EnergyStripe => new Color32(255, 255, 255, 31);
+        }
         /// <summary>토큰 구성이 바뀌면 올린다. ProjectSetup이 낮은 버전의 에셋을 새 기본값으로 바꾼다.</summary>
         public const int CurrentVersion = 2;
         /// <summary>

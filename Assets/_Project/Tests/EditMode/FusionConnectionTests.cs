@@ -15,7 +15,8 @@ namespace Knockbox.Tests.EditMode
         public void DefaultPredictionVersion_IsTrimmedAndIsolatesEarlierComparisonBuilds()
         {
             string version = FusionPredictionPolicy.ConnectionVersion("same");
-            Assert.AreEqual("same-prediction1-snapshot8692-tick60-delay3", version);
+            Assert.AreEqual("same-prediction1-snapshot8692-tick60-delay3-hover1-hold144", version);
+            Assert.AreNotEqual("same-prediction1-snapshot8692-tick60-delay3", version, "카드 호버 RPC가 없는 이전 빌드와는 접속하지 않는다");
             Assert.AreEqual(version, FusionPredictionPolicy.ConnectionVersion(" same "));
             Assert.AreNotEqual("same", version);
             Assert.AreNotEqual("same-prediction1-snapshot8692-tick60-delay2", version);

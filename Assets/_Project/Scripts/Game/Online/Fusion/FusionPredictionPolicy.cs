@@ -14,7 +14,9 @@ namespace Knockbox.Game.Online
         {
             if (string.IsNullOrWhiteSpace(version))
                 throw new FusionSetupException("Photon 게임 버전을 설정해주세요.");
-            return $"{version.Trim()}-prediction1-snapshot{FusionWorldSnapshot.ByteCount}-tick60-delay{DelayTicks}";
+            // hover1: 카드 선택 호버 RPC가 있는 빌드끼리만 접속한다(RPC 목록이 다르면 서로 맞지 않는다).
+            // hold144: 카드 선택 확정 대기가 144틱인 설정끼리만 접속한다(설정 체크섬이 다르면 같은 경기를 진행할 수 없다).
+            return $"{version.Trim()}-prediction1-snapshot{FusionWorldSnapshot.ByteCount}-tick60-delay{DelayTicks}-hover1-hold{CardCollectionRules.LongPickHoldTicks}";
         }
 
         public static NetworkProjectConfig CreateConfig(NetworkProjectConfig source)

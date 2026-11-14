@@ -7,6 +7,7 @@ namespace Knockbox.Game.Maps
     public sealed class MapBoxHandle : MonoBehaviour
     {
         [SerializeField] int order;
+        [SerializeField,HideInInspector] bool rewardStele;
         [SerializeField,HideInInspector] MapBox original;
         [SerializeField,HideInInspector] Vector3 loadedPosition,loadedScale;
         public int Order=>order;
@@ -21,7 +22,11 @@ namespace Knockbox.Game.Maps
             RefreshShape();
         }
         public static string ObjectName(int index)=>"Terrain_Box_"+index;
-        public void SetOrder(int index){order=index;gameObject.name=ObjectName(index);}
+        public static string SteleName(int index)=>"Reward_Stele_"+index;
+        /// <summary>보상 맵 비석 상자. 지형이 아니며 같은 크기 조절·두점자르기 도구로 편집한다.</summary>
+        public bool IsRewardStele=>rewardStele;
+        public void MarkRewardStele()=>rewardStele=true;
+        public void SetOrder(int index){order=index;gameObject.name=rewardStele?SteleName(index):ObjectName(index);}
         public MapBox Read()
         {
             var b=original.Copy();

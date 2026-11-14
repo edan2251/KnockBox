@@ -80,6 +80,15 @@ namespace Knockbox.Game.UI
                 practiceReadySent = runner.RequestRematch(runner.LocalPlayerSlot);
         }
 
+        /// <summary>이번 라운드에 카드 선택을 이미 보냈는지. 온라인 확정 전에 두 번째 카드를 보내지 않게 한다.</summary>
+        public bool CardSubmitted => runner != null && runner.FrontendWorld != null && submittedRound == runner.FrontendWorld.State.Match.Round;
+
+        /// <summary>모놀리스 선택 무대도 기존 카드 UI와 같은 경로(FrontendInputSource.Choose)로 선택을 보낸다.</summary>
+        public void ChooseCard(int index) => Choose(index);
+
+        /// <summary>모놀리스 무대가 켜져 있으면 기존 카드 화면 대신 경기 화면(Hidden) 위에서 고른다.</summary>
+        bool MonolithPick => presenter != null && presenter.CardPickStage != null && presenter.CardPickStage.UsesMonoliths;
+
         void Choose(int index)
         {
             if(submittedRound==runner.FrontendWorld.State.Match.Round)return;
@@ -109,7 +118,7 @@ namespace Knockbox.Game.UI
             if(session!=null && session.State!=SessionState.Running) desired=FrontendScreen.Waiting;
             else if(!online.Active && lobby.IsOpen) desired=joinEntry?FrontendScreen.Join:createEntry||lobby.Busy?FrontendScreen.Waiting:FrontendScreen.Main;
             else if(m.Phase==MatchPhase.Countdown && m.Round==1 && m.PhaseTick<View.IntroRevealTick) desired=FrontendScreen.Versus;
-            else if(m.Phase==MatchPhase.SetPick) desired=FrontendScreen.Cards;
+            else if(m.Phase==MatchPhase.SetPick) desired=MonolithPick?FrontendScreen.Hidden:FrontendScreen.Cards;
             else if(m.Phase==MatchPhase.MatchEnd) desired=FrontendScreen.Result;
             else desired=FrontendScreen.Hidden;
             if(desired!=previous)
@@ -145,8 +154,12 @@ namespace Knockbox.Game.UI
                     if(owned.Count>0)index=CardCollectionRules.CardIndex(owned.Get(owned.Count-1));
                 }
                 View.Cards(m.Picker,m.Picker==slot && m.PickedAt<0 && submittedRound!=m.Round,index,
-                    m.PickedAt<0?0:(m.PhaseTick-m.PickedAt)/(float)runner.World.Config.Match.PickHoldTicks,
+                    m.PickedAt<0?0:Mathf.Min(1,(m.PhaseTick-m.PickedAt)/(float)FrontendView.CardUiHoldTicks(runner.World.Config.Match)),
                     Mathf.Max(0,Mathf.CeilToInt((runner.World.Config.Match.PickTimeoutTicks-m.PhaseTick)/60f)));
+            }
+            // 획득 효과음은 기존 카드 화면과 모놀리스 무대가 같은 확정 시점을 쓴다.
+            if(desired==FrontendScreen.Cards||(m.Phase==MatchPhase.SetPick&&MonolithPick))
+            {
                 if(m.PickedAt>=0&&(m.PickedAt!=lastPickedAt||m.Picker!=lastPicker))presenter.SfxPlayer.Play(Presentation.Sfx.Grab,.5f,1.25f);
                 lastPickedAt=m.PickedAt;lastPicker=m.Picker;
             }

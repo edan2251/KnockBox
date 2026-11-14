@@ -274,7 +274,10 @@ namespace Knockbox.Game
                                             {
                                                 var cards = CardCollectionRules.Apply(config);
                                                 if (cards.ComputeChecksum() == recording.ConfigChecksum) return cards;
-                                                var previousIntro = CardCollectionRules.Apply(config, extendedIntro: false);
+                                                // 2026-11-14 전 기록: 확정 대기 84틱.
+                                                var previousHold = CardCollectionRules.Apply(config, longPickHold: false);
+                                                if (previousHold.ComputeChecksum() == recording.ConfigChecksum) return previousHold;
+                                                var previousIntro = CardCollectionRules.Apply(config, extendedIntro: false, longPickHold: false);
                                                 if (previousIntro.ComputeChecksum() == recording.ConfigChecksum) return previousIntro;
                                                 var previousMotion = CardCollectionRules.Apply(config, cinematic: false);
                                                 if (previousMotion.ComputeChecksum() == recording.ConfigChecksum) return previousMotion;

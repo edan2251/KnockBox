@@ -53,6 +53,10 @@ namespace Knockbox.Game
         [SerializeField] AimLineView aimLine;
         [SerializeField] HelpOverlay help;
         [SerializeField] KoShatter koShatter;
+        [SerializeField, Tooltip("세트 패자의 모놀리스 카드 선택 무대. 비어 있으면 기존 카드 선택 UI를 사용합니다.")]
+        UI.CardPickStage cardPickStage;
+        /// <summary>카드 선택 무대가 소품을 숨겼는지. 무대가 끝난 첫 프레임에 되살린다.</summary>
+        bool stagePresented;
         readonly bool[] shattered = new bool[2];
         int countdownKey = -1;
         readonly WorldRendererBrightness worldBrightness = new WorldRendererBrightness();
@@ -94,6 +98,9 @@ namespace Knockbox.Game
         public HudView Hud => hud;
         public HelpOverlay Help => help;
         public KoShatter KoShatter => koShatter;
+        public UI.CardPickStage CardPickStage => cardPickStage;
+        /// <summary>지금 화면에 그린 맵(카드 선택 무대 중이면 선택 맵).</summary>
+        public ArenaDef BuiltArena => builtArena;
 
         /// <summary>연출 물리(KO 파편)를 켜고 끈다. 시뮬레이션 결과와 무관해야 한다(CP8-5).</summary>
         public bool PresentationPhysics
@@ -262,16 +269,8 @@ namespace Knockbox.Game
         /// <summary>맵을 그린다: 테마, 배경(빛과 그림자), 지형, KO 파편 충돌, 카메라 맞춤, HUD 위치.</summary>
         void BuildArena(ArenaDef arena)
         {
-            builtArena = arena;
             var meta = runner.GetMeta(arena.Name);
-            CurrentTheme = ThemeOverride >= 0 ? palette.Theme(ThemeIndex(arena)) : meta.ResolveTheme(palette);
-            background.Build(arena, CurrentTheme, palette, shapes, LightPosition(arena), meta.Shadow);
-            propShadows.SetMaterial(background.ShadowMaterial);
-            fighterShadows.SetMaterial(background.ShadowMaterial);
-            // 캐릭터 그림자는 실험 경기에서만(CR-004 D/E 피드백). 이전 장면의 측정 테스트는 그대로 둔다.
-            fighterShadows.SetLight(LightPosition(arena), runner.BrawlExperiment ? meta.Shadow : 0f);
-            background.ResetMotes();
-            arenaView.Build(arena, CurrentTheme, palette, shapes, runner.GetMeta(arena.Name).Ceiling);
+            BuildScenery(arena, meta);
             propView.Build(arena, CurrentTheme, shapes);
             propShadows.SetArena(arena, LightPosition(arena));
             boundaryView.SetArena(arena);
@@ -281,6 +280,77 @@ namespace Knockbox.Game
             hud.SetArena(arena);
             worldBrightness.Rebuild(arenaView.transform, propView.transform, fighter0.transform, fighter1.transform,
                 modelRig != null ? modelRig.transform : null);
+        }
+
+        /// <summary>테마, 배경(빛과 그림자), 지형 그림. 경기 맵과 표시 전용 무대 맵이 함께 쓴다.</summary>
+        void BuildScenery(ArenaDef arena, in ArenaMeta meta)
+        {
+            builtArena = arena;
+            var light = meta.HasLight ? meta.Light : BackgroundView.DefaultLight(arena);
+            CurrentTheme = ThemeOverride >= 0 ? palette.Theme(Mathf.Clamp(ThemeOverride, 0, palette.ThemeCount - 1)) : meta.ResolveTheme(palette);
+            background.Build(arena, CurrentTheme, palette, shapes, light, meta.Shadow);
+            propShadows.SetMaterial(background.ShadowMaterial);
+            fighterShadows.SetMaterial(background.ShadowMaterial);
+            // 캐릭터 그림자는 실험 경기에서만(CR-004 D/E 피드백). 이전 장면의 측정 테스트는 그대로 둔다.
+            fighterShadows.SetLight(light, runner.BrawlExperiment ? meta.Shadow : 0f);
+            background.ResetMotes();
+            arenaView.Build(arena, CurrentTheme, palette, shapes, meta.Ceiling);
+        }
+
+        /// <summary>
+        /// 카드 선택 무대처럼 시뮬레이션과 무관한 맵을 화면에만 그린다. 시뮬레이션의 현재 맵·소품 상태는 그대로이며
+        /// 다음 라운드(또는 RestoreMatchArena)에서 경기 맵을 다시 그린다.
+        /// </summary>
+        public void BuildStageArena(ArenaDef arena, in ArenaMeta meta)
+        {
+            BuildScenery(arena, meta);
+            koShatter.Clear();
+            if (cameraRig != null)
+                cameraRig.FitArena(arena);
+            worldBrightness.Rebuild(arenaView.transform, propView.transform, fighter0.transform, fighter1.transform,
+                modelRig != null ? modelRig.transform : null);
+        }
+
+        /// <summary>무대가 같은 라운드 안에서 끝났을 때 시뮬레이션의 현재 맵으로 되돌린다.</summary>
+        public void RestoreMatchArena()
+        {
+            if (runner.World != null && builtArena != runner.World.Arena)
+                BuildArena(runner.World.Arena);
+        }
+
+        /// <summary>
+        /// 카드 선택 무대의 한 프레임: 선택 맵을 세워 두고 고르는 패자만 보이게 한다. 경기 소품·KO 조각·월드 HUD는 숨긴다(상단 승점·하단 획득 목록은 FrontendView가 그대로 보인다).
+        /// FrontendView의 화면 처리 뒤에 불러 같은 프레임의 기존 퇴장 표시를 덮는다. 판정 상태는 바꾸지 않는다.
+        /// floorProgress는 바닥 재구성 진행도(배경도 이에 맞춰 서서히 켜짐), pickerVisible이 거짓이면 패자를 숨기고(위에서 떨어지기 전),
+        /// light는 조명 밝기(0~1), pulseElapsed는 켜진 뒤 밝기 펄스 경과초(-1 없음), exit(0~1)은 확정 뒤 퇴장 진행도(전투 맵 퇴장처럼 지형이 빠지고 배경이 꺼짐)다.
+        /// </summary>
+        public void PresentCardPickStage(int picker, float floorProgress, bool pickerVisible, float light, float pulseElapsed, float exit)
+        {
+            stagePresented = true;
+            light = Mathf.Clamp01(light);
+            exit = Mathf.Clamp01(exit);
+            if (exit > 0) arenaView.PresentTransition(exit, false);
+            else arenaView.PresentTransition(Mathf.Clamp01(floorProgress), true);
+            float opacity = exit > 0 ? 1 - UI.FrontendMotion.Smooth(exit) : UI.FrontendMotion.Out(Mathf.Clamp01(floorProgress));
+            background.SetTransitionOpacity(opacity);
+            background.SetRoundLightLevel(light);
+            background.SetRoundLightPulse(light >= 1 ? pulseElapsed : -1);
+            background.SetShadowVisibility(light * (1 - exit));
+            worldBrightness.SetBrightness(Mathf.Lerp(PreparationBrightness, 1, light));
+            propView.gameObject.SetActive(false);
+            propShadows.gameObject.SetActive(false);
+            koShatter.gameObject.SetActive(false);
+            fighter0.transform.localScale = Vector3.one * (picker == 0 && pickerVisible ? 1 : .0001f);
+            fighter1.transform.localScale = Vector3.one * (picker == 1 && pickerVisible ? 1 : .0001f);
+            if (modelRig != null) modelRig.gameObject.SetActive(modelFighter == picker && pickerVisible);
+            hud.gameObject.SetActive(false);
+            // 캐릭터 그림자는 숨긴 승자 자리에도 그려지므로 선택 장면에서는 끈다(비석 그림자는 무대가 그린다).
+            fighterShadows.gameObject.SetActive(false);
+            aimLine.gameObject.SetActive(false);
+            boundaryView.gameObject.SetActive(false);
+            brawlWeaponView.gameObject.SetActive(false);
+            fx.gameObject.SetActive(true);
+            dust.gameObject.SetActive(true);
         }
 
         void OnMatchBegan(MatchRunner r)
@@ -376,16 +446,27 @@ namespace Knockbox.Game
                 shattered[0] = shattered[1] = false;
                 alpha = 1f;
             }
+            // 카드 선택 무대: 화면에만 선택 맵을 그리고 패자를 표시 전용 상태로 세운다(시뮬레이션 상태는 읽기만 한다).
+            bool stage = cardPickStage != null && cardPickStage.BeginFrame();
+            if (!stage && stagePresented)
+            {
+                propView.gameObject.SetActive(true);
+                stagePresented = false;
+            }
+            var draw0Previous = previous.Fighter0; var draw0 = current.Fighter0;
+            var draw1Previous = previous.Fighter1; var draw1 = current.Fighter1;
+            if (stage && cardPickStage.TryGetFighter(0, out var stand0)) draw0Previous = draw0 = stand0;
+            if (stage && cardPickStage.TryGetFighter(1, out var stand1)) draw1Previous = draw1 = stand1;
             propView.TickFeedback(dt);
             propView.Render(previous.Props, current.Props, alpha);
-            fighter0.Render(previous.Fighter0, current.Fighter0, alpha, dt, world.Arena, world.Config);
-            fighter1.Render(previous.Fighter1, current.Fighter1, alpha, dt, world.Arena, world.Config);
+            fighter0.Render(draw0Previous, draw0, alpha, dt, world.Arena, world.Config);
+            fighter1.Render(draw1Previous, draw1, alpha, dt, world.Arena, world.Config);
             brawlWeaponView.Render(previous, current, alpha, dt, world.Config);
             aimLine.Render(runner, alpha);
             if (modelRig != null)
             {
-                var prevModel = modelFighter == 0 ? previous.Fighter0 : previous.Fighter1;
-                var curModel = modelFighter == 0 ? current.Fighter0 : current.Fighter1;
+                var prevModel = modelFighter == 0 ? draw0Previous : draw1Previous;
+                var curModel = modelFighter == 0 ? draw0 : draw1;
                 modelRig.Render(prevModel, curModel, alpha, dt, world.Config);
             }
             UpdateKnockout(current, world.Config);
@@ -428,19 +509,26 @@ namespace Knockbox.Game
             var frontend = GetComponent<UI.FrontendController>();
             if (frontend != null && frontend.View != null) frontend.View.PresentMatchFrame();
             else worldBrightness.SetBrightness(1);
+            if (stage) cardPickStage.Present();
         }
 
         /// <summary>시뮬레이션 렌더링 후 적용하는 화면 전용 이동. 지형/파이터의 판정 위치는 바꾸지 않는다.</summary>
         public void PresentFrontendStage(float progress, bool entering, float opacity, float scale0, float scale1, float rise, bool combat, bool roundLightOn = true, bool keepBackdrop = false)
+            => PresentFrontendStage(progress, entering, opacity, scale0, scale1, rise, combat, roundLightOn ? 1f : 0f, keepBackdrop);
+
+        /// <summary>roundLight는 조명 밝기(0~1). 꺼질 때 이징한 값을 넘기면 서서히 어두워지고, 1이 되면 빛 영역이 열린다.</summary>
+        public void PresentFrontendStage(float progress, bool entering, float opacity, float scale0, float scale1, float rise, bool combat, float roundLight, bool keepBackdrop = false)
         {
+            roundLight = Mathf.Clamp01(roundLight);
+            bool roundLightOn = roundLight >= 1;
             arenaView.PresentTransition(progress, entering);
             float away = entering ? 1 - UI.FrontendMotion.Out(progress) : progress * progress;
             propView.transform.localPosition = propShadows.transform.localPosition = Vector3.up * (entering ? 1 : -1) * away * (runner.World.Arena.Rows + 3);
             background.SetTransitionOpacity(keepBackdrop ? 1 : opacity);
-            background.SetRoundLight(roundLightOn);
+            background.SetRoundLightLevel(roundLight);
             var frontend = GetComponent<UI.FrontendController>();
             bool worldVisible = frontend == null || frontend.View == null || frontend.View.Screen == UI.FrontendScreen.Hidden;
-            worldBrightness.SetBrightness(entering && !roundLightOn && worldVisible ? PreparationBrightness : 1);
+            worldBrightness.SetBrightness(entering && worldVisible ? Mathf.Lerp(PreparationBrightness, 1, roundLight) : 1);
             bool shadowsReady = roundLightOn && (entering ? arenaView.TransitionSettled : progress <= 0);
             background.SetShadowVisibility(shadowsReady ? 1 : 0);
             propShadows.gameObject.SetActive(shadowsReady);
@@ -563,6 +651,11 @@ namespace Knockbox.Game
         }
 
         static Vector2 V(Vec2 v) => new Vector2(v.X, v.Y);
+
+        /// <summary>
+        /// 화면 전용 장면(카드 선택 등)이 경기와 같은 사건 연출(먼지·소리·흔들림·파이터 반응)을 내게 한다. 시뮬레이션 사건 목록에는 넣지 않는다.
+        /// </summary>
+        public void PresentDisplayEvent(in SimEvent e) => Consume(e);
 
         void Consume(in SimEvent e)
         {

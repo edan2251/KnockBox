@@ -66,6 +66,11 @@ namespace Knockbox.Game.Maps
         [SerializeField] Vector2 light=new Vector2(0,25);
         [SerializeField] bool ceiling=true;
         [SerializeField,Range(0,1)] float shadow=.65f;
+        // 보상(카드 선택) 맵 전용. 화면에만 쓰며 ToArena·지형 체크섬·온라인 목록·기록에 들어가지 않는다(일반 경기 맵은 비어 있음).
+        [SerializeField] bool rewardMap;
+        [SerializeField] RewardStele[] steles=Array.Empty<RewardStele>();
+        [SerializeField] Vector2 loserStand=new Vector2(-13.5f,-9);
+        [SerializeField] RewardStageSettings reward=new RewardStageSettings();
         public string Id=>stableId;
         public string DisplayName=>displayName;
         public string MatchName=>preservedBaseline?"Brawl":"map:"+stableId;
@@ -80,6 +85,13 @@ namespace Knockbox.Game.Maps
         public int RopeCount=>ropes?.Length??0;
         public MapRope Rope(int index)=>ropes[index];
         public Vector2 Spawn(int player)=>player==0?spawn0:spawn1;
+        /// <summary>보상(카드 선택) 맵인지. 보상 맵이면 비석·패자 자리·보상 장면 설정을 쓴다.</summary>
+        public bool IsRewardMap=>rewardMap;
+        public int SteleCount=>steles?.Length??0;
+        public RewardStele Stele(int index)=>steles[index].Copy();
+        /// <summary>P1이 고를 때 패자가 서는 발 위치. P2가 고르면 좌우를 뒤집는다.</summary>
+        public Vector2 LoserStand=>loserStand;
+        public RewardStageSettings Reward=>reward??=new RewardStageSettings();
         public ArenaMeta Metadata()=>new ArenaMeta{Theme=theme,HasLight=true,Light=light,Ceiling=ceiling,Shadow=shadow,Rotation=false,MapTheme=mapTheme};
 
         /// <summary>보존된 Brawl 원본의 판정 체크섬. 옛 txt "Brawl"과 같아야 과거 기록·온라인이 유지된다.</summary>
@@ -224,6 +236,36 @@ namespace Knockbox.Game.Maps
                     {errors.Add("P"+(p+1)+" 시작 위치가 물리 상자와 겹칩니다: "+i);break;}
             }
             if(Vector2.Distance(spawn0,spawn1)<bodySize)errors.Add("양쪽 시작 위치가 겹칩니다.");
+            if(rewardMap)errors.AddRange(ValidateReward(bodySize));
+            return errors;
+        }
+        /// <summary>보상 맵 규칙: 비석 3개, 볼록 다각형, 바닥 위에 섬, 서로·패자 자리와 겹치지 않음, 카드 면이 들어갈 최소 크기.</summary>
+        public const int RewardSteleCount=3;
+        public const float RewardMinHeight=10f,RewardMinWidth=4.5f;
+        List<string> ValidateReward(float bodySize)
+        {
+            var errors=new List<string>();
+            int count=SteleCount;
+            if(count!=RewardSteleCount)errors.Add("보상 맵의 비석은 "+RewardSteleCount+"개여야 합니다. 지금 "+count+"개");
+            var shapes=new List<MapBox>();
+            for(int i=0;i<count;i++)
+            {
+                var s=steles[i];string who="비석 "+(i+1);
+                if(s.vertices==null||s.vertices.Length<3){errors.Add(who+": 꼭짓점이 없습니다.");continue;}
+                MapBox box;
+                try{box=s.ToBox();box.ToBox();}
+                catch(ArgumentException e){errors.Add(who+": "+e.Message);continue;}
+                if(box.maxY-box.minY<RewardMinHeight)errors.Add(who+": 높이가 "+RewardMinHeight+"보다 낮아 그림 영역이 부족합니다.");
+                if(box.maxX-box.minX<RewardMinWidth)errors.Add(who+": 폭이 "+RewardMinWidth+"보다 좁아 글자가 너무 작아집니다.");
+                bool grounded=false;
+                foreach(var b in boxes)if(b.kind!=TerrainKind.OneWay&&Mathf.Abs(b.maxY-box.minY)<.05f&&b.minX<box.maxX&&b.maxX>box.minX){grounded=true;break;}
+                if(!grounded)errors.Add(who+": 아랫변이 바닥(고정 지형) 위에 닿아야 합니다.");
+                foreach(var b in boxes)if(b.kind!=TerrainKind.OneWay&&Overlaps(box,b)){errors.Add(who+": 지형과 겹칩니다: "+b.id);break;}
+                foreach(var other in shapes)if(Overlaps(box,other)){errors.Add(who+": 다른 비석과 겹칩니다.");break;}
+                var stand=new MapBox{minX=loserStand.x-bodySize*.5f,maxX=loserStand.x+bodySize*.5f,minY=loserStand.y,maxY=loserStand.y+bodySize};
+                if(Overlaps(stand,box))errors.Add(who+": 패자 자리와 겹칩니다.");
+                shapes.Add(box);
+            }
             return errors;
         }
         public static bool Finite(float n)=>!float.IsNaN(n)&&!float.IsInfinity(n);
@@ -270,6 +312,26 @@ namespace Knockbox.Game.Maps
             if(physics==null)throw new ArgumentNullException(nameof(physics));
             SaveGeometry(ordered,p0,p1);
             physicalBoxes=(MapPhysicalBox[])physics.Clone();ropes=(MapRope[])connections.Clone();
+        }
+        /// <summary>보상 맵 배치 저장: 비석(화면 왼쪽부터 정렬)과 패자 자리. 지형 배치(SaveLayout)와 별개다.</summary>
+        public void SaveReward(bool isReward,RewardStele[] ordered,Vector2 stand)
+        {
+            if(preservedBaseline)throw new InvalidOperationException("기존 Brawl은 보호됩니다. 사본을 편집해주세요.");
+            rewardMap=isReward;
+            var copy=Array.ConvertAll(ordered??Array.Empty<RewardStele>(),x=>x.Copy());
+            Array.Sort(copy,(a,b)=>a.Bounds.center.x.CompareTo(b.Bounds.center.x));
+            steles=copy;loserStand=stand;
+        }
+        public bool SameReward(MapDefinition other)
+        {
+            if(other==null||other.rewardMap!=rewardMap||other.SteleCount!=SteleCount||other.loserStand!=loserStand)return false;
+            for(int i=0;i<SteleCount;i++)
+            {
+                var a=steles[i].vertices;var b=other.steles[i].vertices;
+                if(a.Length!=b.Length)return false;
+                for(int k=0;k<a.Length;k++)if(a[k]!=b[k])return false;
+            }
+            return true;
         }
         public void MakeEditableCopy(string newId,string title){stableId=newId;displayName=title;preservedBaseline=false;revision=1;}
 #endif

@@ -73,13 +73,27 @@ namespace Knockbox.EditorTools
             }
             return found;
         }
+        /// <summary>보상 맵 비석의 아랫변을 가까운 바닥(고정 지형) 윗면에 맞춘다. 비석 상자의 범위가 곧 윤곽 범위다.</summary>
+        static bool TrySnapSteleBottom(MapAuthoring a,Vector3 p,Vector3 s,out Vector3 snapped)
+        {
+            snapped=p;float best=a.boxTopSnapDistance;bool found=false;float bottom=p.y-s.y*.5f;
+            foreach(var h in a.terrainRoot.GetComponentsInChildren<MapBoxHandle>())
+            {
+                var b=h.Read();
+                if(b.kind==TerrainKind.OneWay||b.kind==TerrainKind.Spike||p.x+s.x*.5f<=b.minX||p.x-s.x*.5f>=b.maxX)continue;
+                float d=Mathf.Abs(bottom-b.maxY);if(d>best)continue;
+                best=d;snapped=new Vector3(p.x,b.maxY+s.y*.5f,p.z);found=true;
+            }
+            return found;
+        }
         public static void Apply(MapAuthoring a, Transform t)
         {
-            bool spawn=t==a.spawn0||t==a.spawn1;
+            bool spawn=t==a.spawn0||t==a.spawn1||a.rewardStand!=null&&t==a.rewardStand;
             var box=t.GetComponent<MapBoxHandle>();
             var physical=t.GetComponent<MapPhysicalBoxHandle>();
             var rope=t.GetComponent<MapRopeHandle>();
-            if(!spawn && (box==null||t.parent!=a.terrainRoot) && (physical==null||t.parent!=a.physicsRoot) && (rope==null||t.parent!=a.ropeRoot))return;
+            bool stele=box!=null&&a.rewardRoot!=null&&t.parent==a.rewardRoot;
+            if(!spawn && !stele && (box==null||t.parent!=a.terrainRoot) && (physical==null||t.parent!=a.physicsRoot) && (rope==null||t.parent!=a.ropeRoot))return;
             Vector3 p=t.localPosition,s=t.localScale;
             if(a.gridSnap)
             {
@@ -87,6 +101,7 @@ namespace Knockbox.EditorTools
                 if(!spawn&&rope==null){s.x=Mathf.Max(.001f,Grid(s.x,a.gridStep));s.y=Mathf.Max(.001f,Grid(s.y,a.gridStep));}
             }
             if(physical!=null && a.boxTopSnap && TrySnapBoxTop(a,physical,p,s,out var boxPosition))p=boxPosition;
+            if(stele && a.boxTopSnap && TrySnapSteleBottom(a,p,s,out var stelePosition))p=stelePosition;
             if(spawn && a.spawnEdgeSnap && TrySnapFoot(a,t.parent.TransformPoint(p),out var foot))p=t.parent.InverseTransformPoint(foot);
             if(p.Equals(t.localPosition)&&s.Equals(t.localScale))return;
             Undo.RecordObject(t,"맵 배치 스냅");t.localPosition=p;t.localScale=s;

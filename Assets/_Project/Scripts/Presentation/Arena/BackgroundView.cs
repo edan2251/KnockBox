@@ -36,7 +36,9 @@ namespace Knockbox.Presentation
         float shadowDarkness = ShadowStrength;
         int width, height;
         public float ShadowVisibility { get; private set; } = 1;
-        public bool RoundLightOn { get; private set; } = true;
+        /// <summary>라운드 조명 밝기(1 켜짐 ~ 0 꺼짐). 꺼질 때는 부르는 쪽이 이징한 값을 넘겨 서서히 어두워진다.</summary>
+        public float RoundLightLevel { get; private set; } = 1;
+        public bool RoundLightOn => RoundLightLevel >= 1;
         public float RoundLightPulse { get; private set; }
         public Vector2 LightPosition => lightPoint;
         public Vector2 BaseLightPosition { get; private set; }
@@ -52,13 +54,18 @@ namespace Knockbox.Presentation
         }
 
         /// <summary>GO 전에는 배경 전체를 그림자 명암으로 놓고, GO에서 밝은 영역을 연다. 퇴장 페이드와 독립적이다.</summary>
-        public void SetRoundLight(bool on)
+        public void SetRoundLight(bool on) => SetRoundLightLevel(on ? 1 : 0);
+
+        /// <summary>조명 밝기를 0~1로 정한다. 0이면 배경 전체가 그림자 명암, 1이면 빛 영역이 열린다. 중간 값은 그 사이로 서서히 바뀐다.</summary>
+        public void SetRoundLightLevel(float level)
         {
-            if (RoundLightOn == on) return;
-            RoundLightOn = on;
-            if (baseMaterial != null) baseMaterial.SetFloat("_ShadowStrength", on ? 0 : shadowDarkness);
-            if (!on) SetRoundLightPulse(-1);
-            SetTransitionOpacity(transitionOpacity);
+            level = Mathf.Clamp01(level);
+            if (RoundLightLevel == level) return;
+            bool wasOn = RoundLightOn;
+            RoundLightLevel = level;
+            if (baseMaterial != null) baseMaterial.SetFloat("_ShadowStrength", shadowDarkness * (1 - level));
+            if (!RoundLightOn) SetRoundLightPulse(-1);
+            if (wasOn != RoundLightOn) SetTransitionOpacity(transitionOpacity);
         }
 
         /// <summary>GO의 빛 받는 배경만 잠깐 밝힌다. PhaseTick 기반 경과초이므로 렌더 프레임률과 무관하다.</summary>
@@ -123,7 +130,7 @@ namespace Knockbox.Presentation
                 baseMaterial = new Material(shader) { name = "Moving_background_light", hideFlags = HideFlags.HideAndDontSave };
                 ShadowMaterial = new Material(shader) { name = "Shared_sharp_shadows", hideFlags = HideFlags.HideAndDontSave };
             }
-            ConfigureMaterial(baseMaterial, texture, RoundLightOn ? 0 : shadowDarkness);
+            ConfigureMaterial(baseMaterial, texture, shadowDarkness * (1 - RoundLightLevel));
             ConfigureMaterial(ShadowMaterial, texture, shadowDarkness);
             SetRoundLightPulse(-1);
             if (baseSprite != null) Destroy(baseSprite);

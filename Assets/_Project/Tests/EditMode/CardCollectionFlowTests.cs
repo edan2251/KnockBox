@@ -201,7 +201,7 @@ namespace Knockbox.Tests.EditMode
         }
 
         [TestCase(false,0)] [TestCase(true,0)] [TestCase(false,1)] [TestCase(true,1)] [TestCase(false,2)] [TestCase(true,2)]
-        [TestCase(false,3)] [TestCase(true,3)]
+        [TestCase(false,3)] [TestCase(true,3)] [TestCase(false,4)] [TestCase(true,4)]
         public void RecordingConfigLookup_FindsCardFlowAndKeepsV8Format(bool online,int previousPresentation)
         {
             var root=new GameObject("Card lookup");root.SetActive(false);
@@ -215,8 +215,11 @@ namespace Knockbox.Tests.EditMode
                 if(previousPresentation > 0)
                 {
                     r.FrontendEnabled=false;
-                    c=CardCollectionRules.Apply(r.CreateConfig(),motion:previousPresentation>=2,
-                        cinematic:previousPresentation==3,extendedIntro:false);
+                    // 4: 2026-11-14 확정 대기 연장 전의 현재 설정(84틱). 1~3은 그보다 앞선 설정이다.
+                    c=previousPresentation==4?CardCollectionRules.Apply(r.CreateConfig(),longPickHold:false)
+                        :CardCollectionRules.Apply(r.CreateConfig(),motion:previousPresentation>=2,
+                        cinematic:previousPresentation==3,extendedIntro:false,longPickHold:false);
+                    if(previousPresentation==4)Assert.AreEqual(84,c.Match.PickHoldTicks,"연장 전 기록의 확정 대기 보존");
                     r.FrontendEnabled=true;
                     if(previousPresentation==3)
                         Assert.AreEqual(348,c.Match.CountdownForRound(1),"90틱 VS를 쓰던 v8 설정 보존");
