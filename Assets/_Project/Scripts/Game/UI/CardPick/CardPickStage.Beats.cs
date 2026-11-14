@@ -78,6 +78,26 @@ namespace Knockbox.Game.UI
             var fighter = presenter.Fighter(shownPicker);
             int c = confirmChosen;
             var rim = PaletteAsset.MonolithDefaults.Rim;
+            if (Due(19, pickStart))
+            {
+                // 클릭 반응: 비석이 쿵 하고 깨어난다(묵직한 흔들림·짧은 확대·밑동 먼지·낮은 소리).
+                BaseDust(c, 5, 3.2f);
+                if (rig != null) { rig.AddTrauma(.28f); rig.Punch(.014f, .1f); }
+                if (sfx != null) { sfx.Play(Sfx.HitStrong, .55f, .6f); sfx.Play(Sfx.Land, .6f, .7f); }
+            }
+            if (Due(20, pickStart + confirm.SecondSurgeTime))
+            {
+                // 두 번째 박동: 한 번 더 울린다.
+                BaseDust(c, 3, 2.2f);
+                if (rig != null) rig.AddTrauma(.18f);
+                if (sfx != null) sfx.Play(Sfx.HitWeak, .5f, .55f);
+            }
+            if (Due(21, pickStart + confirm.FilledTime))
+            {
+                // 꽉 참: 밝게 번쩍이며 아래로 눌리는 반동과 맑은 소리.
+                if (rig != null) { rig.AddTrauma(.2f); rig.Kick(Vector2.down, .08f, .012f, .16f); }
+                if (sfx != null) sfx.Play(Sfx.Countdown, .4f, 1.35f);
+            }
             if (Due(12, pickStart + confirm.LaunchTime))
             {
                 // 돌진 발사: 경기와 같은 발사 사건(먼지·바람 소리·흔들림·몸 늘어남)에, 발밑 땅 금과 큰 먼지를 더한다.

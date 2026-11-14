@@ -299,7 +299,7 @@ namespace Knockbox.Tests.EditMode
         }
 
         [Test]
-        public void Confirm_CoverFromClickUntilTouch_SlingshotOntoTop_ReboundJump_PerSteleTiming_SinkAndLand()
+        public void Confirm_ClickSurgeFill_SlingshotOntoTop_ReboundJump_PerSteleTiming_SinkAndLand()
         {
             Assert.AreEqual(144, CardPickStageTestsHold());
             float available = CardCollectionRules.LongPickHoldTicks / (float)SimConfig.TickRate - CardPickStage.ExitSeconds;
@@ -321,12 +321,18 @@ namespace Knockbox.Tests.EditMode
                 Assert.LessOrEqual(c.HopTime - c.TopLandTime, .06f, who + ": 꼭대기에 닿자마자 반동으로 다시 뛴다");
                 Assert.LessOrEqual(c.HopApex, CardPickConfirm.HopLimit + 1e-4f, who + ": 재도약 꼭대기는 화면 안");
                 Assert.GreaterOrEqual(c.HopApex - top.y, CardPickConfirm.HopMinHeight - 1e-4f, who + ": 재도약이 보일 만큼은 오른다");
-                // 빛: 클릭하자마자 호버 빛이 빠지고 플레이어 색이 차오르기 시작한다(처음에 빠르게), 꼭대기에 닿을 때 다 찬다.
+                // 클릭 반응: 호버 빛이 빠지고, 첫 박동으로 절반 넘게 → 살짝 걸려 내려앉음 → 두 번째 박동으로 0.3초 안에 꽉 참 → 번쩍.
                 Assert.AreEqual(1, c.ChosenLit(0), 1e-4f); Assert.AreEqual(0, c.ChosenLit(CardPickConfirm.LitFadeSeconds * c.Scale), 1e-4f, who + ": 클릭 직후 호버 빛이 빠진다");
                 Assert.AreEqual(0, c.Cover(0), 1e-4f);
-                Assert.Greater(c.Cover(c.TopLandTime / 3), .6f, who + ": 클릭 직후부터 빠르게 차오른다(바로 반응)");
-                Assert.Less(c.Cover(c.TopLandTime * .9f), 1, who + ": 비행 동안에도 마저 차오른다");
-                Assert.AreEqual(1, c.Cover(c.TopLandTime), 1e-4f, who + ": 꼭대기에 닿을 때 다 찬다");
+                float surge = c.Cover(CardPickConfirm.SurgeEnd * c.Scale), caught = c.Cover(CardPickConfirm.CatchEnd * c.Scale);
+                Assert.Greater(surge, .5f, who + ": 첫 박동으로 빠르게 절반 넘게");
+                Assert.Less(caught, surge, who + ": 살짝 걸려 내려앉는다(쫀득)");
+                Assert.AreEqual(1, c.Cover(c.FilledTime), 1e-4f, who + ": 0.3초 안에 꽉 찬다");
+                Assert.LessOrEqual(c.FilledTime, .31f); Assert.Less(c.FilledTime, c.LaunchTime, who + ": 발사 전에 이미 꽉 찬다");
+                Assert.AreEqual(0, c.FillFlash(c.FilledTime - .01f)); Assert.Greater(c.FillFlash(c.FilledTime + .05f), .5f, who + ": 꽉 찬 순간 번쩍");
+                Assert.AreEqual(0, c.FillFlash(c.FilledTime + .3f));
+                float tremble = 0; for (float t = 0; t < c.FilledTime; t += .004f) tremble = Mathf.Max(tremble, Mathf.Abs(c.Tremble(t)));
+                Assert.Greater(tremble, .03f, who + ": 클릭 반응으로 비석이 떤다"); Assert.AreEqual(0, c.Tremble(c.FilledTime + .1f), who + ": 꽉 차면 떨림이 멎는다");
                 // 비행: 실제 포물선(위로 솟는 속도가 줄어듦, 옆으로 일정), 처음만 돌진 잔상.
                 float[] vy = new float[4]; float[] xs = new float[4]; bool[] lunges = new bool[4];
                 for (int k = 0; k < 4; k++)

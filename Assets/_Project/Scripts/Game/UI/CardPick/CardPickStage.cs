@@ -575,9 +575,11 @@ namespace Knockbox.Game.UI
                 {
                     if (i == confirmChosen)
                     {
-                        // 고른 비석: 플레이어 색이 차오른 자리의 카드 내용은 가려진다.
+                        // 고른 비석(클릭 반응): 플레이어 색이 두 번에 걸쳐 차오르고(덮인 자리의 카드 내용은 가려짐), 꽉 찬 순간 밝게 번쩍이며, 그동안 비석이 통째로 살짝 떤다.
                         float fill = confirm.Cover(confirmSince);
-                        monoliths[i].SetEntrance(fill, energyColor, fill > 0 ? fill * monoliths[i].Height : float.NegativeInfinity);
+                        var surgeColor = Color.Lerp(energyColor, PaletteAsset.MonolithDefaults.EnergyHighlight, .65f * confirm.FillFlash(confirmSince));
+                        monoliths[i].SetEntrance(fill, surgeColor, fill > 0 ? fill * monoliths[i].Height : float.NegativeInfinity);
+                        t.localPosition += Vector3.right * confirm.Tremble(confirmSince);
                     }
                     // 나머지 비석: 어두운 상태 그대로(글자·아이콘은 흐리게 보인다).
                     else monoliths[i].SetEntrance(0, energyColor, float.NegativeInfinity);

@@ -5,8 +5,8 @@ namespace Knockbox.Game.UI
 {
     /// <summary>
     /// 카드 선택 확정 연출(4단계)의 시간표와 상태 계산. 상태가 없는 순수 계산이며, 입력은 확정 뒤 경과초(확정 월드의 PhaseTick − PickedAt)다.
-    /// 순서: 클릭 직후 고른 비석의 호버 빛이 빠지고 플레이어 색이 아래에서 차오른다 → 패자가 경기의 좌클릭 충전 그대로 힘을 모은다(새총을 당기듯) →
-    /// 새총처럼 실제 포물선으로 날아간다(발사 직후 가장 빠르고 솟을수록 느려짐) → 비석이 다 차오른 순간 꼭대기에 닿아 착지 반동으로 바로 다시 뛰어오른다(쉬지 않음) →
+    /// 순서: 클릭 직후 고른 비석이 화면 흔들림·떨림과 함께 플레이어 색으로 두 번에 걸쳐 쫀득하게 꽉 차오르고 번쩍인다 → 패자가 경기의 좌클릭 충전 그대로 힘을 모은다(새총을 당기듯) →
+    /// 새총처럼 실제 포물선으로 날아간다(발사 직후 가장 빠르고 솟을수록 느려짐) → 꼭대기에 닿아 착지 반동으로 바로 다시 뛰어오른다(쉬지 않음) →
     /// 순식간에 내리찍는다(쾅, 히트스톱) → 비석이 바닥 끝까지 순식간에 박혀 사라지고(슉, 크기 변화 없음) 패자는 바닥에 착지 →
     /// 구멍에서 솟은 카드 조각 점이 패자에게 흡수된다.
     /// 비석마다 거리와 높이가 달라 시간표를 고른 비석의 위치로 계산한다(멀수록 오래 날고, 화면 위끝까지 남은 높이만큼 다시 뛰어오른다).
@@ -20,7 +20,13 @@ namespace Knockbox.Game.UI
         /// <summary>비행 시간: 기본 + 옆 거리에 비례, 최소·최대. 날아가는 처음 이 비율 동안만 돌진 모습(잔상)이다.</summary>
         public const float FlightBase = .42f, FlightPerUnit = .011f, FlightMin = .5f, FlightMax = .75f, LungeShare = .35f;
         /// <summary>꼭대기에 닿은 뒤 다시 뛰기까지(착지 반동, 거의 쉬지 않음). 클릭 뒤 고른 비석의 호버 빛이 빠지는 시간과 색이 차오르기 시작하는 때.</summary>
-        public const float ReboundDelay = .05f, LitFadeSeconds = .1f, CoverStart = .03f;
+        public const float ReboundDelay = .05f, LitFadeSeconds = .1f;
+        /// <summary>
+        /// 클릭 반응(쫀득한 두 번 차오름): 0.02초부터 첫 박동으로 SurgeFill까지 빠르게 → 살짝 걸려 내려앉음 → 두 번째 박동으로 꽉 참 → 꽉 찬 순간 밝게 번쩍.
+        /// </summary>
+        public const float CoverStart = .02f, SurgeEnd = .12f, CatchEnd = .16f, FillEnd = .3f, SurgeFill = .55f, CatchDrop = .06f, FlashSeconds = .18f;
+        /// <summary>클릭 반응 동안 비석이 좌우로 떠는 폭(유닛, 바닥은 그대로 두고 통째로 아주 살짝).</summary>
+        public const float TrembleWidth = .07f;
         /// <summary>다시 뛰어오르는 높이(최대)와 화면 위끝 한계, 기준 높이에서 오르는 시간, 꼭대기 멈칫, 내리찍기 시간.</summary>
         public const float HopHeight = 2.4f, HopLimit = 8.9f, HopMinHeight = 1.4f, HopRiseSeconds = .18f, HangSeconds = .07f, SlamSeconds = .04f;
         public const float Hitstop = .08f, SinkSeconds = .1f;
@@ -86,10 +92,36 @@ namespace Knockbox.Game.UI
         public float ChosenLit(float since) => 1 - Ease.InQuad(Ease.Range(Base(since), 0, LitFadeSeconds));
 
         /// <summary>
-        /// 고른 비석을 덮는 플레이어 색(0 → 1): 클릭 직후 아래에서 빠르게 차오르기 시작해(감속 이징) 충전·비행 동안 마저 차고,
-        /// 패자가 꼭대기에 닿을 때 다 찬다. 덮인 자리의 카드 내용은 가려진다.
+        /// 고른 비석을 덮는 플레이어 색(0 → 1): 클릭 직후 첫 박동으로 절반 넘게 빠르게 차오르고(감속), 살짝 걸려 내려앉았다가,
+        /// 두 번째 박동으로 0.3초 안에 꽉 찬다. 덮인 자리의 카드 내용은 가려진다.
         /// </summary>
-        public float Cover(float since) => Ease.Out(Ease.Range(Base(since), CoverStart, TopLandAt));
+        public float Cover(float since)
+        {
+            float b = Base(since);
+            if (b < SurgeEnd) return SurgeFill * Ease.Out(Ease.Range(b, CoverStart, SurgeEnd));
+            if (b < CatchEnd) return SurgeFill - CatchDrop * Ease.OutQuad(Ease.Range(b, SurgeEnd, CatchEnd));
+            return Mathf.Lerp(SurgeFill - CatchDrop, 1, Ease.Out(Ease.Range(b, CatchEnd, FillEnd)));
+        }
+
+        /// <summary>꽉 찬 순간의 번쩍임(0~1, 빠르게 켜졌다 서서히 빠짐).</summary>
+        public float FillFlash(float since)
+        {
+            float u = (Base(since) - FillEnd) / FlashSeconds;
+            return u < 0 || u >= 1 ? 0 : Mathf.Min(1, u * 6) * (1 - Ease.OutQuad(u));
+        }
+
+        /// <summary>클릭 반응 동안 비석의 떨림(좌우 이동, 결정적). 클릭과 두 번째 박동에서 세게, 꽉 차면 멎는다.</summary>
+        public float Tremble(float since)
+        {
+            float b = Base(since);
+            if (b < 0 || b >= FillEnd + .06f) return 0;
+            float first = Mathf.Exp(-b / .06f), second = b >= CatchEnd ? Mathf.Exp(-(b - CatchEnd) / .05f) * .8f : 0;
+            return TrembleWidth * Mathf.Max(first, second) * (Mathf.Sin(b * 120f) * .7f + Mathf.Sin(b * 191f + 1.1f) * .3f);
+        }
+
+        /// <summary>두 번째 박동·꽉 참 순간(실제 초). 효과음·흔들림에 쓴다.</summary>
+        public float SecondSurgeTime => CatchEnd * scale;
+        public float FilledTime => FillEnd * scale;
 
         /// <summary>고른 비석의 세로 이동: 충돌 뒤 순식간에(가속 이징) 바닥 끝까지 박혀 사라진다. 크기는 바꾸지 않는다.</summary>
         public float Sink(float since)
