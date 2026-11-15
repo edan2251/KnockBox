@@ -18,6 +18,7 @@
 - **그림·폰트·오디오 추가:** [아트 작업 안내](ART_WORKFLOW.md)
 - **폴더의 역할과 보존 대상:** [프로젝트 폴더 안내](PROJECT_FOLDERS.md)
 - **AI에게 작업 요청:** [AI 참고 안내](../ai_docs/AI_GUIDE.md)
+- **빌드와 시연:** [Windows 빌드 안내](BUILD_GUIDE.md)
 - **커밋 양식:** [공통 커밋 규칙](COMMIT_RULES.md)
 - **온라인 설정과 접속:** [Photon Fusion 설정](../ai_docs/ONLINE_MULTIPLAYER.md#기본-접속과-새-pc-설정)
 

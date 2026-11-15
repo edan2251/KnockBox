@@ -40,6 +40,10 @@
 
    온라인 구현 문서의 접속 설정 절입니다. 새 개발 PC의 App ID 설정과 같은 빌드로 접속하는 조건을 확인합니다.
 
+10. [Windows 빌드와 시연](team/BUILD_GUIDE.md)
+
+    Unity의 빌드 메뉴, 실행 폴더 전달, 온라인 준비와 시연 전 확인 순서입니다.
+
 ## 개발 기준
 
 [현행 개발 명세](ai_docs/CURRENT_DEV_SPEC.md)

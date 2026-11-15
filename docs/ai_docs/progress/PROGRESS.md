@@ -2,6 +2,15 @@
 
 ## 현재 상태
 
+2026-11-16 시연 빌드와 직접 빌드 가이드.
+- 기준: D:/KnockBox, main `153fb44`. 최신 게임의 Photon Fusion Host/Client·기본 3틱 예측, 보상 맵 모놀리스 선택·클릭 반응, 폼 전투/옛 캐릭터 후보 제거를 먼저 확인했다. 카드 효과와 무기·총알은 여전히 보류다. 기존 미추적 커밋 안내는 보존했다.
+- 사용자가 열린 Unity에서 `Knockbox > Build > Windows Development`를 실행했다. Unity 6000.3.23f1 / Windows x64 Development / Main만 포함. 에디터와 배치 에디터를 동시에 실행하지 않았다. **새 빌드 성공: 171.5 MB, 352초, 경고 0건**(Editor.log). 기존 exe가 남아 있는 것으로 성공을 판정하지 않고 새 성공 로그와 Knockbox.Game.dll 갱신을 확인했다.
+- 시연 폴더: `D:/KnockBox/Builds/KnockBox_Demo_20261116_153fb44`. 전체 폴더 ZIP: `D:/KnockBox/Builds/KnockBox_Demo_20261116_153fb44.zip`. 원본 런타임 파일 321개를 복사·SHA-256 대조했고 DoNotShip 디버그 정보 1개만 전달본에서 제외했다. 원본은 보존했다. Paperlogy·집토끼 폰트, Box2D·NanoSockets 고지, 실행 안내·빌드 정보·파일 해시를 함께 넣었다. ZIP CRC 검사 통과. ZIP SHA-256: `8f7dd1fe75fd008049f1a3ae8dc36261b59e06f2eb81db463953b85dccfc2c1c`.
+- 실제 Player 자동 검사: 보존된 brawl_sample 기록 1,361틱(시작 상태 포함 1,362개)이 기존 reference 추적과 전부 일치, 최종 009F21C5 일치. 같은 빌드 반복 실행도 전부 일치하여 두 번 모두 종료 코드 0/PASS. 과거 기대값은 수정하지 않았다.
+- **미통과/미검증:** `-autobots -ticksperframe 60`의 창 없는 75초 검사는 첫 라운드 시작 로그만 있었고 라운드·선택·경기 완료가 없어서 통과로 처리하지 않았다. 이 경로는 Frontend를 건너뛰며 로그 규칙은 `Body g0 r1 e0 legacy`였고 예외는 검출되지 않았다. 원인을 확정하거나 일반 메뉴의 게임 정지로 단정하지 않는다. 검사 프로세스만 종료했다. 최신 exe의 메뉴→연습→모놀리스→다음 세트/결과 시각·조작감과 실제 두 PC Photon은 사용자 확인이 필요하다. Unity EditMode/PlayMode 전체 검사는 이번에 반복하지 않았다.
+- [Windows 빌드와 시연](../../team/BUILD_GUIDE.md)을 추가하고 docs 목차·SETUP에서 연결했다. 수정/추가 문서의 링크 검사를 수행했다. 전체 문서 검사에는 기존 HISTORY 보관 경로 11건과 미추적 커밋 안내의 `.cs(.meta)` 표기 5건, 총 16건이 남는다. 해당 기존 문서는 변경하지 않았다.
+- 보존: 기존 Windows 빌드 348개/182,390,451바이트는 `D:/KnockBox_Backups/Demo_Build_20261115_235808/previous_windows`와 별도 복원본 SHA-256이 일치한다. 소스 기준 목록·빌드 요약·Player 검사·전달 해시도 같은 백업에 둔다. 게임 코드·씬·맵·패키지·Photon 설정을 직접 수정하지 않았다. Unity 빌드 중 PlayerSettings의 preloadedAssets에 InputSystem_Actions 참조가 추가되고 빈 templateDefaultScene 줄 공백이 바뀌었다. 이 설정 변경은 보존하며 별도 검토 대상이다. 스테이징·커밋·푸시와 외부 배포는 하지 않았다.
+
 2026-11-14 클릭 반응을 쫀득하게 바꿨다(사용자 요청).
 - 고른 비석의 색이 패자 도착이 아니라 클릭 직후 0.3초 안에 두 번에 걸쳐 꽉 차오르고(첫 박동 → 살짝 걸림 → 두 번째 박동), 꽉 찬 순간 번쩍인다. 그동안 비석이 살짝 떨고, 클릭·두 번째 박동·꽉 참마다 화면 흔들림·먼지·소리가 난다.
 - CardPickStageTests·표시 규칙 26개, Main/Frontend PlayMode 31개 통과. 화면 캡처로 0.08초 반쯤 참·0.33초 꽉 참과 번쩍임을 확인했다. 사용자 Play 확인이 남았다.
