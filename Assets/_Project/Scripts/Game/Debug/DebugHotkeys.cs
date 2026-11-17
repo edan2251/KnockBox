@@ -118,6 +118,9 @@ namespace Knockbox.Game
                 runner.StepOnce();
             if (!control && k.oKey.wasPressedThisFrame) runner.TryDebugKnockout(0);
             if (!control && k.pKey.wasPressedThisFrame) runner.TryDebugKnockout(1);
+            // K: P1 경기 승리, L: P2 경기 승리(로컬 검수용, 결과 화면까지 바로 간다).
+            if (!control && k.kKey.wasPressedThisFrame) runner.TryDebugMatchWin(0);
+            if (!control && k.lKey.wasPressedThisFrame) runner.TryDebugMatchWin(1);
         }
 
         /// <summary>

@@ -65,6 +65,7 @@ namespace Knockbox.Presentation
                 else DestroyImmediate(transform.GetChild(i).gameObject);
             }
 
+            boxGroups.Clear();
             borderRoot = new GameObject("Connected_arena_boundary").transform;
             borderRoot.SetParent(transform, false);
             var groups = new System.Collections.Generic.List<Transform>();
@@ -79,7 +80,7 @@ namespace Knockbox.Presentation
                     || b.MaxX >= arena.HalfWidth - .001f || b.MinY <= -arena.HalfHeight + .001f || b.MaxY >= arena.HalfHeight - .001f);
                 buildParent = new GameObject("Terrain_box_" + i + "_" + b.Kind).transform;
                 buildParent.SetParent(boundary ? borderRoot : transform, false);
-                if (!boundary) groups.Add(buildParent);
+                if (!boundary) { boxGroups[i] = groups.Count; groups.Add(buildParent); }
                 if(b.IsPolygon)
                 {
                     var sr=ShapeLibrary.Create(buildParent,"Convex_Terrain",shapes.Square,SortingLayers.Terrain,0,theme.terrain);
@@ -178,6 +179,19 @@ namespace Knockbox.Presentation
                 motionParts[i].localPosition = motionPositions[i] + (Vector3)(direction * (current.Rows + 3) * away);
                 TransitionSettled &= away == 0;
             }
+        }
+
+        // 맵 상자 번호 → 연출 묶음 번호(경계 상자는 없음). 같은 지형을 다시 그리지 않을 때도 유지된다.
+        readonly System.Collections.Generic.Dictionary<int, int> boxGroups = new System.Collections.Generic.Dictionary<int, int>();
+
+        /// <summary>
+        /// 화면에서만 한 지형 상자를 위아래로 옮긴다(결과 공간의 시상대 상승 등). PresentTransition 뒤 같은 프레임에 부르며 판정 위치는 그대로다.
+        /// 경계 상자나 없는 번호는 무시한다.
+        /// </summary>
+        public void OffsetBox(int boxIndex, float dy)
+        {
+            if (motionParts == null || !boxGroups.TryGetValue(boxIndex, out int group) || group >= motionParts.Length) return;
+            motionParts[group].localPosition += new Vector3(0f, dy, 0f);
         }
 
         void Rect(ShapeLibrary shapes, Color color, string layer, int order, float minX, float minY, float maxX, float maxY)

@@ -15,7 +15,11 @@ namespace Knockbox.Tests.EditMode
         public void DefaultPredictionVersion_IsTrimmedAndIsolatesEarlierComparisonBuilds()
         {
             string version = FusionPredictionPolicy.ConnectionVersion("same");
-            Assert.AreEqual("same-prediction1-snapshot8692-tick60-delay3-hover1-hold144", version);
+            Assert.AreEqual("same-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry2", version);
+            Assert.AreNotEqual("same-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry1", version, "이어 간 P1이 재구성 대기에 묶이던 빌드와는 접속하지 않는다");
+            Assert.AreNotEqual("same-prediction1-snapshot8700-tick60-delay0-hover1-hold144", version, "확정 입력 묶음 v1(로비 이어 가기 없음) 빌드와는 접속하지 않는다");
+            Assert.AreNotEqual("same-prediction1-snapshot8700-tick60-delay3-hover1-hold144", version, "입력 지연 3틱 빌드와는 접속하지 않는다(SDK 시간 설정이 다름)");
+            Assert.AreNotEqual("same-prediction1-snapshot8692-tick60-delay3-hover1-hold144", version, "결과 공간 상태(Arriving)가 없는 이전 빌드와는 접속하지 않는다");
             Assert.AreNotEqual("same-prediction1-snapshot8692-tick60-delay3", version, "카드 호버 RPC가 없는 이전 빌드와는 접속하지 않는다");
             Assert.AreEqual(version, FusionPredictionPolicy.ConnectionVersion(" same "));
             Assert.AreNotEqual("same", version);
@@ -34,7 +38,7 @@ namespace Knockbox.Tests.EditMode
             Assert.IsNotNull(policy);
             Assert.AreEqual(FusionConnectionSettings.DefaultRegion, policy.Region);
             Assert.AreEqual(FusionConnectionSettings.DefaultAppVersion, policy.AppVersion);
-            Assert.AreEqual(3, OnlineMatch.DefaultOnlineDelay);
+            Assert.AreEqual(FusionPredictionPolicy.DelayTicks, OnlineMatch.DefaultOnlineDelay);
             Assert.AreEqual(9, LockstepSession.ProtocolVersion);
         }
 

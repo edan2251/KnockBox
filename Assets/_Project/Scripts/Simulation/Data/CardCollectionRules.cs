@@ -20,9 +20,33 @@ namespace Knockbox.Simulation
         /// 2026-11-14부터 모놀리스 카드 선택의 확정 연출(충전·곡선 도약·내리찍기·흡수) 시간을 위해 확정 대기를 84틱에서 144틱으로 늘렸다.
         /// 그 전 기록은 false(84틱)로 재현한다.
         /// </param>
-        public static SimConfig Apply(SimConfig source, bool motion = true, bool cinematic = true, bool extendedIntro = true, bool longPickHold = true)
+        /// <summary>결과 공간: 맵 재구성(RebuildTicks) 뒤 낙하, 1초 뒤 준비 허용, KO 1초 뒤 재등장.</summary>
+        public const int ResultsDropTick = RebuildTicks + 6;
+        public const int ResultsUnlockTick = ResultsDropTick + 60;
+        public const int ResultsRespawnTicks = 60;
+        public const float ResultsDropHeight = 7f;
+
+        /// <param name="resultsSpace">
+        /// 2026-11-16 게임 흐름 CP1: 경기가 끝나면 결과 공간에서 자유 조작한다. 맵 목록의 마지막에 결과 공간 맵이 있어야 한다.
+        /// 그 전 기록과 결과 공간 맵이 없는 실행은 false.
+        /// </param>
+        /// <param name="vsIntro">
+        /// 거짓이면 첫 라운드도 다른 라운드와 같은 재구성·3·2·1·GO만 하고 VS 소개(222틱)를 하지 않는다(2026-11-17 사용자 요청, Main 기본).
+        /// 그 전 기록·검사는 참(VS 소개 있음)으로 재현한다.
+        /// </param>
+        public static SimConfig Apply(SimConfig source, bool motion = true, bool cinematic = true, bool extendedIntro = true, bool longPickHold = true,
+            bool resultsSpace = false, bool lobbySpace = false, bool vsIntro = true)
         {
             var match = source.Match;
+            if (resultsSpace || lobbySpace)
+            {
+                match.ResultsSpace = resultsSpace;
+                match.LobbySpace = lobbySpace;
+                match.ResultsDropTick = ResultsDropTick;
+                match.ResultsUnlockTick = ResultsUnlockTick;
+                match.ResultsRespawnTicks = ResultsRespawnTicks;
+                match.ResultsDropHeight = ResultsDropHeight;
+            }
             match.CollectCardsOnly = true;
             match.RoundsToWinSet = 2;
             match.SetsToWinMatch = 5;
@@ -41,7 +65,7 @@ namespace Knockbox.Simulation
                 {
                     match.CountdownTicks = RebuildTicks + CountInTicks;
                     // 기존 v8 리플레이의 90틱 소개도 같은 입력/상태 형식으로 재현한다.
-                    match.IntroCountdownTicks = (extendedIntro ? IntroVsTicks : 90) + match.CountdownTicks;
+                    match.IntroCountdownTicks = vsIntro ? (extendedIntro ? IntroVsTicks : 90) + match.CountdownTicks : match.CountdownTicks;
                     match.KoTicks = 156;
                     match.PickHoldTicks = longPickHold ? LongPickHoldTicks : 84;
                 }

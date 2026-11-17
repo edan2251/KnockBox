@@ -22,7 +22,19 @@ namespace Knockbox.Game
         [SerializeField] Maps.MapCatalog mapCatalog;
         [Tooltip("등록 목록이 비어 있을 때 사용할 기본 정의. 맵 제작 시험은 지정한 맵 하나만 사용합니다.")]
         [SerializeField] Maps.MapDefinition selectedMap;
+        [Tooltip("경기가 끝난 뒤 두 선수가 자유롭게 움직이는 결과 공간 맵. P1 시작 위치는 승자(시상대), P2 시작 위치는 패자 자리입니다. 비우면 기존 결과 화면을 씁니다. 경기 등록 목록에 넣지 않습니다.")]
+        [SerializeField] Maps.MapDefinition resultsMap;
+        [Tooltip("온라인 방에 들어가면 경기 전에 두 선수가 자유롭게 움직이는 로비 맵. P1·P2 시작 위치가 각자의 입장·재등장 자리입니다. 비우면 상대가 들어오자마자 경기를 시작합니다. 경기 등록 목록에 넣지 않습니다.")]
+        [SerializeField] Maps.MapDefinition lobbyMap;
         public Maps.MapCatalog MapCatalog => mapCatalog;
+        public Maps.MapDefinition ResultsMap => resultsMap;
+        public Maps.MapDefinition LobbyMap => lobbyMap;
+
+        /// <summary>
+        /// 화면에 그리지 않는 선수 슬롯(-1 없음). 방장이 혼자 로비에서 기다리는 로컬 연습 월드의 P2다.
+        /// 시뮬레이션에서는 맵 밖에 멈춰 있어 판정에 닿지 않는다(로컬 전용, 기록·전송하지 않음).
+        /// </summary>
+        public int AbsentSlot { get; private set; } = -1;
         [Tooltip("맵 짝 파일(<이름>.json): 테마, 광원, 순환 포함 여부")]
         [SerializeField] TextAsset[] arenaMetaFiles;
         [Tooltip("RegisteredMaps는 등록 맵 순환, Rotation은 옛 검증 맵 순환, 맵 이름은 한 맵 고정(F2)")]
@@ -88,10 +100,22 @@ namespace Knockbox.Game
         public IInputSource RouteFrontendInput(IInputSource input, int slot, bool automaticPick = false)
         {
             if (!FrontendEnabled) return input;
-            var routed = new FrontendInputSource(() => FrontendWorld, () => MenuInputBlocked, input, slot, automaticPick);
+            var routed = new FrontendInputSource(() => FrontendWorld, () => MenuInputBlocked, input, slot, automaticPick,
+                () => PointerOverFrontendButton?.Invoke() == true);
             frontendInputs[slot] = routed;
             return routed;
         }
+
+        /// <summary>화면 버튼 위인지(결과 공간 O/X). 화면(FrontendController)이 연결한다. 판정 상태에는 저장하지 않는다.</summary>
+        public Func<bool> PointerOverFrontendButton { get; set; }
+
+        /// <summary>결과 공간의 다시하기 준비를 켜고 끈다.</summary>
+        public bool ToggleReady(int slot) =>
+            slot >= 0 && slot < 2 && frontendInputs[slot] != null && frontendInputs[slot].ToggleReady();
+
+        /// <summary>결과 공간에서 이 슬롯이 다시하기 준비를 켰는지(확정 전 의도).</summary>
+        public bool IsReadyToggled(int slot) =>
+            slot >= 0 && slot < 2 && frontendInputs[slot] != null && frontendInputs[slot].ReadyToggled;
 
         public bool RequestCardSelection(int slot, int option) =>
             slot >= 0 && slot < 2 && frontendInputs[slot] != null && frontendInputs[slot].Choose(option);
@@ -103,7 +127,8 @@ namespace Knockbox.Game
         public bool TryDebugKnockout(int slot)
         {
             if ((!Application.isEditor && !Debug.isDebugBuild) || slot < 0 || slot > 1
-                || MenuInputBlocked || World == null || World.State.Match.Phase != MatchPhase.Fighting
+                || MenuInputBlocked || World == null
+                || (World.State.Match.Phase != MatchPhase.Fighting && !(World.InFreeSpace && !SimWorld.AwayInResults(World.State.GetFighter(slot))))
                 || Lockstep != null || Recording != null || Playback != null || syncTest != null
                 || GetComponent<Online.OnlineMatch>()?.Active == true) return false;
             if (slot == 0) World.State.Fighter0.Health = 0;
@@ -111,6 +136,30 @@ namespace Knockbox.Game
             // 일반 틱을 거쳐 KO/무기 정리/득점 사건과 연출이 평소처럼 이어진다.
             StepOnce();
             return true;
+        }
+
+        /// <summary>
+        /// 로컬 검수용 경기 승리(K: P1, L: P2). 승자가 마지막 세트의 마지막 라운드만 남긴 상태로 만들고 상대를 즉사시켜
+        /// 평소의 KO → 결과 흐름으로 이어지게 한다. 싸움 중에만, 즉사와 같은 조건(로컬·기록/재생/온라인 아님)에서 동작한다.
+        /// </summary>
+        public bool TryDebugMatchWin(int winner)
+        {
+            if ((!Application.isEditor && !Debug.isDebugBuild) || winner < 0 || winner > 1
+                || MenuInputBlocked || World == null || World.State.Match.Phase != MatchPhase.Fighting
+                || Lockstep != null || Recording != null || Playback != null || syncTest != null
+                || GetComponent<Online.OnlineMatch>()?.Active == true) return false;
+            ref var m = ref World.State.Match;
+            var match = World.Config.Match;
+            if (World.Config.Rules.LegacyMatch)
+            {
+                if (winner == 0) m.Score0 = match.RoundsToWin - 1; else m.Score1 = match.RoundsToWin - 1;
+            }
+            else
+            {
+                if (winner == 0) { m.SetScore0 = match.SetsToWinMatch - 1; m.Score0 = match.RoundsToWinSet - 1; }
+                else { m.SetScore1 = match.SetsToWinMatch - 1; m.Score1 = match.RoundsToWinSet - 1; }
+            }
+            return TryDebugKnockout(1 - winner);
         }
 
         public IInputSource Player1Input { get; set; } = new IdleInputSource();
@@ -274,6 +323,14 @@ namespace Knockbox.Game
                                             {
                                                 var cards = CardCollectionRules.Apply(config);
                                                 if (cards.ComputeChecksum() == recording.ConfigChecksum) return cards;
+                                                // 2026-11-16부터 결과 공간·로비 맵이 연결된 실행의 기록, 2026-11-17부터 VS 소개 없는 기록.
+                                                for (int vs = 0; vs < 2; vs++)
+                                                for (int space = 0; space < 4; space++)
+                                                {
+                                                    if (vs == 0 && space == 0) continue; // 위의 기본 카드 설정과 같다.
+                                                    var flow = CardCollectionRules.Apply(config, resultsSpace: (space & 1) != 0, lobbySpace: (space & 2) != 0, vsIntro: vs == 0);
+                                                    if (flow.ComputeChecksum() == recording.ConfigChecksum) return flow;
+                                                }
                                                 // 2026-11-14 전 기록: 확정 대기 84틱.
                                                 var previousHold = CardCollectionRules.Apply(config, longPickHold: false);
                                                 if (previousHold.ComputeChecksum() == recording.ConfigChecksum) return previousHold;
@@ -377,12 +434,130 @@ namespace Knockbox.Game
         {
             if (IsAuthoringPreview) throw new InvalidOperationException("제작기 시험은 로컬 전용입니다. 시험 종료 후 Main에서 연결해주세요.");
             seed = sharedSeed;
-            StartPreparedMatch(config, arenas, sharedSeed, false);
+            // 로비 맵이 연결된 온라인 경기는 로비에서 시작한다(둘 다 준비하면 1라운드).
+            StartPreparedMatch(config, arenas, sharedSeed, false, config.Match.LobbySpace ? MatchPhase.Lobby : MatchPhase.Countdown);
         }
 
-        void StartPreparedMatch(SimConfig config, ArenaDef[] arenas, uint matchSeed, bool allowLocalFastStart=true)
+        /// <summary>
+        /// Fusion 공유 로비를 혼자 로비에서 이어 시작한다(2026-11-17 로비 입장 A안). 이 월드는 다시 만들지 않고(맵 재구성·암전 없음)
+        /// 공유 월드의 첫 틱까지 혼자 로비로 계속 움직인다. 그 첫 틱에 FusionPredictionSession이 P1 위치를 이어 공유 시작 상태로 바꾼다.
+        /// 확정 기록의 기준이 될 공유 로비 시작 상태(아직 이어 가지 않은 값)를 돌려준다.
+        /// </summary>
+        public SimState ContinueSoloLobbyOnline(SimConfig config, ArenaDef[] arenas, uint sharedSeed)
         {
-            var phase = allowLocalFastStart && skipCountdown ? MatchPhase.Fighting : MatchPhase.Countdown;
+            if (IsAuthoringPreview) throw new InvalidOperationException("제작기 시험은 로컬 전용입니다. 시험 종료 후 Main에서 연결해주세요.");
+            if (!InSoloLobby) throw new InvalidOperationException("혼자 로비가 아닙니다.");
+            seed = sharedSeed;
+            return SimState.CreateMatch(config, arenas, sharedSeed, MatchPhase.Lobby);
+        }
+
+        /// <summary>
+        /// 화면 전용(2026-11-17): 공유 로비가 방장 혼자 로비를 이어 시작했다. 공유 로비의 단계 틱은 0부터 다시 세므로
+        /// 로비 입장 연출(지형 솟음·조명·선수 등장)을 다시 틀지 않게 한다. 판정·기록과 무관하며 새 경기·예측 종료 때 지운다.
+        /// </summary>
+        public bool LobbySceneContinued { get; private set; }
+        /// <summary>화면 전용: 혼자 로비에서 이어 간 선수(이어 가지 못했으면 -1). 그 선수만 등장 연출 없이 바로 보인다.</summary>
+        public int ContinuedLobbySlot { get; private set; } = -1;
+
+        public void MarkLobbyContinued(int continuedSlot)
+        {
+            LobbySceneContinued = true;
+            ContinuedLobbySlot = continuedSlot;
+        }
+
+        /// <summary>
+        /// 화면 전용 예측 보정 완화(2026-11-18). Client가 재실행으로 표시 중이던 선수 위치를 고치면 그 차이만큼 그림을 원래 자리에 두었다가
+        /// 짧게(<see cref="CorrectionSeconds"/>) 줄인다. 상대가 점프·방향을 바꿀 때 한 프레임에 0.7~0.8씩 튀던 것을 줄인다.
+        /// 맞아 날아감·KO·재등장·잡기·큰 차이는 줄이지 않고 바로 보인다(충격 반응을 늦추지 않는다). 판정·입력·기록과 무관하다.
+        /// </summary>
+        public const float CorrectionSeconds = 0.06f, MaxSmoothedCorrection = 3f;
+        Vector2 displayCorrection0, displayCorrection1;
+
+        public Vector2 DisplayCorrection(int fighter) => fighter == 0 ? displayCorrection0 : displayCorrection1;
+
+        /// <summary>예측 경로가 표시 중이던 틱을 고쳤다: before(고치기 전 예측) → after(고친 값).</summary>
+        public void ReportPredictionCorrection(int fighter, Vec2 before, Vec2 after, bool snap)
+        {
+            var delta = new Vector2(before.X - after.X, before.Y - after.Y);
+            ref var offset = ref fighter == 0 ? ref displayCorrection0 : ref displayCorrection1;
+            offset = snap ? Vector2.zero : offset + delta;
+            if (offset.magnitude > MaxSmoothedCorrection) offset = Vector2.zero;
+        }
+
+        /// <summary>실제 시간으로 줄인다(히트스톱 중에도 같은 속도). 0.01 미만이면 0.</summary>
+        public void DecayDisplayCorrection(float realDeltaSeconds)
+        {
+            float keep = Mathf.Exp(-Mathf.Max(0f, realDeltaSeconds) / CorrectionSeconds);
+            displayCorrection0 *= keep; displayCorrection1 *= keep;
+            if (displayCorrection0.sqrMagnitude < 1e-4f) displayCorrection0 = Vector2.zero; // 0.01 미만은 보이지 않는다
+            if (displayCorrection1.sqrMagnitude < 1e-4f) displayCorrection1 = Vector2.zero;
+        }
+
+        public void ClearDisplayCorrection() { displayCorrection0 = displayCorrection1 = Vector2.zero; }
+
+        /// <summary>맞아 날아감·던져짐·KO·낙하(재등장)·잡기 중인 선수는 보정을 늦추지 않고 바로 보인다.</summary>
+        public static bool SnapsDisplayCorrection(in FighterState f) =>
+            f.IsLaunched || f.Action == ActionState.KO || f.Arriving
+            || f.Action == ActionState.Holding || f.Action == ActionState.Held || f.Action == ActionState.Thrown;
+
+        /// <summary>
+        /// 매 화면 프레임: 그리는 상태에서 선수가 피격·던져짐·KO·재등장·잡기로 바뀌었으면 남은 보정을 새 보정 보고가 없어도 바로 지운다
+        /// (2026-11-18 보완: 남은 보정이 충격 반응·재등장 위치에 섞이지 않게). 잡기 중이면 두 선수 모두 지운다. 그다음 실제 시간으로 줄인다.
+        /// </summary>
+        public void UpdateDisplayCorrection(in SimState shown, float realDeltaSeconds)
+        {
+            bool attached = shown.Fighter0.Action == ActionState.Holding || shown.Fighter0.Action == ActionState.Held
+                || shown.Fighter1.Action == ActionState.Holding || shown.Fighter1.Action == ActionState.Held;
+            if (attached) { ClearDisplayCorrection(); return; }
+            if (SnapsDisplayCorrection(shown.Fighter0)) displayCorrection0 = Vector2.zero;
+            if (SnapsDisplayCorrection(shown.Fighter1)) displayCorrection1 = Vector2.zero;
+            DecayDisplayCorrection(realDeltaSeconds);
+        }
+
+        /// <summary>방장이 상대를 기다리는 혼자 로비(P2 자리 비움)가 지금 돌고 있는지.</summary>
+        public bool InSoloLobby => World != null && AbsentSlot == 1 && World.InLobby && !PredictionDriven;
+
+        /// <summary>
+        /// 화면 전용: 공유 월드의 첫 확정 상태가 오기 전까지 해당 선수를 맵 밖에 숨긴다(손님이 방장 P1의 이어 간 위치를 받기 전).
+        /// 다음 예측 단계가 상태를 덮어쓰면 다시 보인다. 판정·확정 기록과 무관하다.
+        /// </summary>
+        public void HideUntilPredicted(int slot)
+        {
+            var state = World.State;
+            if (slot == 0) MakeAbsent(ref state.Fighter0); else MakeAbsent(ref state.Fighter1);
+            World.State = state;
+            PreviousState = state;
+            AbsentSlot = slot;
+        }
+
+        static void MakeAbsent(ref FighterState absent)
+        {
+            absent.RestartAction(ActionState.KO);
+            absent.HitstopTicks = int.MaxValue / 2;
+            absent.Arriving = false;
+            absent.Position = new Vec2(0f, -10000f);
+            absent.Velocity = Vec2.Zero;
+        }
+
+        /// <summary>
+        /// 방장이 상대를 기다리는 동안의 로컬 로비(2026-11-16 게임 흐름 CP3). 같은 설정·맵으로 로비 상태를 만들고 P2는 맵 밖에 멈춰 둔다.
+        /// 기록·전송하지 않는 로컬 월드다. Fusion 연결이면 ContinueSoloLobbyOnline으로 이 월드를 이어 공유 로비가 되고
+        /// (P1 위치를 이어 가며 P2만 떨어진다), 메모리 전송 검사 경로는 StartPreparedOnlineMatch로 새로 시작한다.
+        /// </summary>
+        public void StartSoloLobby(SimConfig config, ArenaDef[] arenas, uint localSeed)
+        {
+            if (!config.Match.LobbySpace) throw new InvalidOperationException("로비 맵이 연결되지 않았습니다.");
+            var state = SimState.CreateMatch(config, arenas, localSeed, MatchPhase.Lobby);
+            MakeAbsent(ref state.Fighter1);
+            Player1Input = RouteFrontendInput(new MouseAimInputSource(() => World, 0), 0);
+            Player2Input = RouteFrontendInput(new IdleInputSource(), 1);
+            Begin(config, arenas, state);
+            AbsentSlot = 1;
+        }
+
+        void StartPreparedMatch(SimConfig config, ArenaDef[] arenas, uint matchSeed, bool allowLocalFastStart=true, MatchPhase onlinePhase=MatchPhase.Countdown)
+        {
+            var phase = allowLocalFastStart && skipCountdown ? MatchPhase.Fighting : onlinePhase;
             if (useLocalDevices)
             {
                 Player1Input = brawlExperiment ? new MouseAimInputSource(() => World, 0) : (IInputSource)new KeyboardInputSource(KeyboardLayout.Left);
@@ -409,7 +584,8 @@ namespace Knockbox.Game
             var config = CreateConfig(combatTuning, rules, OnlineRematch, weaponsEnabled: false,
                 smoothBoxes: combatTuning == null || combatTuning.SmoothBoxRelease,
                 stableConnectors: combatTuning == null || combatTuning.StableConnectorContacts);
-            return includeFrontend && brawlExperiment ? CardCollectionRules.Apply(config) : config;
+            return includeFrontend && brawlExperiment
+                ? CardCollectionRules.Apply(config, resultsSpace: resultsMap != null, lobbySpace: lobbyMap != null, vsIntro: false) : config;
         }
 
         SimConfig CreateConfig(CombatTuning combat, in RuleSet ruleSet, bool onlineRematch = false,
@@ -440,6 +616,9 @@ namespace Knockbox.Game
         public void Begin(SimConfig config, ArenaDef[] arenas, in SimState initial)
         {
             EndPrediction();
+            AbsentSlot = -1;
+            LobbySceneContinued = false; ContinuedLobbySlot = -1;
+            ClearDisplayCorrection();
             World = new SimWorld(config, arenas, initial);
             PreviousState = initial;
             configFromTuning = false;
@@ -568,6 +747,7 @@ namespace Knockbox.Game
             if (confirmed == null) throw new ArgumentNullException(nameof(confirmed));
             predictionSlot = localSlot; confirmedWorld = confirmed; predictionAlpha = 1;
             PredictionDriven = true;
+            if (AbsentSlot == 1 && World != null && World.InLobby) AbsentSlot = -1; // 혼자 로비를 이어 공유 로비가 됨
         }
 
         public void StepPrediction(in SimState restored, InputFrame p1, InputFrame p2)
@@ -575,6 +755,7 @@ namespace Knockbox.Game
             if (!PredictionDriven) throw new InvalidOperationException("Fusion 예측 경기가 시작되지 않았습니다.");
             World.State = restored;
             PreviousState = restored;
+            AbsentSlot = -1;
             World.Step(p1, p2);
         }
 
@@ -596,6 +777,8 @@ namespace Knockbox.Game
         public void EndPrediction()
         {
             PredictionDriven = false;
+            LobbySceneContinued = false; ContinuedLobbySlot = -1;
+            ClearDisplayCorrection();
             confirmedWorld = null;
             predictionSlot = 0;
         }

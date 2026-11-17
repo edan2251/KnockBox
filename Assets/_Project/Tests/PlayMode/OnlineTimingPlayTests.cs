@@ -57,8 +57,8 @@ namespace Knockbox.Tests.PlayMode
                     yield return null;
                 Assert.GreaterOrEqual(hostTicks, 8);
                 Assert.GreaterOrEqual(guestTicks, 8);
-                Assert.AreEqual(3, host.Session.DelayTicks);
-                Assert.AreEqual(3, guest.Session.DelayTicks);
+                Assert.AreEqual(OnlineMatch.DefaultOnlineDelay, host.Session.DelayTicks);
+                Assert.AreEqual(OnlineMatch.DefaultOnlineDelay, guest.Session.DelayTicks);
                 Assert.AreEqual(SessionState.Running, host.Session.State);
                 Assert.AreEqual(SessionState.Running, guest.Session.State);
             }

@@ -20,6 +20,8 @@ namespace Knockbox.Game.Maps
                 if(map==null){errors.Add("등록 목록에 비어 있는 맵이 있습니다.");continue;}
                 if(!ids.Add(map.Id)||!names.Add(map.MatchName))errors.Add("맵 내부 ID 또는 이름이 중복됩니다: "+map.Id);
                 if(map.MatchName.IndexOf(InputRecording.ArenaSeparator)>=0)errors.Add("맵 내부 ID에 쉼표를 넣을 수 없습니다. 입력 기록의 맵 구분자입니다: "+map.Id);
+                // 경기 맵만 순환한다(2026-11-16 CP4). 보상·로비·결과 공간 맵은 실행 단계에서도 막는다.
+                if(map.Usage!=MapUsage.Match)errors.Add("경기 맵이 아닌 맵이 등록 목록에 있습니다("+map.Usage+"): "+map.Id);
                 errors.AddRange(map.Validate(bodySize));
             }
             return errors;
@@ -50,6 +52,7 @@ namespace Knockbox.Game.Maps
         public void Register(MapDefinition map)
         {
             if(map==null)throw new ArgumentNullException(nameof(map));
+            if(map.Usage!=MapUsage.Match)throw new InvalidOperationException("경기 맵만 등록할 수 있습니다. 지금 용도: "+map.Usage);
             foreach(var existing in maps)
             {
                 if(existing==map)return;

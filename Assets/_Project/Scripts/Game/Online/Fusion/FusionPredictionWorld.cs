@@ -25,7 +25,10 @@ namespace Knockbox.Game.Online
         {
             var session = connection != null ? connection.Prediction : null;
             if (session == null || !session.Active || Runner.Tick.Raw < StartTick) return;
+            // 로비 시작: Client는 Host가 정한 첫 공유 상태(이어 간 P1)를 받은 뒤부터 예측한다.
+            if (WaitsForHostStart(session)) return;
             var before = Snapshot.Restore();
+            if (HasStateAuthority && session.PendingLobbyStart) before = session.BeginSharedLobby();
             bool got1 = Runner.TryGetInputForPlayer(Player1, out FusionPlayerInput p1);
             bool got2 = Runner.TryGetInputForPlayer(Player2, out FusionPlayerInput p2);
             if (got1) LastP1 = p1; else p1 = LastP1;
@@ -37,11 +40,17 @@ namespace Knockbox.Game.Online
             Snapshot = FusionWorldSnapshot.Capture(session.Match.World.State);
         }
 
+        bool WaitsForHostStart(FusionPredictionSession session) =>
+            !HasStateAuthority && session.StartsInLobby && Runner.LatestServerTick.Raw < StartTick;
+
         public override void Render()
         {
             var session = connection != null ? connection.Prediction : null;
-            if (session == null || !session.Active) return;
-            session.Match.SetPredictionRenderState(Snapshot.Restore(), Runner.LocalAlpha);
+            if (session == null || !session.Active || WaitsForHostStart(session)) return;
+            var latest = Snapshot.Restore();
+            int offset = Runner.Tick.Raw - latest.Tick;
+            session.ObserveRender(latest.Tick, Runner.LatestServerTick.Raw - offset);
+            session.Match.SetPredictionRenderState(latest, Runner.LocalAlpha);
         }
     }
 }

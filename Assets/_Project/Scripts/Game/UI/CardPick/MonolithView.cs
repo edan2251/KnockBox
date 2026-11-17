@@ -26,6 +26,37 @@ namespace Knockbox.Game.UI
             silhouette = PaletteAsset.MonolithDefaults.Silhouette, silhouetteRim = PaletteAsset.MonolithDefaults.SilhouetteRim,
             silhouetteText = PaletteAsset.MonolithDefaults.SilhouetteText,
         };
+
+        /// <summary>
+        /// 점등(금색 계열) 색만 색상환에서 delta도 돌린다. 명도·채도는 그대로라 P1(delta 0)은 기존 색과 같고,
+        /// 다른 플레이어가 고를 때 그 플레이어 색으로 켜진다(2026-11-17 CP7: 호버·흡수가 P1 색으로 고정되던 문제).
+        /// </summary>
+        public MonolithStyle WithLitHue(float delta)
+        {
+            var s = this;
+            s.bodyLit = ShiftHue(bodyLit, delta); s.rimLit = ShiftHue(rimLit, delta); s.faceLit = ShiftHue(faceLit, delta);
+            s.iconFill = ShiftHue(iconFill, delta); s.stripe = ShiftHue(stripe, delta); s.iconOnFill = ShiftHue(iconOnFill, delta);
+            s.nameLit = ShiftHue(nameLit, delta);
+            return s;
+        }
+
+        /// <summary>색상만 delta(0~1 한 바퀴) 돌린다. 알파·명도·채도 유지.</summary>
+        public static Color ShiftHue(Color c, float delta)
+        {
+            if (Mathf.Approximately(delta, 0)) return c;
+            Color.RGBToHSV(c, out float h, out float sat, out float v);
+            var shifted = Color.HSVToRGB(Mathf.Repeat(h + delta, 1f), sat, v);
+            shifted.a = c.a;
+            return shifted;
+        }
+
+        /// <summary>P1 색을 기준으로 해당 플레이어 색까지의 색상 차이(0~1).</summary>
+        public static float HueDelta(Color player1, Color player)
+        {
+            Color.RGBToHSV(player1, out float h0, out _, out _);
+            Color.RGBToHSV(player, out float h, out _, out _);
+            return h - h0;
+        }
     }
 
     /// <summary>
@@ -68,6 +99,10 @@ namespace Knockbox.Game.UI
         [SerializeField, Range(0f, .4f), Tooltip("그림 영역 사선 무늬 굵기(0이면 무늬 없음)")] float stripeWidth = .12f;
         [SerializeField, Range(0f, 1f), Tooltip("다른 비석을 호버했을 때 어두워지는 정도")] float silhouetteDepth = .92f;
         [SerializeField] MonolithStyle style = MonolithStyle.Default;
+        // 표시에 쓰는 색: 저장된 style에서 점등 색만 고르는 플레이어 색으로 돌린 것.
+        MonolithStyle shown = MonolithStyle.Default;
+        float litHue;
+        bool shownReady;
         [Header("부품(프리팹에 저장)")]
         [SerializeField] SpriteRenderer rim, body, bodyGlow, face, faceGlow, iconFill, nameBand, panel;
         [SerializeField] SpriteRenderer[] stripes = new SpriteRenderer[StripeCount];
@@ -114,6 +149,15 @@ namespace Knockbox.Game.UI
         /// <summary>
         /// 원근 보정: 0이면 그대로, 클수록 꺼진 상태 색을 어둡게 한다(뒤에 있는 작은 비석). 켜지는 만큼 보정이 빠져 호버한 비석은 늘 밝다.
         /// </summary>
+        /// <summary>점등 색의 색상 회전(MonolithStyle.HueDelta). 0이면 저장된 색 그대로.</summary>
+        public void SetLitHue(float delta)
+        {
+            litHue = delta;
+            shown = style.WithLitHue(delta);
+            shownReady = true;
+        }
+        public float LitHue => litHue;
+
         public void SetDepth(float amount) => depth = Mathf.Clamp01(amount);
         public float Depth => depth;
 
@@ -495,6 +539,8 @@ namespace Knockbox.Game.UI
         public void Present(float lit, float silhouette, bool chosen)
         {
             if (chosen) { lit = 1; silhouette = 0; }
+            if (!shownReady) SetLitHue(litHue);
+            var style = shown;
             var box = Bounds(CurrentOutline);
             float litGlow = Out(Mathf.Clamp01(lit)) * (box.yMax + rimWidth), energyGlow = energy * (box.yMax + rimWidth);
             float glow = Mathf.Max(litGlow, energyGlow);

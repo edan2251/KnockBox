@@ -170,6 +170,24 @@ namespace Knockbox.Simulation
         public bool RematchBothHold;
         /// <summary>CR-005 카드 획득 시연. 몸 폼으로 시작하고 능력 없는 카드 3개만 제시한다.</summary>
         public bool CollectCardsOnly;
+        /// <summary>
+        /// 결과 공간(2026-11-16 게임 흐름 CP1): 켜면 MatchEnd가 결과 공간 맵의 자유 조작이 되고, 맵 목록의 마지막이 결과 공간 맵이다.
+        /// 재대결은 준비 비트(SimWorld.ReadyButton) 유지로 정한다. 끈 설정은 기존 MatchEnd 규칙 그대로.
+        /// </summary>
+        public bool ResultsSpace;
+        /// <summary>
+        /// 로비(2026-11-16 게임 흐름 CP3): 켜면 맵 목록의 마지막이 로비 맵이며(결과 공간 맵보다 뒤), 온라인 경기는 Lobby 단계에서 시작한다.
+        /// 낙하·준비·재등장 수치는 결과 공간 값을 함께 쓴다.
+        /// </summary>
+        public bool LobbySpace;
+        /// <summary>결과 공간·로비: 단계에 들어온 뒤 이 틱까지 맵을 재구성하고, 그 뒤 두 선수가 자리 위에서 떨어진다.</summary>
+        public int ResultsDropTick;
+        /// <summary>결과 공간: 이 틱부터 재대결 준비를 받는다.</summary>
+        public int ResultsUnlockTick;
+        /// <summary>결과 공간: KO 뒤 재등장까지의 틱.</summary>
+        public int ResultsRespawnTicks;
+        /// <summary>결과 공간: 자리 위 몇 유닛에서 떨어지는지(맵 경계 안으로 줄인다).</summary>
+        public float ResultsDropHeight;
 
         public static MatchParams Default => new MatchParams
         {
@@ -202,6 +220,17 @@ namespace Knockbox.Simulation
                 v.Value(nameof(CollectCardsOnly), true);
             if (IntroCountdownTicks != 0)
                 v.Value(nameof(IntroCountdownTicks), IntroCountdownTicks);
+            if (ResultsSpace)
+                v.Value(nameof(ResultsSpace), true);
+            if (LobbySpace)
+                v.Value(nameof(LobbySpace), true);
+            if (ResultsSpace || LobbySpace)
+            {
+                v.Value(nameof(ResultsDropTick), ResultsDropTick);
+                v.Value(nameof(ResultsUnlockTick), ResultsUnlockTick);
+                v.Value(nameof(ResultsRespawnTicks), ResultsRespawnTicks);
+                v.Value(nameof(ResultsDropHeight), ResultsDropHeight);
+            }
         }
     }
 

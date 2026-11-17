@@ -67,6 +67,7 @@ namespace Knockbox.Game.UI
         bool settledShown;
         // 호버가 바뀐 비석(바닥 먼지 반응용).
         int feltHover = -1;
+        float litHue;
         ProjectedShadowMesh shadows;
         Transform shadowRoot;
         ArenaDef arena;
@@ -263,6 +264,8 @@ namespace Knockbox.Game.UI
             var stand = SimState.CreateRound(confirmed.Config, arena, 0u, MatchPhase.Countdown);
             standing = stand.Fighter0;
             int picker = m.Picker;
+            // 점등·흡수 색은 고르는 플레이어 색을 따른다(P1이면 기존 금색 그대로).
+            litHue = MonolithStyle.HueDelta(presenter.Palette.FighterBody(0), presenter.Palette.FighterBody(picker));
             // P1 배치로 저장된 패자 자리. P2가 고르면 좌우를 뒤집은 자리에 선다(맵의 시작 위치는 쓰지 않는다).
             float standX = picker == 1 ? -standFoot.x : standFoot.x;
             standing.Position = new Vec2(standX, standFoot.y + confirmed.Config.HalfBody);
@@ -297,6 +300,7 @@ namespace Knockbox.Game.UI
                 silhouette[i] = 1;
                 if (!used) continue;
                 monoliths[i].Bind(Face(m.GetOption(options[i]), confirmed.Config), presenter.Shapes);
+                monoliths[i].SetLitHue(litHue);
                 monoliths[i].Canvas.worldCamera = Camera.main;
             }
             ApplyDepth();

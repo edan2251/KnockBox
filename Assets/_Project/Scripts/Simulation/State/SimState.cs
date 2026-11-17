@@ -76,13 +76,63 @@ namespace Knockbox.Simulation
         /// </summary>
         public static SimState CreateMatch(SimConfig config, ArenaDef[] arenas, uint seed, MatchPhase startPhase)
         {
-            var rotation = ArenaRotation.Create(seed, arenas.Length);
+            int count = RotationCount(config, arenas);
+            var rotation = ArenaRotation.Create(seed, count);
+            if (startPhase == MatchPhase.Lobby)
+                return CreateLobby(config, arenas, seed, rotation, count);
             var state = CreateRound(config, arenas[rotation.Current], seed, startPhase);
             // 맵 하나면 순환 상태를 비워 둔다(CreateRound와 같은 상태).
-            if (arenas.Length > 1)
+            if (count > 1)
                 state.Match.Rotation = rotation;
             return state;
         }
+
+        /// <summary>
+        /// 로비에서 시작하는 경기(2026-11-16 게임 흐름 CP3): 경기 상태는 CreateMatch와 같고, 단계만 Lobby이며 두 선수는 로비 맵의
+        /// 자기 시작 위치 위에서 떨어질 준비를 한다. 구조물은 로비 맵 기준(로비 맵에는 물리 상자가 없다). 기록 재생도 이 함수로 다시 만든다.
+        /// </summary>
+        static SimState CreateLobby(SimConfig config, ArenaDef[] arenas, uint seed, in ArenaRotation rotation, int count)
+        {
+            if (!config.Match.LobbySpace) throw new InvalidOperationException("로비 단계는 로비 설정(MatchParams.LobbySpace)에서만 시작합니다.");
+            var lobby = arenas[LobbyArenaIndex(config, arenas)];
+            var state = CreateRound(config, arenas[rotation.Current], seed, MatchPhase.Lobby);
+            if (count > 1)
+                state.Match.Rotation = rotation;
+            PropPhysics.Init(ref state.Props, lobby, config);
+            PlaceForDrop(config, lobby, ref state.Fighter0, 0, 1, 0);
+            PlaceForDrop(config, lobby, ref state.Fighter1, 1, 0, 1);
+            return state;
+        }
+
+        /// <summary>
+        /// 결과 공간·로비의 낙하 시작: 맵의 spot번째 시작 위치 위(맵 경계 안)에 새 선수 상태를 세운다. 증강·직전 버튼은 이어 간다.
+        /// 낙하가 끝나 착지하기 전까지 Arriving이다.
+        /// </summary>
+        /// <param name="drop">거짓이면 자리 위에 바로 선다(결과 공간의 승자: 시상대 위에서 화면만 솟아오른다).</param>
+        public static void PlaceForDrop(SimConfig config, ArenaDef arena, ref FighterState f, int spot, int otherSpot, int index, bool drop = true)
+        {
+            var center = SpawnCenter(config, arena, spot);
+            var other = SpawnCenter(config, arena, otherSpot);
+            // 맵 경계 안에서 시작한다(자리 위쪽은 비워 두어야 한다).
+            float top = arena.BoundaryHalfHeight - config.HalfBody - 0.5f;
+            float y = drop ? SimMath.Max(center.Y, SimMath.Min(center.Y + config.Match.ResultsDropHeight, top)) : center.Y;
+            var keep = f;
+            f = CreateFighter(config, arena, new Vec2(center.X, y), center.X <= other.X ? 1 : -1, index);
+            KeepMatchPart(ref f, keep);
+            f.PrevButtons = keep.PrevButtons;
+            f.Arriving = true;
+        }
+
+        /// <summary>순환하는 경기 맵 수. 결과 공간·로비 설정이면 맵 목록 끝의 그 맵들을 뺀다.</summary>
+        public static int RotationCount(SimConfig config, ArenaDef[] arenas) =>
+            arenas.Length - (config.Match.ResultsSpace ? 1 : 0) - (config.Match.LobbySpace ? 1 : 0);
+
+        /// <summary>맵 목록 순서: 경기 맵(순환) → 결과 공간 맵(설정 시) → 로비 맵(설정 시).</summary>
+        public static int ResultsArenaIndex(SimConfig config, ArenaDef[] arenas) =>
+            config.Match.ResultsSpace ? RotationCount(config, arenas) : -1;
+
+        public static int LobbyArenaIndex(SimConfig config, ArenaDef[] arenas) =>
+            config.Match.LobbySpace ? arenas.Length - 1 : -1;
 
         /// <summary>시작 위치(파이터 중심)를 직접 정한다.</summary>
         public static SimState CreateRound(SimConfig config, ArenaDef arena, uint seed, Vec2 center0, Vec2 center1, MatchPhase startPhase)
@@ -161,7 +211,7 @@ namespace Knockbox.Simulation
             state.Fighter1.Augments = default;
         }
 
-        static FighterState CreateFighter(SimConfig config, ArenaDef arena, Vec2 center, int facing, int index)
+        internal static FighterState CreateFighter(SimConfig config, ArenaDef arena, Vec2 center, int facing, int index)
         {
             ref readonly var m = ref config.Movement;
             var f = new FighterState

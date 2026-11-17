@@ -240,6 +240,7 @@ namespace Knockbox.EditorTools
         {
             if(HasUnsavedPlacement(a))throw new InvalidOperationException("배치를 먼저 저장한 뒤 등록해주세요.");
             if(a.definition.IsRewardMap)throw new InvalidOperationException("보상 맵은 경기 맵 목록에 등록하지 않습니다.");
+            if(a.definition.IsSpaceMap)throw new InvalidOperationException("로비·결과 공간 맵은 경기 맵 목록에 등록하지 않습니다. Main의 MatchRunner에 연결하세요.");
             Undo.RecordObject(a.catalog,"맵 등록");a.catalog.Register(a.definition);
             EditorUtility.SetDirty(a.catalog);AssetDatabase.SaveAssetIfDirty(a.catalog);
         }
@@ -440,7 +441,10 @@ namespace Knockbox.EditorTools
             using(new EditorGUI.DisabledScope(!loaded||protectedReason!=null))
                 if(GUILayout.Button("맵 저장"))Run(()=>MapAuthoringOperations.Save(a),"맵 정의에 저장했습니다. 등록 없이 시험할 수 있습니다.");
             using(new EditorGUI.DisabledScope(!loaded||!string.IsNullOrEmpty(pending)))
-                if(GUILayout.Button("저장한 맵으로 시험"))Run(()=>MapAuthoringOperations.Test(a),"Main 연습을 시작합니다. Play를 중지하면 제작기로 돌아옵니다.");
+                if(GUILayout.Button("저장한 맵으로 시험"))Run(()=>MapAuthoringOperations.Test(a),
+                    a.definition!=null&&a.definition.Usage==MapUsage.Lobby?"혼자 기다리는 로비를 엽니다. Play를 중지하면 제작기로 돌아옵니다."
+                    :a.definition!=null&&a.definition.Usage==MapUsage.Results?"연습을 시작해 첫 싸움에서 P1 승리로 결과 공간까지 갑니다. Play를 중지하면 제작기로 돌아옵니다."
+                    :"Main 연습을 시작합니다. Play를 중지하면 제작기로 돌아옵니다.");
             EditorGUILayout.HelpBox("씬 저장(Ctrl+S)과 맵 저장은 별개입니다. 시험은 GameMaps 등록 없이 이 맵만 사용합니다. Play 중지로 편집에 복귀합니다.",MessageType.None);
             registration=EditorGUILayout.Foldout(registration,"정식 경기 목록 · 별도 등록",true);
             if(registration)
@@ -452,6 +456,7 @@ namespace Knockbox.EditorTools
                 if(a.catalog!=null)foreach(var map in a.catalog.Maps)if(map!=null)EditorGUILayout.ObjectField(map.DisplayName,map,typeof(MapDefinition),false);
                 EditorGUILayout.HelpBox("최대 8개. 두 맵 이상이면 직전 라운드와 다른 맵을 고릅니다. 목록은 다음 경기부터 적용합니다.",MessageType.None);
             }
+            UsageSection(a,loaded);
             RewardSection(a,loaded);
             theme=EditorGUILayout.Foldout(theme,"맵 테마",true);
             if(theme&&a.definition!=null)
@@ -521,7 +526,80 @@ namespace Knockbox.EditorTools
             serializedObject.ApplyModifiedProperties();
             if(a.rewardPreview)EditorGUILayout.HelpBox("미리보기는 저장되지 않는 화면 표시입니다. 샘플 카드로 그리고, 광원 위치와 패자 자리를 씬 뷰에 표시합니다. 그림자와 대기 캐릭터는 Play에서 확인하세요.",MessageType.None);
         }
-        void OnSceneGUI()=>MapPlacementSnap.DrawGrid((MapAuthoring)target);
+        bool usageOpen=true;
+        /// <summary>
+        /// 맵 용도(2026-11-16 게임 흐름 CP4): 경기·로비·결과 공간. 로비·결과 공간 맵은 GameMaps에 등록하지 않고 Main의 MatchRunner에 연결한다.
+        /// 두 발 위치의 뜻이 용도에 따라 바뀌며(결과 공간: 승자·패자 자리, 로비: P1·P2 입장 자리), 결과 공간은 승자 자리 아래 지형을 시상대로 지정한다.
+        /// </summary>
+        void UsageSection(MapAuthoring a,bool loaded)
+        {
+            if(a.definition==null)return;
+            usageOpen=EditorGUILayout.Foldout(usageOpen,"맵 용도 · 경기 / 로비 / 결과 공간",true);
+            if(!usageOpen)return;
+            var d=a.definition;
+            if(d.IsRewardMap){EditorGUILayout.HelpBox("보상 맵(카드 선택)입니다. 용도는 아래 보상 맵 설정에서 바꿉니다.",MessageType.None);return;}
+            using(new EditorGUI.DisabledScope(d.PreservedBaseline))
+            {
+                EditorGUI.BeginChangeCheck();
+                var choice=(MapUsage)EditorGUILayout.EnumPopup(new GUIContent("용도"),d.Usage,e=>(MapUsage)e!=MapUsage.Reward,false);
+                if(EditorGUI.EndChangeCheck())Run(()=>SetUsage(d,choice,d.PodiumBoxId),"맵 용도를 "+UsageName(choice)+"(으)로 바꿨습니다.");
+            }
+            switch(d.Usage)
+            {
+                case MapUsage.Lobby:
+                    EditorGUILayout.HelpBox("로비 맵: 온라인 방의 대기 공간입니다. P1·P2 시작 위치가 각자의 입장·재등장 자리입니다. 물리 상자·로프는 둘 수 없고, 자리 위쪽은 비워 두세요(위에서 떨어집니다).\n"
+                        +"GameMaps에는 등록하지 않고 Main의 Match > MatchRunner > 로비 맵에 연결합니다. 시험은 연결 없이 혼자 기다리는 로비를 엽니다.",MessageType.None);
+                    break;
+                case MapUsage.Results:
+                    EditorGUILayout.HelpBox("결과 공간 맵: 경기 뒤 두 선수가 자유롭게 움직이는 곳입니다. P1 시작 위치가 승자 자리(시상대 위), P2 시작 위치가 패자 자리입니다(슬롯과 무관). 물리 상자·로프는 둘 수 없고, 자리 위쪽은 비워 두세요.\n"
+                        +"GameMaps에는 등록하지 않고 Main의 Match > MatchRunner > 결과 공간 맵에 연결합니다. 시험은 연습을 시작해 첫 싸움에서 P1 승리로 바로 결과 공간까지 갑니다.",MessageType.None);
+                    EditorGUILayout.LabelField("시상대 지형",string.IsNullOrEmpty(d.PodiumBoxId)?"(지정 안 함 · 상승 연출 없음)":d.PodiumBoxId);
+                    using(new EditorGUI.DisabledScope(!loaded||d.PreservedBaseline))
+                    {
+                        var selected=Selection.activeGameObject!=null?Selection.activeGameObject.GetComponent<MapBoxHandle>():null;
+                        using(new EditorGUI.DisabledScope(selected==null||selected.IsRewardStele))
+                            if(GUILayout.Button("선택한 지형을 시상대로 지정"))Run(()=>SetUsage(d,MapUsage.Results,selected.Id),"시상대 지형을 지정했습니다. 승자 자리를 그 윗면에 두세요.");
+                        using(new EditorGUI.DisabledScope(string.IsNullOrEmpty(d.PodiumBoxId)))
+                            if(GUILayout.Button("시상대 지정 해제"))Run(()=>SetUsage(d,MapUsage.Results,""),"시상대 지정을 해제했습니다.");
+                    }
+                    break;
+                default:
+                    EditorGUILayout.HelpBox("경기 맵입니다. GameMaps에 등록하면 경기 순환에 들어갑니다.",MessageType.None);
+                    break;
+            }
+            if(d.IsSpaceMap)
+                using(new EditorGUI.DisabledScope(!loaded))
+                using(new EditorGUILayout.HorizontalScope())
+                {
+                    if(GUILayout.Button(d.SpotLabel(0)+" 선택"))Selection.activeTransform=a.spawn0;
+                    if(GUILayout.Button(d.SpotLabel(1)+" 선택"))Selection.activeTransform=a.spawn1;
+                }
+        }
+        static string UsageName(MapUsage usage)=>usage==MapUsage.Lobby?"로비":usage==MapUsage.Results?"결과 공간":usage==MapUsage.Reward?"보상":"경기";
+        static void SetUsage(MapDefinition d,MapUsage usage,string podium)
+        {
+            Undo.RecordObject(d,"맵 용도");d.SetUsage(usage,podium);
+            EditorUtility.SetDirty(d);AssetDatabase.SaveAssetIfDirty(d);
+        }
+        void OnSceneGUI()
+        {
+            var a=(MapAuthoring)target;
+            MapPlacementSnap.DrawGrid(a);
+            // 로비·결과 공간 맵: 두 발 위치의 뜻과 시상대를 씬 뷰에 표시한다(저장되지 않는 표시).
+            if(a.definition==null||!a.definition.IsSpaceMap||a.spawn0==null||a.spawn1==null)return;
+            Handles.Label(a.spawn0.position+Vector3.up*1.2f,a.definition.SpotLabel(0));
+            Handles.Label(a.spawn1.position+Vector3.up*1.2f,a.definition.SpotLabel(1));
+            string podium=a.definition.PodiumBoxId;
+            if(string.IsNullOrEmpty(podium)||a.terrainRoot==null)return;
+            foreach(var h in a.terrainRoot.GetComponentsInChildren<MapBoxHandle>(true))
+                if(h.Id==podium)
+                {
+                    var b=h.Read();
+                    Handles.color=new Color(1f,.85f,.2f,1f);
+                    Handles.DrawWireCube(new Vector3((b.minX+b.maxX)*.5f,(b.minY+b.maxY)*.5f),new Vector3(b.maxX-b.minX,b.maxY-b.minY));
+                    Handles.Label(new Vector3(b.minX,b.maxY+.4f),"시상대");
+                }
+        }
         void Run(Action action,string done){try{action();message=done;messageType=MessageType.Info;}catch(Exception e){message=e.Message;messageType=MessageType.Error;}Repaint();}
     }
     [CustomEditor(typeof(MapDefinition))]
@@ -541,6 +619,7 @@ namespace Knockbox.EditorTools
                 Field("mapTheme","맵 테마");Field("theme","기존 테마 번호");Field("light","광원 위치");
                 Field("ceiling","천장 표시");Field("shadow","그림자 농도");
                 Field("rewardMap","보상 맵(카드 선택)");
+                if(!d.IsRewardMap){Field("usage","맵 용도");if(d.Usage==MapUsage.Results)Field("podiumBoxId","시상대 지형 ID");}
                 if(d.IsRewardMap){Field("loserStand","패자 자리(P1 배치 발 위치)");Field("reward","보상 장면 값");}
             }
             serializedObject.ApplyModifiedProperties();

@@ -6472,6 +6472,8 @@ MonoBehaviour:
   - {fileID: 4900000, guid: e5ff03fb447f936449090f4eadd7167d, type: 3}
   mapCatalog: {fileID: 11400000, guid: 9452a485e7bf811449cb194cc19907e8, type: 2}
   selectedMap: {fileID: 11400000, guid: 7ae76ec49df51404ab034de576774d51, type: 2}
+  resultsMap: {fileID: 11400000, guid: 5826ac2964dea0e458d6835d42af4a74, type: 2}
+  lobbyMap: {fileID: 11400000, guid: ffc22e55c351296429e63a0f88953144, type: 2}
   arenaMetaFiles:
   - {fileID: 4900000, guid: 8f99199c325d8424194432d6969f31f1, type: 3}
   - {fileID: 4900000, guid: eeee09e928189414cb0dbb98862ffa78, type: 3}

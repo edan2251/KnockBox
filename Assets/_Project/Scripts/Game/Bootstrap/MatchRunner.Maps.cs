@@ -12,24 +12,64 @@ namespace Knockbox.Game
     {
         // 시험 정의는 실행 중에만 연결하며 Main과 GameMaps에 저장하지 않는다.
         Maps.MapDefinition authoringPreview;
-        public bool IsAuthoringPreview => authoringPreview != null;
+        // 로비·결과 공간 맵 시험(CP4): 경기 맵 목록은 그대로 두고 이 실행의 로비·결과 공간 맵만 바꾼다.
+        Maps.MapDefinition spacePreview;
+        public bool IsAuthoringPreview => authoringPreview != null || spacePreview != null;
+        /// <summary>제작기 시험 중인 로비·결과 공간 맵의 용도(아니면 Match).</summary>
+        public Maps.MapUsage PreviewUsage => spacePreview != null ? spacePreview.Usage : Maps.MapUsage.Match;
 
 #if UNITY_EDITOR
-        /// <summary>저장한 정의 하나만 시험한다. 등록 목록과 Main의 저장 참조는 바꾸지 않는다.</summary>
+        /// <summary>
+        /// 저장한 정의 하나만 시험한다. 등록 목록과 Main의 저장 참조는 바꾸지 않는다.
+        /// 로비·결과 공간 맵은 이 실행에서만 그 맵을 쓰고(Play 종료 시 원래 참조로 돌아감), 경기 맵은 등록 목록 그대로다.
+        /// </summary>
         public void ConfigureAuthoringPreview(Maps.MapDefinition definition)
         {
             if (definition == null) throw new InvalidOperationException("시험할 맵 정의를 찾을 수 없습니다.");
             if (Lockstep != null || OnlineRematch) throw new InvalidOperationException("맵 시험은 로컬 연습에서만 가능합니다.");
+            if (definition.Usage == Maps.MapUsage.Reward) throw new InvalidOperationException("보상 맵은 경기에서 세트를 진 뒤 확인합니다.");
             var errors = definition.Validate(CreateConfig().Movement.BodySize);
             if (errors.Count > 0) throw new InvalidOperationException(string.Join("\n", errors));
+            if (definition.IsSpaceMap)
+            {
+                spacePreview = definition;
+                if (definition.Usage == Maps.MapUsage.Results) resultsMap = definition;
+                else lobbyMap = definition;
+                return;
+            }
             authoringPreview = definition;
         }
 #endif
 
-        /// <summary>로컬 시작과 온라인 핸드셰이크가 같은 검증을 거쳐 경기별 맵 스냅샷을 만든다.</summary>
+        /// <summary>
+        /// 로컬 시작과 온라인 핸드셰이크가 같은 검증을 거쳐 경기별 맵 스냅샷을 만든다.
+        /// 결과 공간 설정이면 경기 맵 뒤에 결과 공간 맵을 붙인다(온라인 맵 목록·기록에 같은 순서로 들어간다).
+        /// </summary>
         public ArenaDef[] PrepareMatchArenas(SimConfig config)
         {
-            if (IsAuthoringPreview)
+            var arenas = PrepareRotationArenas(config);
+            if (!config.Match.ResultsSpace && !config.Match.LobbySpace) return arenas;
+            var all = new System.Collections.Generic.List<ArenaDef>(arenas);
+            if (config.Match.ResultsSpace) all.Add(PrepareSpaceArena(resultsMap, Maps.MapUsage.Results, "결과 공간", config));
+            if (config.Match.LobbySpace) all.Add(PrepareSpaceArena(lobbyMap, Maps.MapUsage.Lobby, "로비", config));
+            return all.ToArray();
+        }
+
+        /// <summary>결과 공간·로비 맵: 맞는 용도로 지정되고 물리 상자가 없는 맵 정의여야 한다(CP4).</summary>
+        static ArenaDef PrepareSpaceArena(Maps.MapDefinition map, Maps.MapUsage usage, string label, SimConfig config)
+        {
+            if (map == null) throw new InvalidOperationException(label + " 맵이 연결되지 않았습니다.");
+            if (map.Usage != usage) throw new InvalidOperationException(map.name + "의 맵 용도가 " + map.Usage + "입니다. MapAuthoring에서 " + label + " 용도로 지정해주세요.");
+            var errors = map.Validate(config.Movement.BodySize);
+            if (errors.Count > 0) throw new InvalidOperationException(map.name + ": " + string.Join("\n", errors));
+            var arena = map.ToArena();
+            if (arena.PropCount != 0) throw new InvalidOperationException(map.name + ": " + label + " 맵에는 물리 상자를 두지 않습니다.");
+            return arena;
+        }
+
+        ArenaDef[] PrepareRotationArenas(SimConfig config)
+        {
+            if (authoringPreview != null)
             {
                 var errors = authoringPreview.Validate(config.Movement.BodySize);
                 if (errors.Count > 0) throw new InvalidOperationException(string.Join("\n", errors));
@@ -115,7 +155,7 @@ namespace Knockbox.Game
         /// <summary>새 맵 정의 찾기: 제작기 시험 맵 → 저장된 정의. 옛 txt/json 맵이면 null.</summary>
         Maps.MapDefinition FindDefinition(string name)
         {
-            if (IsAuthoringPreview && name == authoringPreview.MatchName) return authoringPreview;
+            if (authoringPreview != null && name == authoringPreview.MatchName) return authoringPreview;
             return FindSavedDefinition(name);
         }
 
@@ -186,7 +226,9 @@ namespace Knockbox.Game
         /// </summary>
         public ArenaDef ResolveRecordedArena(string name)
         {
-            if (IsAuthoringPreview && name == authoringPreview.MatchName) return authoringPreview.ToArena();
+            if (authoringPreview != null && name == authoringPreview.MatchName) return authoringPreview.ToArena();
+            if (resultsMap != null && name == resultsMap.MatchName) return resultsMap.ToArena();
+            if (lobbyMap != null && name == lobbyMap.MatchName) return lobbyMap.ToArena();
             if (arenaFiles != null)
             {
                 foreach (var file in arenaFiles)

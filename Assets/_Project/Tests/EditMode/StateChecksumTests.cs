@@ -72,6 +72,8 @@ namespace Knockbox.Tests.EditMode
         static bool StateLeafIsActive(string path, bool weaponsEnabled, bool throwEnabled, bool graphEnabled)
         {
             if(path.StartsWith("Props.Graph.",StringComparison.Ordinal))return graphEnabled;
+            // 결과 공간의 착지 전 표시(2026-11-16)는 참일 때만 해시한다. 기준 상태는 거짓이며 참으로 바꾸면 해시가 바뀌는지는 위 검사가 본다.
+            if (path == "Fighter0.Arriving" || path == "Fighter1.Arriving") return false;
             if (!path.StartsWith("Weapon.", StringComparison.Ordinal)) return true;
             if (!weaponsEnabled) return false;
             // v7에는 투척 확장이 없었다. v8 사례는 어떤 말단 필드도 제외하지 않는다.
@@ -103,7 +105,9 @@ namespace Knockbox.Tests.EditMode
             foreach (var (path, mutate) in Leaves(typeof(SimState), ""))
             {
                 // 구기록에는 무기 블록 자체가 없다. 활성 사례에서는 새 필드를 하나도 제외하지 않는다.
-                if (!StateLeafIsActive(path, weaponsEnabled, throwEnabled, graphEnabled))
+                // 참일 때만 해시하는 결과 공간 표시도 거짓→참 변경은 해시를 바꿔야 한다.
+                bool arriving = path == "Fighter0.Arriving" || path == "Fighter1.Arriving";
+                if (!arriving && !StateLeafIsActive(path, weaponsEnabled, throwEnabled, graphEnabled))
                     continue;
                 count++;
                 object boxed = baseState;
@@ -161,6 +165,19 @@ namespace Knockbox.Tests.EditMode
             }
             foreach (var (path, mutate) in Leaves(typeof(MatchParams), "Match."))
             {
+                // 결과 공간 수치(2026-11-16)는 결과 공간을 켤 때만 해시한다. 끈 설정은 기존 해시를 유지하고, 켠 설정은 모든 수치를 담아야 한다.
+                if (path.StartsWith("Match.Results", StringComparison.Ordinal) && path != "Match.ResultsSpace")
+                {
+                    var inactive = (MatchParams)mutate(MatchParams.Default);
+                    Assert.AreEqual(baseChecksum, new SimConfig(MovementParams.Default, inactive).ComputeChecksum(),
+                        "결과 공간을 끈 설정은 기존 해시를 유지해야 함: " + path);
+                    var active = MatchParams.Default;
+                    active.ResultsSpace = true;
+                    uint activeBase = new SimConfig(MovementParams.Default, active).ComputeChecksum();
+                    if (new SimConfig(MovementParams.Default, (MatchParams)mutate(active)).ComputeChecksum() == activeBase)
+                        missing.AppendLine(path);
+                    continue;
+                }
                 var m = (MatchParams)mutate(MatchParams.Default);
                 if (new SimConfig(MovementParams.Default, m).ComputeChecksum() == baseChecksum)
                     missing.AppendLine(path);

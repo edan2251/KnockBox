@@ -54,8 +54,56 @@ namespace Knockbox.Game.Online
             };
         }
 
+        static Task warmup;
+
+        /// <summary>
+        /// 빌드에서 앱 시작 때 한 번: 오프라인 Single 모드 Runner를 시작했다가 바로 끈다(2026-11-18). 첫 방 만들기·참가에서
+        /// Fusion·연결 코드의 첫 실행 준비 때문에 0.1~0.23초씩 멈추던 것을 앱 시작 불러오기 구간으로 옮긴다(같은 실행의 두 번째 방 만들기는 멈춤 없음으로 측정).
+        /// 네트워크 접속·방 생성은 하지 않는다. 방 만들기·참가는 이 준비가 끝난 뒤 시작해 Runner가 겹치지 않는다. 에디터·검사에서는 하지 않는다.
+        /// </summary>
+        public static void WarmUpOnce()
+        {
+            if (warmup != null || Application.isEditor) return;
+            warmup = WarmUpAsync();
+        }
+
+        static async Task WarmUpAsync()
+        {
+            var go = new GameObject("FusionWarmup_Runtime");
+            try
+            {
+                var runner = go.AddComponent<NetworkRunner>();
+                var result = await runner.StartGame(new StartGameArgs
+                {
+                    GameMode = GameMode.Single,
+                    SessionName = "warmup",
+                    Config = FusionPredictionPolicy.CreateConfig(NetworkProjectConfig.Global),
+                    SceneManager = new FusionStateSceneManager(go.scene),
+                });
+                if (runner != null && runner.IsRunning) await runner.Shutdown();
+                if (!result.Ok) Debug.LogWarning($"[Knockbox][online] Fusion 시작 준비 실패: {result.ShutdownReason}");
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[Knockbox][online] Fusion 시작 준비 실패: {e.GetType().Name}");
+            }
+            finally
+            {
+                if (go != null) UnityEngine.Object.Destroy(go);
+            }
+        }
+
+        /// <summary>시작 준비 Runner가 끝날 때까지 기다린다(실패해도 연결은 그대로 진행).</summary>
+        static async Task AwaitWarmup()
+        {
+            if (warmup == null) return;
+            try { await warmup; } catch (Exception) { }
+        }
+
         public static async Task<(FusionTransport transport, string code)> HostAsync(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            await AwaitWarmup();
             cancellationToken.ThrowIfCancellationRequested();
             var appSettings = ReadSettings();
             for (int attempt = 0; attempt < HostAttempts; attempt++)
@@ -90,6 +138,7 @@ namespace Knockbox.Game.Online
             cancellationToken.ThrowIfCancellationRequested();
             if (!FusionRoomCode.TryNormalize(code, out var normalized))
                 throw new FusionSetupException("8자리 방 코드를 확인해주세요.");
+            await AwaitWarmup();
             var appSettings = ReadSettings();
             cancellationToken.ThrowIfCancellationRequested();
             var connection = Create();

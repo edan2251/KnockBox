@@ -5,10 +5,14 @@ using Knockbox.Simulation;
 
 namespace Knockbox.Game.Online
 {
-    /// <summary>모든 Fusion 접속에 쓰는 고정 정책. 60Hz와 SDK 입력 지연 3틱을 한 곳에서 관리한다.</summary>
+    /// <summary>모든 Fusion 접속에 쓰는 고정 정책. 60Hz와 SDK 최소 입력 지연(0틱)을 한 곳에서 관리한다.</summary>
     public static class FusionPredictionPolicy
     {
-        public const int DelayTicks = 3;
+        /// <summary>
+        /// SDK 최소 입력 지연. 2026-11-17 측정: 3틱(또는 1틱)이 왕복 지연보다 길면 Client 예측 시각이 받은 Host 상태 뒤로 밀려
+        /// 상태가 올 때만 2~3틱씩 진행(빠른 연결에서 P2 화면 표시 시간 정지 60%대)했다. 0틱에서 정지가 사라지고 내 입력이 같은 프레임에 반영된다.
+        /// </summary>
+        public const int DelayTicks = 0;
 
         public static string ConnectionVersion(string version)
         {
@@ -16,7 +20,8 @@ namespace Knockbox.Game.Online
                 throw new FusionSetupException("Photon 게임 버전을 설정해주세요.");
             // hover1: 카드 선택 호버 RPC가 있는 빌드끼리만 접속한다(RPC 목록이 다르면 서로 맞지 않는다).
             // hold144: 카드 선택 확정 대기가 144틱인 설정끼리만 접속한다(설정 체크섬이 다르면 같은 경기를 진행할 수 없다).
-            return $"{version.Trim()}-prediction1-snapshot{FusionWorldSnapshot.ByteCount}-tick60-delay{DelayTicks}-hover1-hold{CardCollectionRules.LongPickHoldTicks}";
+            // carry2: 확정 입력 첫 묶음에 혼자 로비의 P1 이어 가기가 들어가고(묶음 형식 v2), 이어 간 P1이 공유 첫 틱부터 움직이는 빌드끼리만 접속한다.
+            return $"{version.Trim()}-prediction1-snapshot{FusionWorldSnapshot.ByteCount}-tick60-delay{DelayTicks}-hover1-hold{CardCollectionRules.LongPickHoldTicks}-carry2";
         }
 
         public static NetworkProjectConfig CreateConfig(NetworkProjectConfig source)

@@ -11,7 +11,8 @@ namespace Knockbox.Game.Online
     /// </summary>
     public unsafe struct FusionWorldSnapshot : INetworkStruct
     {
-        public const int ByteCount = 8692;
+        // 2026-11-16 8692 → 8700: 결과 공간의 FighterState.Arriving(선수당 4바이트 정렬).
+        public const int ByteCount = 8700;
         public const int WordCount = ByteCount / sizeof(int);
         public fixed int Words[WordCount];
 

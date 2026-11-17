@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Knockbox.Presentation;
 using Knockbox.Simulation;
 using UnityEngine;
@@ -9,7 +10,8 @@ using static Knockbox.Game.UI.FrontendWidgets;
 
 namespace Knockbox.Game.UI
 {
-    public enum FrontendScreen { Hidden, Main, Join, Waiting, Versus, Cards, Result }
+    /// <summary>Podium은 결과 공간(경기 뒤 자유 조작) 위의 작은 결과 표시다. 월드가 보이며 매트로 가리지 않는다.</summary>
+    public enum FrontendScreen { Hidden, Main, Join, Waiting, Versus, Cards, Result, Podium, Lobby, Options }
 
     /// <summary>승인된 R5 구도. 화면만 그리며 경기 상태는 쓰지 않는다.</summary>
     [DefaultExecutionOrder(200)]
@@ -107,9 +109,9 @@ namespace Knockbox.Game.UI
             create=Button(mainContent,"Create_room",new Rect(120,240,720,94),Theme.createRoom,Theme,PaletteAsset.Transparent,Theme.white,()=>CreateRoom?.Invoke(),40);
             joinMenu=Button(mainContent,"Join_room",new Rect(120,354,720,94),Theme.joinRoom,Theme,PaletteAsset.Transparent,Theme.white,()=>OpenJoin?.Invoke(),40);
             practice=Button(mainContent,"Practice",new Rect(120,468,720,94),Theme.practice,Theme,PaletteAsset.Transparent,Theme.white,()=>Practice?.Invoke(),40);
-            menuButtons[0]=create.GetComponent<FrontendButtonMotion>();
-            menuButtons[1]=joinMenu.GetComponent<FrontendButtonMotion>();
-            menuButtons[2]=practice.GetComponent<FrontendButtonMotion>();
+            BuildMenuPages(mainContent);
+            menuButtons=new[]{create,joinMenu,practice,startGame,optionsButton,quitButton,menuBack}
+                .Select(b=>b.GetComponent<FrontendButtonMotion>()).ToArray();
             menuAlpha=mainContent.gameObject.AddComponent<CanvasGroup>();
 
             lobby=Rect(menu,"Room",900,230,820,720);
@@ -127,6 +129,7 @@ namespace Knockbox.Game.UI
             copy=Button(lobby,"Copy_code",new Rect(250,280,320,70),"코드 복사",Theme,Theme.button,Theme.white,()=>CopyCode?.Invoke(),28);
             Status=Text(lobby,"Status",new Rect(0,390,820,140),"",Theme.textFont,30,Theme.status);
             lobbyBack=Button(lobby,"Back",new Rect(250,560,320,75),"돌아가기",Theme,PaletteAsset.Transparent,Theme.back,()=>Back?.Invoke(),28);
+            BuildOptions(menu);
 
             duel=Rect(stage,"Shared_VS_and_cards",0,0,1920,1080);
             split=Rect(duel,"White_divider",0,0,1920,1080).gameObject.AddComponent<FrontendGraphic>();
@@ -225,13 +228,22 @@ namespace Knockbox.Game.UI
         public void Show(FrontendScreen screen)
         {
             if(Screen==screen && enteredAt>0) return;
+            // 코드 입력·방 화면에서 돌아오면 게임 시작 하위 메뉴를 유지하고, 경기·결과에서 돌아오면 첫 메뉴로.
+            if(screen==FrontendScreen.Main && Screen!=FrontendScreen.Join && Screen!=FrontendScreen.Waiting) StartMenuOpen=false;
+            // 메뉴(메인·방 만들기·코드 참가)에서 로비로 들어가면 큰 캐릭터의 도약·낙하 퇴장을 먼저 보여준다(CP5).
+            lobbyFromMenu=screen==FrontendScreen.Lobby && (Screen==FrontendScreen.Main||Screen==FrontendScreen.Join||Screen==FrontendScreen.Waiting);
             Screen=screen;enteredAt=Time.unscaledTime;acquired=-1;acquiredProgress=0;
+            ApplyMenuPage();
             bool main=screen==FrontendScreen.Main;
             bool room=screen==FrontendScreen.Join||screen==FrontendScreen.Waiting;
             bool vs=screen==FrontendScreen.Versus, pick=screen==FrontendScreen.Cards, result=screen==FrontendScreen.Result;
-            menu.gameObject.SetActive(main||room);menuAlpha.gameObject.SetActive(main);lobby.gameObject.SetActive(room);
-            duel.gameObject.SetActive(vs||pick||result);
-            matte.gameObject.SetActive(screen!=FrontendScreen.Hidden);
+            bool podium=screen==FrontendScreen.Podium, lobbyScreen=screen==FrontendScreen.Lobby;
+            bool free=podium||lobbyScreen;
+            bool options=screen==FrontendScreen.Options;
+            menu.gameObject.SetActive(main||room||lobbyScreen||options);menuAlpha.gameObject.SetActive(main);lobby.gameObject.SetActive(room||lobbyScreen);
+            ShowOptions(options);
+            duel.gameObject.SetActive(vs||pick||result||free);
+            matte.gameObject.SetActive(screen!=FrontendScreen.Hidden&&!free);
             inventory.gameObject.SetActive(screen==FrontendScreen.Hidden||pick);
             foreach(var n in nameplates)n.SetActive(vs||result);
             vsText.gameObject.SetActive(vs);pickTitle.gameObject.SetActive(pick);pickHint.gameObject.SetActive(pick);
@@ -241,11 +253,12 @@ namespace Knockbox.Game.UI
             setScore.gameObject.SetActive(false);
             for(int i=0;i<2;i++)
             {
-                portraits[i].gameObject.SetActive(true);
+                portraits[i].gameObject.SetActive(!free);
                 portraitAlpha[i].alpha=1;
             }
+            ShowFreeSpace(screen);
             CodeInput.gameObject.SetActive(screen==FrontendScreen.Join);join.gameObject.SetActive(screen==FrontendScreen.Join);
-            roomCode.gameObject.SetActive(screen==FrontendScreen.Waiting);copy.gameObject.SetActive(screen==FrontendScreen.Waiting);
+            roomCode.gameObject.SetActive(screen==FrontendScreen.Waiting||lobbyScreen);copy.gameObject.SetActive(screen==FrontendScreen.Waiting||lobbyScreen);
             CanChoose=false;HoveredCard=-1;
             for(int i=0;i<3;i++) {cardAlpha[i].alpha=pick?0:1;cards[i].interactable=!pick;}
             split.SetSides(Theme.duelLeft,Theme.duelRight);

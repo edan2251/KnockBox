@@ -151,14 +151,14 @@ namespace Knockbox.Game.UI
         {
             float age = Time.unscaledTime - enteredAt;
             veil.color = PaletteAsset.Transparent;
-            if (Screen == FrontendScreen.Main || Screen == FrontendScreen.Join || Screen == FrontendScreen.Waiting)
+            if (Screen == FrontendScreen.Main || Screen == FrontendScreen.Join || Screen == FrontendScreen.Waiting || Screen == FrontendScreen.Options)
             {
-                bool main = Screen == FrontendScreen.Main;
+                bool main = Screen == FrontendScreen.Main, room = Screen == FrontendScreen.Join || Screen == FrontendScreen.Waiting;
                 float speed = 1 - Mathf.Exp(-16 * Time.unscaledDeltaTime);
                 menuAlpha.alpha = Mathf.Lerp(menuAlpha.alpha, main ? 1 : 0, speed);
-                lobbyAlpha.alpha = Mathf.Lerp(lobbyAlpha.alpha, main ? 0 : 1, speed);
+                lobbyAlpha.alpha = Mathf.Lerp(lobbyAlpha.alpha, room ? 1 : 0, speed);
                 menuAlpha.interactable = menuAlpha.blocksRaycasts = main;
-                lobbyAlpha.interactable = lobbyAlpha.blocksRaycasts = !main;
+                lobbyAlpha.interactable = lobbyAlpha.blocksRaycasts = room;
                 ((RectTransform)menuAlpha.transform).anchoredPosition = new Vector2(845 - 100 * (1 - menuAlpha.alpha), -205);
                 lobby.anchoredPosition = new Vector2(900 + 100 * (1 - lobbyAlpha.alpha), -230);
                 AnimateEntries(main ? menuEntries : roomEntries, main ? menuEntryPositions : roomEntryPositions,
@@ -168,6 +168,7 @@ namespace Knockbox.Game.UI
                 return;
             }
             if (Screen == FrontendScreen.Hidden) return;
+            if (Screen == FrontendScreen.Podium || Screen == FrontendScreen.Lobby) { AnimatePodium(); return; }
             float entry = Out(age / .42f);
             float exit = 0;
             if (Screen == FrontendScreen.Versus)
@@ -416,6 +417,11 @@ namespace Knockbox.Game.UI
             {
                 motionPresenter.PresentFrontendStage(1, true, 1, 1, 1, 0, true);
                 points.Root.gameObject.SetActive(false); return;
+            }
+            if (w.InFreeSpace)
+            {
+                PresentResultsSpace(w);
+                return;
             }
             bool countdown = m.Phase == MatchPhase.Countdown, ko = m.Phase == MatchPhase.KO;
             bool fighting = m.Phase == MatchPhase.Fighting;

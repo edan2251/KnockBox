@@ -664,6 +664,42 @@ namespace Knockbox.Tests.EditMode
             finally { Object.DestroyImmediate(go); }
         }
 
+        [Test]
+        public void LitColors_FollowPickerHue_P1KeepsDefaultGold()
+        {
+            // 2026-11-17 CP7: 호버 점등과 흡수 점이 늘 P1(금색)으로 보이던 문제.
+            var palette = AssetDatabase.LoadAssetAtPath<PaletteAsset>("Assets/_Project/Art/Palette.asset");
+            Assert.IsNotNull(palette);
+            float p1 = MonolithStyle.HueDelta(palette.FighterBody(0), palette.FighterBody(0));
+            float p2 = MonolithStyle.HueDelta(palette.FighterBody(0), palette.FighterBody(1));
+            Assert.AreEqual(0, p1, 1e-6f);
+            var gold = PaletteAsset.MonolithDefaults.IconFill;
+            Assert.AreEqual(gold, MonolithStyle.ShiftHue(gold, p1), "P1이 고를 때 색은 기존 그대로");
+            Color.RGBToHSV(MonolithStyle.ShiftHue(gold, p2), out float shifted, out float s, out float v);
+            Color.RGBToHSV(palette.FighterBody(1), out float target, out _, out _);
+            Color.RGBToHSV(gold, out float h0, out float s0, out float v0);
+            Color.RGBToHSV(palette.FighterBody(0), out float p1Hue, out _, out _);
+            Assert.AreEqual(Mathf.Repeat(target + (h0 - p1Hue), 1), shifted, 1e-3f, "P2가 고르면 P2 색상 쪽으로 돈다");
+            Assert.AreEqual(s0, s, 1e-3f); Assert.AreEqual(v0, v, 1e-3f);
+
+            var shapes = AssetDatabase.LoadAssetAtPath<ShapeLibrary>("Assets/_Project/Art/ShapeLibrary.asset");
+            shapes.Activate();
+            var go = new GameObject("Monolith_hue_test");
+            try
+            {
+                var view = go.AddComponent<MonolithView>();
+                view.Build(shapes, FrontendTheme.Load());
+                Catalog.TryGet(CardCollectionRules.FirstCardId, out var face);
+                view.Bind(face, shapes);
+                view.Present(1, 0, false);
+                Assert.AreEqual(gold, view.FillColor, "색상 회전을 받지 않은 비석(편집기 미리보기 등)은 기존 색");
+                view.SetLitHue(p2);
+                view.Present(1, 0, false);
+                Assert.AreEqual(MonolithStyle.ShiftHue(gold, p2), view.FillColor, "켜진 비석은 고르는 플레이어 색");
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
         [TestCase(0)] [TestCase(1)]
         public void FixedLight_StandsAbovePicker_AndMirrorsOffsetForP2(int picker)
         {

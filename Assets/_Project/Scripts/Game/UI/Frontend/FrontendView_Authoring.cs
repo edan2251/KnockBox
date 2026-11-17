@@ -28,6 +28,7 @@ namespace Knockbox.Game.UI
             Bind(join,()=>JoinRoom?.Invoke()); Bind(practice,()=>Practice?.Invoke());
             Bind(copy,()=>CopyCode?.Invoke()); Bind(lobbyBack,()=>Back?.Invoke());
             Bind(resultBack,()=>Back?.Invoke()); Bind(resultReady,()=>Rematch?.Invoke());
+            BindMenuPages();BindOptions();
             for(int i=0;i<cards.Length;i++)
             {
                 int index=i;

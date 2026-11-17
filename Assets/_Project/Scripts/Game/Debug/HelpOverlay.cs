@@ -21,7 +21,7 @@ namespace Knockbox.Game
             "F6 P2 input (keyboard / pad / dummy / bot)    [ ] dummy behavior\n" +
             "F7 reduce shake    F8 sync test    F11 tuning preset (default / fast)    HOME form display\n" +
             "F9 start/stop input recording    F10 replay last recording\n" +
-            "O/P KO P1/P2 (offline test)   CTRL+P pause   CTRL+O step   F12 debug text   ~ help";
+            "O/P KO P1/P2 (offline test)   CTRL+P pause   CTRL+O step   F12 debug text   ~ close";
 
         public const string BrawlText =
             "KNOCKBOX  -  brawl controls\n" +
@@ -39,7 +39,7 @@ namespace Knockbox.Game
             "F3 hitbox overlay   F4 surface mode   F5 reset round   F6 P2 input\n" +
             "[ ] dummy behavior   F7 reduce shake   F8 sync test\n" +
             "F9 start/stop input recording   F10 replay last recording\n" +
-            "O/P KO P1/P2 (offline test)   CTRL+P pause   CTRL+O step   F12 debug text   ~ help";
+            "O/P KO P1/P2 (offline test)   CTRL+P pause   CTRL+O step   F12 debug text   ~ close";
 
         TextMesh text;
         SpriteRenderer panel;

@@ -19,6 +19,11 @@ namespace Knockbox.Simulation
         // 6은 폼 시대의 FormSelect 자리다. 기록·체크섬 호환을 위해 번호를 비워 둔다(2026-11-11 폼 전투 제거).
         /// <summary>세트가 끝난 뒤 세트 패자만 고르는 단계(D-050).</summary>
         SetPick = 7,
+        /// <summary>
+        /// 온라인 방의 대기 공간(2026-11-16 게임 흐름 CP3). 로비 맵에서 두 선수가 자유롭게 움직이고, 둘 다 준비하면 1라운드 Countdown으로 간다.
+        /// MatchParams.LobbySpace를 켠 온라인 경기에서만 이 단계로 시작한다.
+        /// </summary>
+        Lobby = 8,
     }
 
     /// <summary>선택지 번호. 0 없음, 증강(카드)은 AugmentBase + 증강 번호(CP23). 1~3은 폼 시대의 폼 획득 번호였다.</summary>

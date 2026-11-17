@@ -159,6 +159,11 @@ namespace Knockbox.Simulation
         public int MantleTicks;
         public Vec2 MantleFrom;
         public Vec2 MantleTo;
+        /// <summary>
+        /// 결과 공간에서 입장·재등장으로 떨어지는 중(착지 전). 조작을 받지 않고 상대와의 공격·밀어내기 판정에서 빠진다.
+        /// 결과 공간 밖에서는 늘 거짓이며, 참일 때만 체크섬에 넣는다(기존 기록·기대 체크섬 유지, 2026-11-16).
+        /// </summary>
+        public bool Arriving;
 
         public const int NoAttack = -1;
         public const sbyte SurfaceNone = 0;
@@ -271,6 +276,8 @@ namespace Knockbox.Simulation
             v.Value("MantleFrom.Y", MantleFrom.Y);
             v.Value("MantleTo.X", MantleTo.X);
             v.Value("MantleTo.Y", MantleTo.Y);
+            if (Arriving)
+                v.Value(nameof(Arriving), true);
         }
     }
 }

@@ -14,27 +14,50 @@ namespace Knockbox.Simulation
     /// 고정 60틱 시뮬레이션. `입력 두 개 → 다음 상태`인 순수 함수처럼 동작한다.
     /// 상태는 State 한 필드에 모두 있고, Events는 상태가 아니다(매 Step 시작 시 비워짐).
     /// </summary>
-    public sealed class SimWorld : ISimStepper
+    public sealed partial class SimWorld : ISimStepper
     {
         public SimState State;
         readonly ArenaDef[] arenas;
+        /// <summary>결과 공간 맵(경기 끝 뒤 자유 조작). 설정이 켜져 있을 때 맵 목록의 마지막이며 순환에 들어가지 않는다.</summary>
+        readonly ArenaDef resultsArena;
+        /// <summary>로비 맵(온라인 방의 대기 공간). 설정이 켜져 있을 때 맵 목록의 마지막이며 순환에 들어가지 않는다.</summary>
+        readonly ArenaDef lobbyArena;
 
         public SimWorld(SimConfig config, ArenaDef arena, in SimState initial, int eventCapacity = SimEventBuffer.DefaultCapacity)
             : this(config, new[] { arena }, initial, eventCapacity)
         {
         }
 
-        /// <param name="arenas">맵 순환 목록(CP12). 지금 맵은 State.Match.Rotation이 고른다.</param>
+        /// <param name="arenas">
+        /// 맵 순환 목록(CP12). 지금 맵은 State.Match.Rotation이 고른다.
+        /// 결과 공간·로비 설정(MatchParams.ResultsSpace/LobbySpace)이면 경기 맵 뒤에 결과 공간 맵, 그 뒤에 로비 맵이 있다.
+        /// 기록·온라인 맵 목록이 같은 배열을 그대로 쓴다.
+        /// </param>
         public SimWorld(SimConfig config, ArenaDef[] arenas, in SimState initial, int eventCapacity = SimEventBuffer.DefaultCapacity)
         {
             if (arenas == null || arenas.Length == 0 || Array.IndexOf(arenas, null) >= 0)
                 throw new ArgumentException("맵이 하나 이상 있어야 함", nameof(arenas));
+            int rotationCount = SimState.RotationCount(config, arenas);
+            if (rotationCount < 1)
+                throw new ArgumentException("결과 공간·로비 설정에는 경기 맵 뒤에 그 맵들이 있어야 함", nameof(arenas));
             int count = initial.Match.Rotation.Count;
-            if (count > 1 && count != arenas.Length)
-                throw new ArgumentException($"맵 순환 상태({count}개)와 맵 목록({arenas.Length}개)이 다름", nameof(arenas));
+            if (count > 1 && count != rotationCount)
+                throw new ArgumentException($"맵 순환 상태({count}개)와 맵 목록({rotationCount}개)이 다름", nameof(arenas));
             ValidateTerrainFeatures(config,arenas);
             Config = config;
             this.arenas = arenas;
+            if (config.Match.ResultsSpace)
+            {
+                resultsArena = arenas[SimState.ResultsArenaIndex(config, arenas)];
+                if (resultsArena.PropCount != 0)
+                    throw new ArgumentException("결과 공간 맵에는 물리 상자를 두지 않습니다.", nameof(arenas));
+            }
+            if (config.Match.LobbySpace)
+            {
+                lobbyArena = arenas[SimState.LobbyArenaIndex(config, arenas)];
+                if (lobbyArena.PropCount != 0)
+                    throw new ArgumentException("로비 맵에는 물리 상자를 두지 않습니다.", nameof(arenas));
+            }
             for (int i = 0; i < arenas.Length; i++)
                 arenas[i].PrepareSurfaceData();
             State = initial;
@@ -42,9 +65,28 @@ namespace Knockbox.Simulation
             PropScratch = new PropScratch();
         }
 
-        /// <summary>지금 라운드의 맵. 라운드가 바뀌면(RoundTransition → Countdown) 다른 맵일 수 있다.</summary>
-        public ArenaDef Arena => arenas[State.Match.Rotation.Current];
+        /// <summary>
+        /// 지금 라운드의 맵. 라운드가 바뀌면(RoundTransition → Countdown) 다른 맵일 수 있다.
+        /// 결과 공간이 켜진 경기의 MatchEnd에서는 결과 공간 맵, Lobby 단계에서는 로비 맵이다.
+        /// </summary>
+        public ArenaDef Arena => InResultsSpace ? resultsArena : InLobby ? lobbyArena : arenas[State.Match.Rotation.Current];
 
+        /// <summary>결과 공간 맵(설정이 꺼져 있으면 null).</summary>
+        public ArenaDef ResultsArena => resultsArena;
+
+        /// <summary>로비 맵(설정이 꺼져 있으면 null).</summary>
+        public ArenaDef LobbyArena => lobbyArena;
+
+        /// <summary>경기가 끝나 결과 공간에서 자유 조작하는 중(MatchEnd + 결과 공간 설정).</summary>
+        public bool InResultsSpace => resultsArena != null && State.Match.Phase == MatchPhase.MatchEnd;
+
+        /// <summary>온라인 방의 로비에서 자유 조작하는 중.</summary>
+        public bool InLobby => lobbyArena != null && State.Match.Phase == MatchPhase.Lobby;
+
+        /// <summary>점수 없이 자유롭게 움직이는 공간(결과 공간 또는 로비).</summary>
+        public bool InFreeSpace => InResultsSpace || InLobby;
+
+        /// <summary>기록·온라인 맵 목록 전체(결과 공간·로비 맵 포함).</summary>
         public int ArenaCount => arenas.Length;
 
         public ArenaDef GetArena(int index) => arenas[index];
@@ -77,6 +119,8 @@ namespace Knockbox.Simulation
             if (State.Match.Phase != MatchPhase.RoundTransition)
                 throw new InvalidOperationException($"설정은 RoundTransition 단계에서만 바꿀 수 있음(지금 {State.Match.Phase})");
             if(config==null)throw new ArgumentNullException(nameof(config));
+            if(config.Match.ResultsSpace!=Config.Match.ResultsSpace||config.Match.LobbySpace!=Config.Match.LobbySpace)
+                throw new InvalidOperationException("결과 공간·로비 설정은 경기 중에 바꿀 수 없음(맵 목록 구성이 달라짐)");
             ValidateTerrainFeatures(config,arenas);Config=config;
         }
 
@@ -115,7 +159,17 @@ namespace Knockbox.Simulation
                     s.Match.Rotation.Advance();
                     SimState.StartNextRound(ref s, Config, Arena);
                     break;
+                case MatchPhase.Lobby:
+                    if (lobbyArena == null)
+                        throw new InvalidOperationException("로비 설정 없이 Lobby 단계에 들어옴");
+                    StepFreeSpace(ref s, p1, p2, lobbyArena, true);
+                    break;
                 case MatchPhase.MatchEnd:
+                    if (resultsArena != null)
+                    {
+                        StepFreeSpace(ref s, p1, p2, resultsArena, false);
+                        break;
+                    }
                     bool rematch = Config.Match.RematchBothHold
                         ? (p1.Buttons & p2.Buttons & InputButtons.Attack) != 0
                         : (InputFrame.Pressed(p1.Buttons, s.Fighter0.PrevButtons) | InputFrame.Pressed(p2.Buttons, s.Fighter1.PrevButtons)) != InputButtons.None;
@@ -147,6 +201,17 @@ namespace Knockbox.Simulation
         /// </summary>
         void StepFighting(ref SimState s, in InputFrame p1, in InputFrame p2)
         {
+            StepFighters(ref s, p1, p2, true);
+            CheckKnockout(ref s);
+        }
+
+        /// <summary>
+        /// 싸움 한 틱에서 KO 확인을 뺀 부분. 결과 공간도 같은 이동·전투 규칙을 쓴다.
+        /// interact가 거짓이면 두 파이터 사이의 밀어내기·몸 충돌·공격 판정을 건너뛴다(재등장 낙하 중 피격 무시).
+        /// 싸움 단계는 늘 참이며 판정 순서는 이전과 같다.
+        /// </summary>
+        void StepFighters(ref SimState s, in InputFrame p1, in InputFrame p2, bool interact)
+        {
             BrawlWeapons.Tick(ref s, Config, Arena, Events);
             var weaponInput0 = p1;
             var weaponInput1 = p2;
@@ -172,20 +237,20 @@ namespace Knockbox.Simulation
                 RopeConnectors.Resolve(ref s,Arena,Config,prev0,prev1,frozen0,frozen1,PropScratch,Events);
 
             // 몸 충돌 판정은 이동 직후(밀어내기 전) 스냅숏의 접촉과 법선으로 한다.
-            var contact = BodyContact.Measure(s.Fighter0, s.Fighter1, Config);
+            var contact = interact ? BodyContact.Measure(s.Fighter0, s.Fighter1, Config) : default;
             // 붙잡기 동안은 둘이 붙어 있으므로 밀어내지 않는다.
             bool attached = s.Fighter0.Action == ActionState.Holding || s.Fighter0.Action == ActionState.Held
                             || s.Fighter1.Action == ActionState.Holding || s.Fighter1.Action == ActionState.Held;
-            if (!attached)
+            if (interact && !attached)
                 FighterPush.Resolve(ref s.Fighter0, ref s.Fighter1, prev0, prev1, frozen0, frozen1, Config, Arena);
             if (!frozen0)
                 FighterMovement.ResolveContacts(ref s.Fighter0, s.Fighter1, scratch0, Config, Arena, 0, s.Tick, Events);
             if (!frozen1)
                 FighterMovement.ResolveContacts(ref s.Fighter1, s.Fighter0, scratch1, Config, Arena, 1, s.Tick, Events);
 
-            FighterCombat.ResolveInteractions(ref s.Fighter0, ref s.Fighter1, frozen0, frozen1, contact, Config, Arena, s.Tick, Events);
+            if (interact)
+                FighterCombat.ResolveInteractions(ref s.Fighter0, ref s.Fighter1, frozen0, frozen1, contact, Config, Arena, s.Tick, Events);
             BrawlWeapons.AfterCombat(ref s, Config, Arena, frozen0, frozen1, prev0, prev1, Events);
-            CheckKnockout(ref s);
         }
 
         void StepFighter(ref FighterState f, in InputFrame input, int index, int tick, BrawlWeaponKind heldWeapon, out MovementScratch scratch)
@@ -244,6 +309,8 @@ namespace Knockbox.Simulation
                 int winner = s.Match.Score0 >= target ? 0 : 1;
                 s.Match.SetPhase(MatchPhase.MatchEnd);
                 Events.Add(new SimEvent(s.Tick, SimEventType.MatchEnd, winner, Vec2.Zero, Vec2.Zero, s.Match.Round));
+                if (resultsArena != null)
+                    EnterResultsSpace(ref s);
                 return;
             }
             s.Match.SetPhase(MatchPhase.RoundTransition);
@@ -274,6 +341,8 @@ namespace Knockbox.Simulation
             {
                 m.SetPhase(MatchPhase.MatchEnd);
                 Events.Add(new SimEvent(s.Tick, SimEventType.MatchEnd, winner, Vec2.Zero, Vec2.Zero, m.Round));
+                if (resultsArena != null)
+                    EnterResultsSpace(ref s);
                 return;
             }
             m.Set++;

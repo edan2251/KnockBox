@@ -46,6 +46,12 @@ namespace Knockbox.Game.Maps
             kind=b.Kind,minX=b.MinX,minY=b.MinY,maxX=b.MaxX,maxY=b.MaxY,vertices=b.IsPolygon?Array.ConvertAll(b.Polygon.CopyPoints(),p=>new Vector2(p.X,p.Y)):null};
     }
 
+    /// <summary>
+    /// 맵 용도(2026-11-16 게임 흐름 CP4). 경기 맵만 경기 등록 목록(GameMaps)에 들어간다.
+    /// 보상 맵은 이전처럼 rewardMap 설정으로도 판별해 기존 에셋을 그대로 쓴다.
+    /// </summary>
+    public enum MapUsage { Match = 0, Reward = 1, Lobby = 2, Results = 3 }
+
     /// <summary>Authoritative ordered terrain and physical boxes. Conversion is lossless; no Unity physics or implicit snapping.</summary>
     [CreateAssetMenu(menuName="Knockbox/맵/맵 정의")]
     public sealed class MapDefinition : ScriptableObject
@@ -71,6 +77,18 @@ namespace Knockbox.Game.Maps
         [SerializeField] RewardStele[] steles=Array.Empty<RewardStele>();
         [SerializeField] Vector2 loserStand=new Vector2(-13.5f,-9);
         [SerializeField] RewardStageSettings reward=new RewardStageSettings();
+        // 맵 용도(CP4). 로비·결과 공간은 판정 맵이지만 경기 순환에는 들어가지 않는다. 용도·시상대 지정은 판정 체크섬에 들어가지 않는다.
+        [SerializeField] MapUsage usage;
+        [Tooltip("결과 공간: 승자 자리(P1 시작 위치) 아래의 시상대 지형 ID. 연출(시상대 상승)에만 쓰며 판정과 무관합니다.")]
+        [SerializeField] string podiumBoxId;
+        /// <summary>맵 용도. 보상 맵 설정이 켜져 있으면 보상 맵이다.</summary>
+        public MapUsage Usage=>rewardMap?MapUsage.Reward:usage;
+        /// <summary>점수 없이 자유롭게 움직이는 공간(로비·결과 공간) 맵.</summary>
+        public bool IsSpaceMap=>Usage==MapUsage.Lobby||Usage==MapUsage.Results;
+        public string PodiumBoxId=>podiumBoxId;
+        /// <summary>용도에 따른 두 발 위치의 뜻(제작기 표시용).</summary>
+        public string SpotLabel(int player)=>Usage==MapUsage.Results?(player==0?"승자 자리(시상대 위)":"패자 자리")
+            :Usage==MapUsage.Lobby?"P"+(player+1)+" 입장·재등장 자리":"P"+(player+1)+" 시작 위치";
         public string Id=>stableId;
         public string DisplayName=>displayName;
         public string MatchName=>preservedBaseline?"Brawl":"map:"+stableId;
@@ -237,6 +255,37 @@ namespace Knockbox.Game.Maps
             }
             if(Vector2.Distance(spawn0,spawn1)<bodySize)errors.Add("양쪽 시작 위치가 겹칩니다.");
             if(rewardMap)errors.AddRange(ValidateReward(bodySize));
+            if(IsSpaceMap)errors.AddRange(ValidateSpace(bodySize));
+            return errors;
+        }
+        /// <summary>
+        /// 로비·결과 공간 맵 규칙(CP4): 물리 상자·로프 없음(재등장·결과 기록 단순화), 두 자리 위에서 떨어지는 시작 위치가 지형에 막히지 않음,
+        /// 결과 공간의 시상대 지정이 있으면 그 지형이 있고 승자 자리가 그 윗면 위.
+        /// </summary>
+        List<string> ValidateSpace(float bodySize)
+        {
+            var errors=new List<string>();
+            string what=Usage==MapUsage.Lobby?"로비 맵":"결과 공간 맵";
+            if(PhysicalBoxCount>0||RopeCount>0)errors.Add(what+"에는 물리 상자·로프를 두지 않습니다.");
+            float h=bodySize*.5f, top=rows*.5f-1f-h-.5f;
+            for(int p=0;p<2;p++)
+            {
+                var s=Spawn(p);
+                float y=Mathf.Max(s.y,Mathf.Min(s.y+CardCollectionRules.ResultsDropHeight,top));
+                var start=new MapBox{minX=s.x-h,maxX=s.x+h,minY=y,maxY=y+bodySize};
+                foreach(var b in boxes)
+                    if(b.kind!=TerrainKind.OneWay&&Overlaps(start,b)){errors.Add(SpotLabel(p)+" 위가 지형("+b.id+")에 막혀 떨어질 수 없습니다. 자리 위쪽을 비워 주세요.");break;}
+            }
+            if(Usage==MapUsage.Results&&!string.IsNullOrEmpty(podiumBoxId))
+            {
+                int index=Array.FindIndex(boxes,b=>b.id==podiumBoxId);
+                if(index<0)errors.Add("시상대로 지정한 지형("+podiumBoxId+")이 없습니다.");
+                else
+                {
+                    var b=boxes[index];
+                    if(Mathf.Abs(spawn0.y-b.maxY)>.05f||spawn0.x<b.minX||spawn0.x>b.maxX)errors.Add("승자 자리(P1 시작 위치)가 시상대 윗면 위에 있어야 합니다.");
+                }
+            }
             return errors;
         }
         /// <summary>보상 맵 규칙: 비석 3개, 볼록 다각형, 바닥 위에 섬, 서로·패자 자리와 겹치지 않음, 카드 면이 들어갈 최소 크기.</summary>
@@ -334,6 +383,14 @@ namespace Knockbox.Game.Maps
             return true;
         }
         public void MakeEditableCopy(string newId,string title){stableId=newId;displayName=title;preservedBaseline=false;revision=1;}
+        /// <summary>맵 용도와 시상대 지정(결과 공간). 보상 맵은 기존 보상 맵 설정으로 바꾼다.</summary>
+        public void SetUsage(MapUsage value,string podium)
+        {
+            if(preservedBaseline)throw new InvalidOperationException("기존 Brawl은 보호됩니다. 사본을 편집해주세요.");
+            if(value==MapUsage.Reward)throw new InvalidOperationException("보상 맵은 보상 맵 설정에서 켭니다.");
+            if(rewardMap&&value!=MapUsage.Match)throw new InvalidOperationException("보상 맵 설정을 먼저 꺼 주세요.");
+            usage=value;podiumBoxId=value==MapUsage.Results?(podium??""):"";
+        }
 #endif
     }
 }

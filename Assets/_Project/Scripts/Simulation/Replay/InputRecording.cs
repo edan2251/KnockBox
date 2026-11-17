@@ -17,8 +17,13 @@ namespace Knockbox.Simulation
         public const ushort FormatVersion = 8;
         /// <summary>제작기 물리 맵은 전체 지형·질량·시작 방식 해시를 쓰는 v9. 구 맵 기록은 v8로 유지한다.</summary>
         public const ushort PhysicsMapVersion = 9;
+        /// <summary>
+        /// 10: 방장 혼자 로비의 P1을 이어 간 온라인 로비 시작(2026-11-17, <see cref="LobbyCarry"/>). 이어 간 값이 있을 때만 쓰며
+        /// 맵 해시 방식을 명시 칸으로 담는다. v4~v9 기록은 그대로 읽고 같은 시작 상태를 만든다.
+        /// </summary>
+        public const ushort LobbyCarryVersion = 10;
         public bool UsesGeometryChecksum { get; private set; }
-        public ushort WrittenVersion => UsesGeometryChecksum ? PhysicsMapVersion : FormatVersion;
+        public ushort WrittenVersion => Carry.Has ? LobbyCarryVersion : UsesGeometryChecksum ? PhysicsMapVersion : FormatVersion;
         const ushort WeaponsVersion = 7;
         const ushort ChargeVersion = 6;
         const ushort AimVersion = 5;
@@ -38,6 +43,8 @@ namespace Knockbox.Simulation
         public string Mode = "";
         public ArenaRotation Rotation;
         public uint InitialChecksum;
+        /// <summary>로비 시작에서 이어 간 P1(없으면 Has 거짓). 시작 상태 체크섬에 포함된다.</summary>
+        public LobbyCarry Carry;
         public bool HasFinalChecksum;
         public uint FinalChecksum;
 
@@ -48,8 +55,11 @@ namespace Knockbox.Simulation
         public static InputRecording Begin(SimConfig config, ArenaDef arena, uint seed, Vec2 spawn0, Vec2 spawn1, MatchPhase startPhase, string mode) =>
             Begin(config, new[] { arena }, default, seed, spawn0, spawn1, startPhase, mode);
 
-        public static InputRecording Begin(SimConfig config, ArenaDef[] arenas, in ArenaRotation rotation, uint seed, Vec2 spawn0, Vec2 spawn1, MatchPhase startPhase, string mode)
+        public static InputRecording Begin(SimConfig config, ArenaDef[] arenas, in ArenaRotation rotation, uint seed, Vec2 spawn0, Vec2 spawn1, MatchPhase startPhase, string mode,
+            LobbyCarry carry = default)
         {
+            if (carry.Has && startPhase != MatchPhase.Lobby)
+                throw new ArgumentException("로비 이어 가기는 로비에서 시작한 기록에만 쓸 수 있습니다.", nameof(carry));
             var names = new string[arenas.Length];
             for (int i = 0; i < arenas.Length; i++)
                 names[i] = arenas[i].Name ?? "";
@@ -66,6 +76,7 @@ namespace Knockbox.Simulation
                 Arena = string.Join(ArenaSeparator.ToString(), names),
                 Mode = mode ?? "",
                 Rotation = rotation,
+                Carry = carry,
             };
             rec.InitialChecksum = rec.BuildState(config, arenas).ComputeChecksum();
             return rec;
@@ -107,6 +118,14 @@ namespace Knockbox.Simulation
         /// <summary>검사 없이 기록의 시작 상태를 만든다(설정이 달라도 재생해 보는 디버그 재생용).</summary>
         public SimState BuildState(SimConfig config, ArenaDef[] arenas)
         {
+            // 로비에서 시작한 온라인 기록(2026-11-16): 시작 상태는 설정·맵·시드로 다시 만든다(로비 맵의 낙하 자리).
+            if (StartPhase == MatchPhase.Lobby)
+            {
+                var lobby = SimState.CreateMatch(config, arenas, Seed, MatchPhase.Lobby);
+                lobby.Match.Rotation = Rotation;
+                Carry.Apply(config, arenas, ref lobby);
+                return lobby;
+            }
             var state = SimState.CreateRound(config, arenas[Rotation.Current], Seed, Spawn0, Spawn1, StartPhase);
             state.Match.Rotation = Rotation;
             return state;
@@ -180,6 +199,13 @@ namespace Knockbox.Simulation
                 w.Write(Rotation.Count);
                 w.Write(Rotation.Slot);
                 w.Write(Rotation.Cycle);
+                if (Carry.Has)
+                {
+                    w.Write(UsesGeometryChecksum);
+                    var carry = new byte[LobbyCarry.Size];
+                    Carry.Write(carry, 0);
+                    w.Write(carry);
+                }
                 w.Write(p1.Count);
                 var buffer = new byte[InputFrame.Size * 2];
                 for (int i = 0; i < p1.Count; i++)
@@ -199,7 +225,7 @@ namespace Knockbox.Simulation
             if (r.ReadUInt32() != Magic)
                 throw new InvalidDataException("입력 기록 파일이 아님");
             ushort version = r.ReadUInt16();
-            if (version != PhysicsMapVersion && version != FormatVersion && version != WeaponsVersion && version != ChargeVersion && version != AimVersion && version != NoAimVersion)
+            if (version != LobbyCarryVersion && version != PhysicsMapVersion && version != FormatVersion && version != WeaponsVersion && version != ChargeVersion && version != AimVersion && version != NoAimVersion)
                 throw new InvalidDataException(version < NoAimVersion
                     ? $"CR-003(폼 전투) 전의 입력 기록(버전 {version})은 호환되지 않음"
                     : $"지원하지 않는 입력 기록 버전: {version}");
@@ -228,6 +254,16 @@ namespace Knockbox.Simulation
                     Slot = r.ReadInt32(),
                     Cycle = r.ReadInt32(),
                 };
+            }
+            if (version == LobbyCarryVersion)
+            {
+                rec.UsesGeometryChecksum = r.ReadBoolean();
+                byte[] carry = r.ReadBytes(LobbyCarry.Size);
+                if (carry.Length != LobbyCarry.Size)
+                    throw new InvalidDataException("입력 기록이 중간에 끊김");
+                rec.Carry = LobbyCarry.Read(carry, 0);
+                if (!rec.Carry.Has || rec.StartPhase != MatchPhase.Lobby)
+                    throw new InvalidDataException("v10 입력 기록에는 로비 시작과 이어 간 P1 값이 있어야 함");
             }
             int count = r.ReadInt32();
             if (count < 0)

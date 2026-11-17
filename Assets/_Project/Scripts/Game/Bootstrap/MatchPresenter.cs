@@ -66,6 +66,7 @@ namespace Knockbox.Game
         int queued;
         double lastSimTime;
         int renderedRound;
+        bool renderedResults;
         /// <summary>지금 그려진 맵. 시뮬레이션의 현재 맵(라운드마다 바뀔 수 있다)과 다르면 다시 그린다.</summary>
         ArenaDef builtArena;
 
@@ -90,6 +91,8 @@ namespace Knockbox.Game
         public DustPool Dust => dust;
         public ImpactFx Fx => fx;
         public CameraRig CameraRig => cameraRig;
+        /// <summary>옵션의 강한 섬광 줄이기(CP6): KO 화면 섬광을 끄고 색수차 펄스를 줄인다.</summary>
+        public bool ReduceFlash { get; set; }
         public SfxPlayer SfxPlayer => sfxPlayer;
         public bool OverlayVisible => overlay != null && overlay.gameObject.activeSelf;
 
@@ -369,6 +372,7 @@ namespace Knockbox.Game
             if (cameraRig != null)
                 cameraRig.ResetEffects();
             renderedRound = r.World.State.Match.Round;
+            renderedResults = r.World.InFreeSpace;
             queued = 0;
             lastSimTime = SimTime();
         }
@@ -427,11 +431,20 @@ namespace Knockbox.Game
             var previous = runner.PreviousState;
             var current = world.State;
             float alpha = runner.RenderAlpha;
-            if (current.Match.Round != renderedRound)
+            // 결과 공간에서 새 경기로 나간 순간도 새 라운드로 본다. 1라운드에 끝난 경기(검수 단축키)는 재시작 뒤에도
+            // 라운드 번호가 1로 같아, 번호만 비교하면 결과 공간 맵을 계속 그렸다(2026-11-16 CP1 버그).
+            bool inResults = world.InFreeSpace;
+            bool leftResults = renderedResults && !inResults;
+            renderedResults = inResults;
+            if (current.Match.Round != renderedRound || leftResults)
             {
                 // 새 라운드(또는 새 경기): 시작 위치로 순간 이동했으므로 보간하지 않고 발을 새로 디딘다.
                 // 맵 순환(CP12)이면 맵도 바뀌었다.
                 renderedRound = current.Match.Round;
+                runner.ClearDisplayCorrection();
+                if (leftResults)
+                    for (int k = 0; k < 2; k++)
+                        if (shattered[k]) Fighter(k).SetShattered(false);
                 propView.ResetFeedback();
                 if (world.Arena != builtArena)
                 {
@@ -444,6 +457,23 @@ namespace Knockbox.Game
                 koShatter.Clear();
                 brawlWeaponView.Clear();
                 shattered[0] = shattered[1] = false;
+                alpha = 1f;
+            }
+            // 결과 공간: 같은 라운드 안에서 경기 맵이 결과 공간 맵으로 바뀐다. 새 경기(라운드 변경)는 위에서 다시 그린다.
+            if (inResults && world.Arena != builtArena)
+            {
+                BuildArena(world.Arena);
+                fx.Clear();
+                dust.Clear();
+                fighter0.ResetPose();
+                fighter1.ResetPose();
+                koShatter.Clear();
+                brawlWeaponView.Clear();
+                for (int k = 0; k < 2; k++)
+                {
+                    if (shattered[k]) Fighter(k).SetShattered(false);
+                    shattered[k] = false;
+                }
                 alpha = 1f;
             }
             // 카드 선택 무대: 화면에만 선택 맵을 그리고 패자를 표시 전용 상태로 세운다(시뮬레이션 상태는 읽기만 한다).
@@ -461,6 +491,7 @@ namespace Knockbox.Game
             propView.Render(previous.Props, current.Props, alpha);
             fighter0.Render(draw0Previous, draw0, alpha, dt, world.Arena, world.Config);
             fighter1.Render(draw1Previous, draw1, alpha, dt, world.Arena, world.Config);
+            ApplyPredictionCorrection(stage, current);
             brawlWeaponView.Render(previous, current, alpha, dt, world.Config);
             aimLine.Render(runner, alpha);
             if (modelRig != null)
@@ -469,7 +500,8 @@ namespace Knockbox.Game
                 var curModel = modelFighter == 0 ? draw0 : draw1;
                 modelRig.Render(prevModel, curModel, alpha, dt, world.Config);
             }
-            UpdateKnockout(current, world.Config);
+            if (world.InFreeSpace) UpdateResultsKnockout(current, world.Config);
+            else UpdateKnockout(current, world.Config);
             UpdateCountdownSound(current, world.Config);
             dust.Tick(dt);
             koShatter.Tick(dt);
@@ -477,7 +509,7 @@ namespace Knockbox.Game
             if (cameraRig != null)
             {
                 cameraRig.Tick(dt);
-                postFx.ReduceMotion = cameraRig.ReduceMotion;
+                postFx.ReduceMotion = cameraRig.ReduceMotion || ReduceFlash;
             }
             // 카메라와 같은 확정 타격 사건에서 얻은 광원 위치를 세 종류의 그림자에 같은 프레임에 적용한다.
             var movingLight = background.BaseLightPosition + (cameraRig != null ? cameraRig.LightOffset : Vector2.zero);
@@ -510,6 +542,71 @@ namespace Knockbox.Game
             if (frontend != null && frontend.View != null) frontend.View.PresentMatchFrame();
             else worldBrightness.SetBrightness(1);
             if (stage) cardPickStage.Present();
+            RenderReadyMarkers(current, world.Config);
+        }
+
+        ReadyMarkers readyMarkers;
+        bool readyMarkersVisible, ready0, ready1;
+
+        /// <summary>결과 공간의 머리 위 준비 표식. 화면(FrontendController)이 확정 입력과 내 준비 의도로 매 프레임 정한다.</summary>
+        public void SetReadyMarkers(bool visible, bool readyP1, bool readyP2)
+        {
+            readyMarkersVisible = visible;
+            ready0 = readyP1;
+            ready1 = readyP2;
+        }
+
+        void RenderReadyMarkers(in SimState s, SimConfig config)
+        {
+            if (readyMarkers == null)
+            {
+                if (!readyMarkersVisible) return;
+                readyMarkers = new ReadyMarkers(transform, shapes, palette);
+            }
+            float half = config.Movement.BodySize * 0.5f;
+            for (int k = 0; k < 2; k++)
+            {
+                var view = Fighter(k);
+                // KO로 조각난 동안과 낙하 전(숨김)에는 표식도 숨긴다.
+                bool shown = readyMarkersVisible && s.GetFighter(k).Action != ActionState.KO && view.transform.localScale.x > .5f;
+                readyMarkers.Render(shown, k, view.BodyCenter + new Vector2(0f, half), k == 0 ? ready0 : ready1, Time.unscaledTime);
+            }
+        }
+
+        /// <summary>
+        /// 결과 공간의 KO: 점수는 없고 그 선수만 히트스탑(ResultsRespawnTicks) 동안 멈춘다. 경기 KO와 같은 순간(KoHitstop)에 조각나고,
+        /// 재등장(KO가 풀림)하면 몸을 되돌린다. 상태만 보고 정하므로 틱을 건너뛰어도 한 번만 일어난다.
+        /// </summary>
+        void UpdateResultsKnockout(in SimState s, SimConfig config)
+        {
+            fighter0.Celebrating = fighter1.Celebrating = false;
+            for (int k = 0; k < 2; k++)
+            {
+                var f = s.GetFighter(k);
+                var view = Fighter(k);
+                if (f.Action != ActionState.KO)
+                {
+                    if (shattered[k])
+                    {
+                        shattered[k] = false;
+                        view.SetShattered(false);
+                        view.ResetPose();
+                    }
+                    continue;
+                }
+                if (shattered[k] || config.Match.ResultsRespawnTicks - f.HitstopTicks < config.Combat.KoHitstop)
+                    continue;
+                shattered[k] = true;
+                var center = view.BodyCenter;
+                koShatter.Shatter(center, palette.FighterBody(k), new Vector2(f.Velocity.X, f.Velocity.Y));
+                if (koShatter.PhysicsEnabled)
+                    view.SetShattered(true);
+                fx.RingBurst(center, palette.FighterBody(k), 0.6f, 4f, 0.3f);
+                fx.Shards(center, Vector2.up, 360f, 10, palette.FighterBody(k), 11f, 0.22f, 0.7f);
+                dust.Burst(center, 4, 3f, 0f);
+                AddTrauma(0.5f);
+                sfxPlayer.Play(Sfx.WallSplat, 0.8f);
+            }
         }
 
         /// <summary>시뮬레이션 렌더링 후 적용하는 화면 전용 이동. 지형/파이터의 판정 위치는 바꾸지 않는다.</summary>
@@ -517,7 +614,8 @@ namespace Knockbox.Game
             => PresentFrontendStage(progress, entering, opacity, scale0, scale1, rise, combat, roundLightOn ? 1f : 0f, keepBackdrop);
 
         /// <summary>roundLight는 조명 밝기(0~1). 꺼질 때 이징한 값을 넘기면 서서히 어두워지고, 1이 되면 빛 영역이 열린다.</summary>
-        public void PresentFrontendStage(float progress, bool entering, float opacity, float scale0, float scale1, float rise, bool combat, float roundLight, bool keepBackdrop = false)
+        /// <param name="healthBars">월드 HUD(체력바·점수 점) 표시. 생략하면 combat을 따른다. 결과 공간은 조작 중에도 숨긴다.</param>
+        public void PresentFrontendStage(float progress, bool entering, float opacity, float scale0, float scale1, float rise, bool combat, float roundLight, bool keepBackdrop = false, bool? healthBars = null)
         {
             roundLight = Mathf.Clamp01(roundLight);
             bool roundLightOn = roundLight >= 1;
@@ -527,7 +625,8 @@ namespace Knockbox.Game
             background.SetTransitionOpacity(keepBackdrop ? 1 : opacity);
             background.SetRoundLightLevel(roundLight);
             var frontend = GetComponent<UI.FrontendController>();
-            bool worldVisible = frontend == null || frontend.View == null || frontend.View.Screen == UI.FrontendScreen.Hidden;
+            bool worldVisible = frontend == null || frontend.View == null || frontend.View.Screen == UI.FrontendScreen.Hidden
+                || frontend.View.Screen == UI.FrontendScreen.Podium || frontend.View.Screen == UI.FrontendScreen.Lobby;
             worldBrightness.SetBrightness(entering && worldVisible ? Mathf.Lerp(PreparationBrightness, 1, roundLight) : 1);
             bool shadowsReady = roundLightOn && (entering ? arenaView.TransitionSettled : progress <= 0);
             background.SetShadowVisibility(shadowsReady ? 1 : 0);
@@ -544,7 +643,7 @@ namespace Knockbox.Game
             fighter1.transform.localPosition += Vector3.up * rise;
             if (modelRig != null) modelRig.gameObject.SetActive(combat || (modelFighter == 0 ? scale0 : scale1) > .01f);
             hud.FrontendFlow = runner.World.Config.Match.IntroCountdownTicks > 0;
-            hud.gameObject.SetActive(combat);
+            hud.gameObject.SetActive(healthBars ?? combat);
             fighterShadows.gameObject.SetActive(combat || (entering && shadowsReady));
             aimLine.gameObject.SetActive(combat);
             boundaryView.gameObject.SetActive(combat);
@@ -656,6 +755,28 @@ namespace Knockbox.Game
         /// 화면 전용 장면(카드 선택 등)이 경기와 같은 사건 연출(먼지·소리·흔들림·파이터 반응)을 내게 한다. 시뮬레이션 사건 목록에는 넣지 않는다.
         /// </summary>
         public void PresentDisplayEvent(in SimEvent e) => Consume(e);
+
+        /// <summary>
+        /// Client 예측 보정 완화를 그림에만 더한다(<see cref="MatchRunner.DisplayCorrection"/>). 피격·던져짐·KO·재등장·잡기로 바뀐 선수의 남은 보정은
+        /// <see cref="MatchRunner.UpdateDisplayCorrection"/>가 바로 지운다(붙잡기 중에는 두 선수가 같은 시점으로 보인다).
+        /// </summary>
+        void ApplyPredictionCorrection(bool clear, in SimState current)
+        {
+            if (clear || !runner.PredictionDriven) { runner.ClearDisplayCorrection(); return; }
+            runner.UpdateDisplayCorrection(current, Time.unscaledDeltaTime);
+            var c0 = runner.DisplayCorrection(0); var c1 = runner.DisplayCorrection(1);
+            if (c0 != Vector2.zero) fighter0.transform.localPosition += (Vector3)c0;
+            if (c1 != Vector2.zero) fighter1.transform.localPosition += (Vector3)c1;
+        }
+
+        /// <summary>화면에서만 지형 상자 하나를 옮긴다(결과 공간의 시상대 상승). 판정 위치는 그대로다.</summary>
+        public void OffsetTerrainBox(int boxIndex, float dy) => arenaView.OffsetBox(boxIndex, dy);
+
+        /// <summary>화면에서만 선수를 위아래로 옮긴다(시상대와 함께 솟음·자동 점프). 판정 위치는 그대로다.</summary>
+        public void OffsetFighterVisual(int fighter, float dy)
+        {
+            if (dy != 0f) Fighter(fighter).transform.localPosition += Vector3.up * dy;
+        }
 
         void Consume(in SimEvent e)
         {
@@ -900,7 +1021,7 @@ namespace Knockbox.Game
                     fx.RingBurst(center, palette.flash, 0.5f, 4.5f, 0.35f);
                     fx.Glow(center, palette.flash, 6f, 0.5f, 0.4f);
                     fx.Shards(center, Vector2.up, 360f, 10, palette.FighterBody(e.Fighter), 12f, 0.26f, 0.6f);
-                    if (!reduceMotion)
+                    if (!reduceMotion && !ReduceFlash)
                         fx.ScreenFlash(false);
                     AddTrauma(0.6f, e.Direction.X);
                     Punch(0.03f, 12f * Frame);

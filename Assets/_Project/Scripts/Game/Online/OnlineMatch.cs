@@ -66,9 +66,11 @@ namespace Knockbox.Game.Online
         static void Attach()
         {
             var runner = FindFirstObjectByType<MatchRunner>();
-            if (runner == null || runner.GetComponent<OnlineMatch>() != null)
+            if (runner == null || !runner.BrawlExperiment || !UI.FrontendController.UseFrontendForThisRun)
                 return;
-            if (!runner.BrawlExperiment || !UI.FrontendController.UseFrontendForThisRun)
+            // 첫 방 만들기·참가의 Fusion 첫 실행 비용을 앱 시작(이미 불러오기 정지가 있는 때)으로 옮긴다(빌드 전용).
+            FusionConnection.WarmUpOnce();
+            if (runner.GetComponent<OnlineMatch>() != null)
                 return;
             runner.gameObject.AddComponent<OnlineMatch>();
             runner.gameObject.AddComponent<OnlineLobby>();
@@ -147,6 +149,13 @@ namespace Knockbox.Game.Online
             finished = false;
             matches = 0;
             Notice = "";
+            // 로비 맵이 있으면 방장은 상대를 기다리는 동안 혼자 로비에서 움직인다(로컬 월드, 기록·전송 없음).
+            if (host && runner.FrontendEnabled && preparedConfig.Match.LobbySpace)
+            {
+                runner.StartSoloLobby(preparedConfig, preparedArenas, seed);
+                runner.MenuInputBlocked = false;
+                runner.Running = true;
+            }
             Debug.Log($"[Knockbox][online] {(host ? "방장" : "손님")} 시작({connection.GetType().Name}): 설정 {configChecksum:X8}, 맵 {arenaChecksum:X8}, 봇 {bot}");
         }
 
@@ -201,11 +210,21 @@ namespace Knockbox.Game.Online
                 showControls = !showControls;
         }
 
+        SimState StartShared()
+        {
+            runner.StartPreparedOnlineMatch(preparedConfig, preparedArenas, session.Seed);
+            return runner.World.State;
+        }
+
         void BeginMatch()
         {
             started = true;
-            runner.StartPreparedOnlineMatch(preparedConfig, preparedArenas, session.Seed);
             int slot = session.LocalSlot;
+            // 로비 입장 A안(2026-11-17): Fusion 방장은 혼자 돌던 로비 월드를 다시 만들지 않고(맵 재구성·암전 없음) 이어 간다.
+            bool continueSolo = fusionTransport != null && slot == 0 && runner.InSoloLobby;
+            SimState initial = continueSolo
+                ? runner.ContinueSoloLobbyOnline(preparedConfig, preparedArenas, session.Seed)
+                : StartShared();
             IInputSource local;
             if (bot)
             {
@@ -223,12 +242,14 @@ namespace Knockbox.Game.Online
             {
                 // The common session carries agreement, heartbeat/RTT, checksums and termination.
                 // Combat input and state do not pass through TryGetInputs or the old delay queue.
-                session.Begin(runner.World.State.Tick, null);
+                session.Begin(initial.Tick, null);
                 runner.Ticked += OnTicked;
                 try
                 {
                     prediction = new FusionPredictionSession(fusionTransport.Connection, runner,
-                        preparedConfig, preparedArenas, local, slot, session.DelayTicks);
+                        preparedConfig, preparedArenas, local, slot, session.DelayTicks, initial, continueSolo);
+                    // 손님: 방장이 이어 간 P1 위치를 첫 공유 상태로 받기 전에는 P1을 그리지 않는다(기본 낙하 자리에 잠깐 보였다가 튀지 않게).
+                    if (slot == 1 && prediction.StartsInLobby) runner.HideUntilPredicted(0);
                 }
                 catch (Exception e)
                 {
@@ -260,6 +281,8 @@ namespace Knockbox.Game.Online
 
         void OnTicked(MatchRunner r)
         {
+            // 방장이 공유 첫 틱을 기다리며 혼자 로비를 돌리는 동안의 틱은 로컬 월드다(체크섬·경기 수에 넣지 않는다).
+            if (prediction != null && !r.PredictionDriven) return;
             var w = r.EventWorld;
             int tick = w.State.Tick;
             if (LockstepSession.NeedsChecksum(tick))
@@ -351,8 +374,25 @@ namespace Knockbox.Game.Online
             : s.Reason == EndReason.ProtocolError ? "CONNECTION ERROR"
             : "DISCONNECTED";
 
+        bool guiWarmed;
+
+        /// <summary>
+        /// 경기 중 상단 온라인 정보 줄의 글꼴(기본 GUI 글꼴·굵게)을 앱 첫 프레임에 미리 불러 둔다(2026-11-18). 처음 그릴 때 글꼴을 읽느라
+        /// 온라인 1라운드 카운트다운에서 두 PC 모두 0.2~0.4초 멈췄다(빌드 측정: GUI.Repaint·FontEngine). 화면 표시는 바꾸지 않는다.
+        /// </summary>
+        void WarmGuiFont()
+        {
+            guiWarmed = true;
+            top ??= new GUIStyle(GUI.skin.label) { fontSize = 14, alignment = TextAnchor.UpperCenter, fontStyle = FontStyle.Bold };
+            marker ??= new GUIStyle(GUI.skin.label) { fontSize = 15, alignment = TextAnchor.LowerCenter, fontStyle = FontStyle.Bold };
+            big ??= new GUIStyle(GUI.skin.label) { fontSize = 22, alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
+            var sample = new GUIContent("ONLINE YOU = P1 P2 RTT - 0123456789 ms DELAY TAB: CONTROLS WAITING FOR OPPONENT .s YOU WIN LOSE REMATCH: BOTH HOLD LEFT CLICK READY");
+            top.CalcSize(sample); marker.CalcSize(sample); big.CalcSize(sample);
+        }
+
         void OnGUI()
         {
+            if (!guiWarmed) WarmGuiFont();
             var frontend = GetComponent<UI.FrontendController>();
             if (frontend != null && frontend.View != null && frontend.View.Screen != UI.FrontendScreen.Hidden) return;
             if (session == null || session.State == SessionState.WaitingPeer || session.State == SessionState.Connecting)

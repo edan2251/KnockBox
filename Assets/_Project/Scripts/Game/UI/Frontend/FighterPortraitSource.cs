@@ -26,7 +26,10 @@ namespace Knockbox.Game.UI
             var config = runner.World.Config;
             var arena = runner.World.Arena;
             var state = SimState.CreateRound(config, arena, 1u, MatchPhase.Fighting);
-            var sample = new SimWorld(config, arena, state);
+            var arenas = new List<ArenaDef> { arena };
+            if (config.Match.ResultsSpace) arenas.Add(runner.World.ResultsArena);
+            if (config.Match.LobbySpace) arenas.Add(runner.World.LobbyArena);
+            var sample = new SimWorld(config, arenas.ToArray(), state);
             for (int i = 0; i < 120; i++) sample.Step(default, default);
             var sourceRoot = new GameObject("UI_actual_FighterView_sources");
             sourceRoot.transform.SetParent(owner, false);

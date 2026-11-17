@@ -57,11 +57,10 @@ namespace Knockbox.Tests.PlayMode
         {for(int i=0;i<650&&runner.World.State.Match.Phase!=phase;i++)runner.StepOnce();Assert.AreEqual(phase,runner.World.State.Match.Phase);}
 
         [UnityTest]
-        public IEnumerator ActualMain_BindsSavedUI_LobbyPracticeVsAndCardAcquisitionReuseObjects()
+        public IEnumerator ActualMain_BindsSavedUI_LobbyPracticeAndCardAcquisitionReuseObjects()
         {
             yield return Load();using var pointer=PlayModeSceneScope.SuspendPointerInput();
-            // 모놀리스 토글을 끈 기존 카드 UI 경로. 켠 경로는 ActualMain_MonolithPick_*에서 확인한다.
-            runner.GetComponent<MatchPresenter>().CardPickStage.UseMonoliths=false;
+            // 2026-11-17: Main의 카드 선택은 모놀리스 무대다(기존 카드 화면 검사는 정리). 세부 선택 연출은 ActualMain_MonolithPick_*에서 확인한다.
 #if UNITY_EDITOR
             var profile=UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.VolumeProfile>("Assets/_Project/Prefabs/Frontend/PostFxProfile.asset");
             Assert.True(profile.TryGet<UnityEngine.Rendering.Universal.ChromaticAberration>(out var originalAberration));
@@ -73,25 +72,27 @@ namespace Knockbox.Tests.PlayMode
             var logo=View.Stage.Find(Knockbox.Presentation.SceneObjectName.Path("Main_and_lobby/Menu/Logo"));var p0=View.Portrait(0);var p1=View.Portrait(1);
             Assert.AreEqual(FrontendScreen.Main,View.Screen);
             Assert.AreEqual(MatchRunner.RegisteredMapsName,runner.ArenaName);
-            Assert.AreEqual(runner.MapCatalog.Maps.Count,runner.World.ArenaCount);
+            // 2026-11-16: Main은 결과 공간 맵과 로비 맵을 경기 맵 목록 끝에 붙인다(순환에는 들어가지 않음).
+            Assert.NotNull(runner.World.ResultsArena,"Main에는 결과 공간 맵이 연결되어 있어야 함");
+            Assert.NotNull(runner.World.LobbyArena,"Main에는 로비 맵이 연결되어 있어야 함");
+            Assert.AreEqual(runner.MapCatalog.Maps.Count+2,runner.World.ArenaCount);
             Assert.NotNull(runner.MapCatalog.Find(runner.World.Arena.Name),"현재 경기 맵은 등록된 정의 중 하나여야 함");
             ButtonAt("Main_and_lobby/Menu/Join_room").onClick.Invoke();yield return null;
             Assert.AreEqual(FrontendScreen.Join,View.Screen);Assert.IsTrue(View.CodeInput.gameObject.activeInHierarchy);
             ButtonAt("Main_and_lobby/Room/Back").onClick.Invoke();yield return null;Assert.AreEqual(FrontendScreen.Main,View.Screen);
             ButtonAt("Main_and_lobby/Menu/Practice").onClick.Invoke();Idle();yield return null;
-            Assert.AreEqual(FrontendScreen.Versus,View.Screen);
+            // 2026-11-17: 연습·재시작·온라인 경기는 VS 소개 없이 바로 경기 맵 재구성과 3·2·1·GO로 시작한다.
+            Assert.AreEqual(FrontendScreen.Hidden,View.Screen);Assert.AreEqual(0,View.IntroRevealTick);
             for(int i=0;i<80;i++)runner.StepOnce();yield return null;
-            Vector2 vsPosition=p0.anchoredPosition;
             for(int r=0;r<2;r++)
             {
                 Until(MatchPhase.Fighting);runner.World.State.Fighter0.Health=0;runner.StepOnce();
                 Until(r==0?MatchPhase.RoundTransition:MatchPhase.SetPick);
             }
-            yield return new WaitForSecondsRealtime(1.4f);yield return new WaitForEndOfFrame();
-            Assert.AreEqual(FrontendScreen.Cards,View.Screen);Assert.AreSame(p0,View.Portrait(0));Assert.AreSame(p1,View.Portrait(1));
-            CaptureEvidence("authored-main-cards");
-            Assert.That(Vector2.Distance(vsPosition,p0.anchoredPosition),Is.LessThan(.01f));Assert.IsFalse(p1.gameObject.activeInHierarchy);
-            Assert.True(View.CanChoose);View.CardButton(2).onClick.Invoke();View.CardButton(0).onClick.Invoke();
+            yield return null;
+            Assert.AreEqual(FrontendScreen.Hidden,View.Screen,"카드 선택은 경기 화면 위 모놀리스 무대");
+            Assert.AreSame(p0,View.Portrait(0));Assert.AreSame(p1,View.Portrait(1));
+            controller.ChooseCard(2);controller.ChooseCard(0);
             runner.StepOnce();runner.StepOnce();yield return null;
             Assert.AreEqual(1,runner.World.State.Fighter0.Augments.Count);Assert.AreEqual(CardCollectionRules.FirstCardId+2,runner.World.State.Fighter0.Augments.Get(0));
             Until(MatchPhase.Fighting);yield return null;
@@ -276,20 +277,167 @@ namespace Knockbox.Tests.PlayMode
             Assert.IsNull(presenter.Fighter(picker).LookTarget);Assert.AreEqual(0,presenter.Fighter(picker).StageBreath);
             LogAssert.NoUnexpectedReceived();
         }
+        /// <summary>메인 메뉴 두 쪽(2026-11-16 CP3): 게임 시작·옵션·게임 종료 → 게임 시작 → 방 만들기·코드로 참가·연습·뒤로.</summary>
         [UnityTest]
-        public IEnumerator ActualMain_ResultWaitsForO_ThenLocalRematchOrX()
+        public IEnumerator ActualMain_MenuPages_StartOpensRoomChoicesAndBackReturns()
+        {
+            yield return Load();
+            Assert.AreEqual(FrontendScreen.Main,View.Screen);Assert.IsFalse(View.StartMenuOpen);
+            var start=ButtonAt("Main_and_lobby/Menu/Start_game");var create=ButtonAt("Main_and_lobby/Menu/Create_room");
+            Assert.IsTrue(start.gameObject.activeInHierarchy);Assert.IsTrue(ButtonAt("Main_and_lobby/Menu/Options").gameObject.activeInHierarchy);
+            Assert.IsTrue(ButtonAt("Main_and_lobby/Menu/Quit").gameObject.activeInHierarchy);Assert.IsFalse(create.gameObject.activeInHierarchy);
+            start.onClick.Invoke();yield return null;
+            Assert.IsTrue(View.StartMenuOpen);Assert.IsTrue(create.gameObject.activeInHierarchy);Assert.IsFalse(start.gameObject.activeInHierarchy);
+            ButtonAt("Main_and_lobby/Menu/Join_room").onClick.Invoke();yield return null;Assert.AreEqual(FrontendScreen.Join,View.Screen);
+            ButtonAt("Main_and_lobby/Room/Back").onClick.Invoke();yield return null;
+            Assert.AreEqual(FrontendScreen.Main,View.Screen);Assert.IsTrue(View.StartMenuOpen,"코드 입력에서 돌아오면 게임 시작 메뉴 유지");
+            ButtonAt("Main_and_lobby/Menu/Menu_back").onClick.Invoke();yield return null;
+            Assert.IsFalse(View.StartMenuOpen);Assert.IsTrue(start.gameObject.activeInHierarchy);
+            LogAssert.NoUnexpectedReceived();
+        }
+        /// <summary>옵션(2026-11-16 CP6): 메인 → 옵션(현재 값 글자·조작 안내) → 뒤로. 값 버튼은 사용자 저장 설정을 바꾸므로 누르지 않는다.</summary>
+        [UnityTest]
+        public IEnumerator ActualMain_Options_OpensWithCurrentValuesAndBackReturns()
+        {
+            yield return Load();
+            ButtonAt("Main_and_lobby/Menu/Options").onClick.Invoke();yield return null;
+            Assert.AreEqual(FrontendScreen.Options,View.Screen);
+            var volume=ButtonAt("Main_and_lobby/Options_panel/Option_0");
+            Assert.IsTrue(volume.gameObject.activeInHierarchy);
+            StringAssert.StartsWith("효과음 음량",volume.GetComponentInChildren<Text>().text);
+            StringAssert.Contains("조작",View.Stage.Find(Knockbox.Presentation.SceneObjectName.Path("Main_and_lobby/Options_panel/Controls_guide")).GetComponent<Text>().text);
+            Assert.IsFalse(ButtonAt("Main_and_lobby/Menu/Start_game").gameObject.activeInHierarchy,"옵션 동안 메뉴는 숨김");
+            ButtonAt("Main_and_lobby/Options_panel/Option_6").onClick.Invoke();yield return null;
+            Assert.AreEqual(FrontendScreen.Main,View.Screen);Assert.IsFalse(volume.gameObject.activeInHierarchy);
+            LogAssert.NoUnexpectedReceived();
+        }
+        /// <summary>방장 혼자 로비(2026-11-16 CP3): 로비 맵에서 P1만 떨어져 움직이고, P2 자리는 그리지 않는다.</summary>
+        [UnityTest]
+        public IEnumerator ActualMain_SoloLobby_HostLandsAloneOnLobbyMap()
+        {
+            yield return Load();
+            var presenter=runner.GetComponent<MatchPresenter>();
+            var config=runner.CreateConfig();var arenas=runner.PrepareMatchArenas(config);
+            Assert.IsTrue(config.Match.LobbySpace,"Main에는 로비 맵이 연결되어 있어야 함");
+            runner.StartSoloLobby(config,arenas,3u);runner.Running=false;runner.MenuInputBlocked=false;
+            Assert.AreEqual(1,runner.AbsentSlot);Assert.IsTrue(runner.World.InLobby);
+            for(int i=0;i<config.Match.ResultsUnlockTick+5;i++)runner.StepOnce();
+            yield return null;yield return null;
+            Assert.IsFalse(runner.World.State.Fighter0.Arriving,"P1 착지");Assert.IsTrue(runner.World.State.Fighter0.Grounded);
+            Assert.AreSame(runner.World.LobbyArena,presenter.BuiltArena,"로비 맵을 그림");
+            Assert.That(presenter.Fighter(1).transform.localScale.x,Is.LessThan(.01f),"빈 P2 자리는 그리지 않음");
+            Assert.That(presenter.Fighter(0).transform.localScale.x,Is.GreaterThan(.9f));
+            LogAssert.NoUnexpectedReceived();
+        }
+        /// <summary>
+        /// 로비 입장 A안 화면 확인(2026-11-17, 실제 Photon). 실제 Main의 방 만들기로 혼자 로비에 착지한 뒤 손님이 들어와도
+        /// 방장 화면은 로비 화면 그대로, 맵 입장 연출(지형 솟음)이 다시 돌지 않고, P1은 한 프레임도 사라지지 않으며 P2만 나타난다.
+        /// </summary>
+        [UnityTest, Explicit("Uses the locally configured Photon app and two real NetworkRunners.")]
+        public IEnumerator ActualMain_OnlineHostLobby_GuestJoinKeepsSceneAndP1()
+        {
+            yield return Load();
+            var presenter=runner.GetComponent<MatchPresenter>();
+            var online=runner.GetComponent<OnlineMatch>();var lobby=runner.GetComponent<OnlineLobby>();
+            var arenaView=(Knockbox.Presentation.ArenaView)typeof(MatchPresenter).GetField("arenaView",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Instance).GetValue(presenter);
+            GameObject guest=null;FusionTransport guestWire=null;
+            try
+            {
+                lobby.CreateRoom();
+                double until=Time.realtimeSinceStartupAsDouble+45;
+                while(string.IsNullOrEmpty(lobby.RoomCode)&&Time.realtimeSinceStartupAsDouble<until)yield return null;
+                Assert.IsFalse(string.IsNullOrEmpty(lobby.RoomCode),"방 생성");
+                Assert.IsTrue(runner.InSoloLobby);
+                until=Time.realtimeSinceStartupAsDouble+3;
+                while(Time.realtimeSinceStartupAsDouble<until)yield return null;
+                Assert.IsFalse(runner.World.State.Fighter0.Arriving,"P1 혼자 착지");
+                Assert.AreEqual(FrontendScreen.Lobby,View.Screen);
+                int began=0;runner.MatchBegan+=_=>began++;
+                // 손님: 방장과 같은 설정·맵(직렬화 값 복사)을 가진 화면 없는 실행기.
+                guest=new GameObject("LobbyJoin_Guest");guest.SetActive(false);
+                var gr=guest.AddComponent<MatchRunner>();
+                JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(runner),gr);
+                guest.SetActive(true);gr.FrontendEnabled=true;
+                var gm=guest.AddComponent<OnlineMatch>();
+                var joining=FusionConnection.JoinAsync(lobby.RoomCode);
+                until=Time.realtimeSinceStartupAsDouble+45;
+                while(!joining.IsCompleted&&Time.realtimeSinceStartupAsDouble<until)yield return null;
+                Assert.IsTrue(joining.IsCompleted&&!joining.IsFaulted,"손님 참가");
+                guestWire=joining.Result;
+                gm.StartSession(guestWire,false,0);
+                float minP1=1,maxP2=0;bool screenKept=true,sceneSettled=true;
+                until=Time.realtimeSinceStartupAsDouble+5;
+                while(Time.realtimeSinceStartupAsDouble<until&&(gm.Prediction==null||gm.Prediction.Journal.World.State.Tick<150))
+                {
+                    yield return new WaitForEndOfFrame();
+                    Assert.IsFalse(online.Ended,online.Session?.EndDetail);Assert.IsFalse(gm.Ended,gm.Session?.EndDetail);
+                    minP1=Mathf.Min(minP1,presenter.Fighter(0).transform.localScale.x);
+                    maxP2=Mathf.Max(maxP2,presenter.Fighter(1).transform.localScale.x);
+                    screenKept&=View.Screen==FrontendScreen.Lobby;
+                    sceneSettled&=arenaView.TransitionSettled;
+                }
+                Debug.Log($"[Knockbox][test] 로비 입장 화면: began={began} screenKept={screenKept} sceneSettled={sceneSettled} minP1={minP1:0.00} maxP2={maxP2:0.00} carry={online.Prediction?.Journal.Carry.Has} driven={runner.PredictionDriven}");
+                Assert.IsNotNull(online.Prediction);Assert.IsTrue(runner.PredictionDriven,"공유 로비로 넘어감");
+                Assert.IsTrue(online.Prediction.Journal.Carry.Has,"P1 이어 감");
+                Assert.AreEqual(0,began,"방장 월드를 다시 시작하지 않음");
+                Assert.IsTrue(screenKept,"방장 화면은 로비 화면 그대로(대기·메뉴 화면을 거치지 않음)");
+                Assert.IsTrue(sceneSettled,"맵 입장 연출(지형 솟음)을 다시 돌리지 않음");
+                Assert.That(minP1,Is.GreaterThan(.9f),"P1이 사라졌다 다시 나타나지 않음");
+                Assert.That(maxP2,Is.GreaterThan(.9f),"P2가 나타남");
+                TestContext.WriteLine($"minP1={minP1:0.00} maxP2={maxP2:0.00} carry=({online.Prediction.Journal.Carry.Position.X:0.00},{online.Prediction.Journal.Carry.Position.Y:0.00})");
+            }
+            finally
+            {
+                if(guest!=null)Object.Destroy(guest);
+                guestWire?.Dispose();
+                lobby.CancelAndOpen();
+            }
+            double cleanup=Time.realtimeSinceStartupAsDouble+10;
+            while(Object.FindObjectsByType<Fusion.NetworkRunner>(FindObjectsSortMode.None).Length>0&&Time.realtimeSinceStartupAsDouble<cleanup)yield return null;
+        }
+        bool PodiumButtonFontRestored()=>ButtonAt("Shared_VS_and_cards/Ready_for_rematch").GetComponentInChildren<Text>(true).text!="O  다시하기";
+        /// <summary>결과 공간(2026-11-16 게임 흐름 CP1): 경기 끝 → 결과 공간 맵·낙하·체력바 숨김 → O 토글(연습: 표시 중 다시 누르면 취소) → 새 경기, X → 메인.</summary>
+        [UnityTest]
+        public IEnumerator ActualMain_ResultsSpace_PodiumReadyToggle_ThenRematchOrX()
         {
             yield return Load();runner.GetComponent<OnlineLobby>().StartPractice();Idle();
-            runner.World.State.Match.Phase=MatchPhase.MatchEnd;runner.World.State.Match.SetScore0=5;runner.World.State.Match.RoundWinner=0;
-            runner.World.State.Match.PhaseTick=runner.World.Config.Match.MatchEndMinTicks;
-            yield return null;Assert.AreEqual(FrontendScreen.Result,View.Screen);
-            for(int i=0;i<90;i++)runner.StepOnce();yield return null;Assert.AreEqual(MatchPhase.MatchEnd,runner.World.State.Match.Phase);
-            ButtonAt("Shared_VS_and_cards/Ready_for_rematch").onClick.Invoke();yield return null;
-            Assert.That(View.RematchDim.left.a,Is.LessThan(.01f));
-            yield return new WaitForSecondsRealtime(.7f);for(int i=0;i<5;i++)runner.StepOnce();yield return null;
-            Assert.AreEqual(MatchPhase.Countdown,runner.World.State.Match.Phase);
-            runner.World.State.Match.Phase=MatchPhase.MatchEnd;runner.World.State.Match.SetScore1=5;
-            runner.World.State.Match.PhaseTick=runner.World.Config.Match.MatchEndMinTicks;yield return null;
+            var presenter=runner.GetComponent<MatchPresenter>();
+            Assert.NotNull(runner.World.ResultsArena);
+            void FinishMatch()
+            {
+                Until(MatchPhase.Fighting);
+                runner.World.State.Match.SetScore0=runner.World.Config.Match.SetsToWinMatch-1;
+                runner.World.State.Match.Score0=runner.World.Config.Match.RoundsToWinSet-1;
+                runner.World.State.Fighter1.Health=0;
+                Until(MatchPhase.MatchEnd);
+            }
+            FinishMatch();yield return null;
+            Assert.AreEqual(FrontendScreen.Podium,View.Screen);Assert.IsTrue(runner.World.InResultsSpace);
+            for(int i=0;i<runner.World.Config.Match.ResultsUnlockTick+5;i++)runner.StepOnce();
+            yield return null;yield return null;
+            Assert.AreSame(runner.World.Arena,presenter.BuiltArena,"결과 공간 맵을 그림");
+            Assert.IsFalse(runner.World.State.Fighter0.Arriving||runner.World.State.Fighter1.Arriving,"두 선수 모두 착지");
+            Assert.IsTrue(View.PodiumReadyVisible);
+            var ready=ButtonAt("Shared_VS_and_cards/Ready_for_rematch");
+            Assert.IsTrue(ready.gameObject.activeInHierarchy&&ready.interactable);
+            // 연습: 켠 뒤 짧은 표시 중 다시 누르면 취소된다.
+            ready.onClick.Invoke();yield return null;ready.onClick.Invoke();
+            yield return new WaitForSecondsRealtime(.75f);for(int i=0;i<5;i++)runner.StepOnce();yield return null;
+            Assert.AreEqual(MatchPhase.MatchEnd,runner.World.State.Match.Phase,"취소한 준비는 보내지 않음");
+            ready.onClick.Invoke();
+            yield return new WaitForSecondsRealtime(.75f);yield return null;for(int i=0;i<3;i++)runner.StepOnce();yield return null;
+            Assert.AreEqual(MatchPhase.Countdown,runner.World.State.Match.Phase);Assert.AreEqual(0,runner.World.State.Match.SetScore0);
+            Assert.AreNotEqual(FrontendScreen.Podium,View.Screen);
+            // 1라운드에 끝난 경기도 재시작하면 등록된 경기 맵으로 시뮬레이션과 화면이 함께 돌아온다(2026-11-16 CP1 버그).
+            Assert.AreEqual(1,runner.World.State.Match.Round);
+            Assert.AreNotSame(runner.World.ResultsArena,runner.World.Arena);
+            Assert.NotNull(runner.MapCatalog.Find(runner.World.Arena.Name),"재경기 맵은 등록 목록의 맵");
+            yield return null;
+            Assert.AreSame(runner.World.Arena,presenter.BuiltArena,"화면도 경기 맵을 다시 그림");
+            Assert.IsFalse(ready.gameObject.activeInHierarchy,"결과 공간 버튼은 새 경기로 돌아오면 숨김");
+            Assert.AreEqual(PodiumButtonFontRestored(),true,"기존 결과 화면 버튼 글자 크기를 되돌림");
+            FinishMatch();for(int i=0;i<runner.World.Config.Match.ResultsUnlockTick+5;i++)runner.StepOnce();
+            yield return null;yield return null;
             ButtonAt("Shared_VS_and_cards/Return_to_menu").onClick.Invoke();yield return null;
             Assert.AreEqual(FrontendScreen.Main,View.Screen);LogAssert.NoUnexpectedReceived();
         }

@@ -50,7 +50,7 @@ namespace Knockbox.Game.UI
                 var dot = absorbDots[k];
                 if (dot.gameObject.activeSelf != show) dot.gameObject.SetActive(show);
                 if (!show) continue;
-                dot.color = icon ? PaletteAsset.MonolithDefaults.IconFill : accent;
+                dot.color = icon ? MonolithStyle.ShiftHue(PaletteAsset.MonolithDefaults.IconFill, litHue) : accent;
                 dot.transform.localPosition = new Vector3(position.x, position.y, 0);
                 ShapeLibrary.SetSize(dot, size, size);
             }

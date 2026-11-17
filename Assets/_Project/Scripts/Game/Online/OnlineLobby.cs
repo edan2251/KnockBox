@@ -40,6 +40,17 @@ namespace Knockbox.Game.Online
             Runner.Running=true;
         }
 
+        /// <summary>제작기의 로비 맵 시험(CP4): 연결 없이 방장 혼자 기다리는 로비를 그대로 연다.</summary>
+        public void StartLobbyPreview()
+        {
+            CancelPendingConnection();
+            var config = Runner.CreateConfig();
+            Runner.StartSoloLobby(config, Runner.PrepareMatchArenas(config), (uint)Environment.TickCount | 1u);
+            open=false;
+            Runner.MenuInputBlocked=false;
+            Runner.Running=true;
+        }
+
         public void CancelAndOpen()
         {
             CancelPendingConnection();
@@ -248,7 +259,7 @@ namespace Knockbox.Game.Online
                 "RIGHT CLICK  PICK UP / THROW / GRAB\n" +
                 "HOLDING PLAYER: LEFT CLICK to THROW\n" +
                 "PISTOL 6 SHOTS; EMPTY: THROW\n" +
-                (frontend ? "REMATCH  CLICK O: READY / X: MENU" : "REMATCH      both HOLD LEFT CLICK");
+                (frontend ? "READY / REMATCH  R or O: TOGGLE   X: MENU" : "REMATCH      both HOLD LEFT CLICK");
             GUI.Label(new Rect(rect.x + 12, rect.y + 22, rect.width - 24, rect.height - 26), text, style);
         }
     }
