@@ -232,9 +232,20 @@ namespace Knockbox.Presentation
 
         void Activate(int index)
         {
-            bool streak = shards[index].Streak;
+            ref readonly var s = ref shards[index];
+            bool streak = s.Streak;
             shardRenderers[index].enabled = !streak;
             streakRenderers[index].enabled = streak;
+            // 이번 프레임의 Tick이 이미 지났어도 처음 그려지는 모습이 제자리·제 크기가 되게 바로 맞춘다
+            // (안 그러면 한 번도 쓰지 않은 조각이 화면 가운데에 원래 크기 1로 한 프레임 보였다, 2026-11-20 결과 공간 깜빡임).
+            var sr = streak ? streakRenderers[index] : shardRenderers[index];
+            sr.transform.localPosition = s.Position;
+            if (s.FramePiece) { sr.transform.localRotation = Quaternion.Euler(0, 0, s.Angle); ShapeLibrary.SetSize(sr, s.Dimensions.x, s.Dimensions.y); }
+            else if (streak) { sr.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(s.Velocity.y, s.Velocity.x) * Mathf.Rad2Deg); ShapeLibrary.SetSize(sr, Mathf.Clamp(s.Velocity.magnitude * 0.035f, 0.08f, 0.5f), s.Size); }
+            else { sr.transform.localRotation = Quaternion.Euler(0f, 0f, s.Angle); ShapeLibrary.SetSize(sr, s.Size, s.Size); }
+            var color = s.FramePiece ? palette.flash : s.Color;
+            color.a = 1f;
+            sr.color = color;
         }
 
         /// <summary>확산 고리(지름 from → to).</summary>

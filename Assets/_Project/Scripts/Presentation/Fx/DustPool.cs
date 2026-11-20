@@ -59,7 +59,12 @@ namespace Knockbox.Presentation
                 p.Velocity = new Vector2(side * spread * random.Range(0.6f, 1.2f), random.Range(0.3f, 1.1f));
                 p.Size = random.Range(0.18f, 0.32f);
                 p.Age = 0f;
-                renderers[next].enabled = true;
+                // 이번 프레임의 Tick이 이미 지났어도 처음 그려지는 모습이 제자리·제 크기가 되게 바로 맞춘다(2026-11-20 결과 공간 깜빡임).
+                var r = renderers[next];
+                r.transform.localPosition = new Vector3(p.Position.x, p.Position.y, 0f);
+                r.transform.localScale = new Vector3(p.Size, p.Size, 1f) / r.sprite.bounds.size.x;
+                r.color = color;
+                r.enabled = true;
                 next = (next + 1) % Capacity;
             }
         }
