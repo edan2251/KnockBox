@@ -49,8 +49,11 @@ namespace Knockbox.Simulation
             if (config.Match.ResultsSpace)
             {
                 resultsArena = arenas[SimState.ResultsArenaIndex(config, arenas)];
-                if (resultsArena.PropCount != 0)
-                    throw new ArgumentException("결과 공간 맵에는 물리 상자를 두지 않습니다.", nameof(arenas));
+                // 결과 공간 물리(2026-11-20 숫자 발판)를 끈 설정(그 전 설정·검사용 조합)은 결과 공간 맵의 물리 상자를 움직이지 않는다
+                // (Step의 resultsProps 조건). 숫자 몸은 화면 위 밖의 시작 자리에 그대로 있다. Main은 맵에 물리 상자가 있으면 늘 켠다.
+                // 점수에 맞지 않는 숫자 몸은 로프 그래프의 '없앰' 표시로 끈다.
+                if (resultsArena.HasScoreBodies && !resultsArena.HasPropGraph)
+                    throw new ArgumentException("결과 공간 숫자 발판은 독립 로프로 매달아야 합니다.", nameof(arenas));
             }
             if (config.Match.LobbySpace)
             {
@@ -69,7 +72,7 @@ namespace Knockbox.Simulation
         /// 지금 라운드의 맵. 라운드가 바뀌면(RoundTransition → Countdown) 다른 맵일 수 있다.
         /// 결과 공간이 켜진 경기의 MatchEnd에서는 결과 공간 맵, Lobby 단계에서는 로비 맵이다.
         /// </summary>
-        public ArenaDef Arena => InResultsSpace ? resultsArena : InLobby ? lobbyArena : arenas[State.Match.Rotation.Current];
+        public ArenaDef Arena => InResultsSpace ? resultsArena : InLobby || InLobbyExit ? lobbyArena : arenas[State.Match.Rotation.Current];
 
         /// <summary>결과 공간 맵(설정이 꺼져 있으면 null).</summary>
         public ArenaDef ResultsArena => resultsArena;
@@ -82,6 +85,18 @@ namespace Knockbox.Simulation
 
         /// <summary>온라인 방의 로비에서 자유 조작하는 중.</summary>
         public bool InLobby => lobbyArena != null && State.Match.Phase == MatchPhase.Lobby;
+
+        /// <summary>로비에서 첫 경기로 나가는 전환 중(둘 다 준비한 뒤, 조작 잠김). 화면은 아직 로비 맵이다.</summary>
+        public bool InLobbyExit => lobbyArena != null && State.Match.Phase == MatchPhase.LobbyExit;
+
+        /// <summary>
+        /// 자유 공간의 조작이 풀리는(준비를 받기 시작하는) 단계 틱. 결과 발표가 켜진 결과 공간은 ResultsCeremonyTicks,
+        /// 로비·그 전 결과 공간은 ResultsUnlockTick.
+        /// </summary>
+        public int FreeSpaceUnlockTick => UnlockTick(Config.Match, !InResultsSpace);
+
+        public static int UnlockTick(in MatchParams match, bool lobby) =>
+            !lobby && match.ResultsCeremonyTicks > 0 ? match.ResultsCeremonyTicks : match.ResultsUnlockTick;
 
         /// <summary>점수 없이 자유롭게 움직이는 공간(결과 공간 또는 로비).</summary>
         public bool InFreeSpace => InResultsSpace || InLobby;
@@ -133,7 +148,10 @@ namespace Knockbox.Simulation
             s.Match.PhaseTick++;
 
             // 구조물은 카운트다운·싸움·KO 동안 움직인다(히트스탑과 상관없이, 09 4절).
-            if (phase == MatchPhase.Countdown || phase == MatchPhase.Fighting || phase == MatchPhase.KO)
+            // 결과 공간 물리(2026-11-20 실험)가 켜진 설정은 결과 공간에서도 시작 틱부터 움직인다.
+            bool resultsProps = phase == MatchPhase.MatchEnd && resultsArena != null && Config.Match.ResultsPropReleaseTick > 0
+                && s.Match.PhaseTick >= Config.Match.ResultsPropReleaseTick;
+            if (phase == MatchPhase.Countdown || phase == MatchPhase.Fighting || phase == MatchPhase.KO || resultsProps)
             {
                 PropInteraction.PrepareConnectorLoads(s, Arena, Config, PropScratch, phase == MatchPhase.Fighting);
                 PropPhysics.Step(ref s.Props, Arena, Config, PropScratch, s.Tick, Events);
@@ -163,6 +181,13 @@ namespace Knockbox.Simulation
                     if (lobbyArena == null)
                         throw new InvalidOperationException("로비 설정 없이 Lobby 단계에 들어옴");
                     StepFreeSpace(ref s, p1, p2, lobbyArena, true);
+                    break;
+                case MatchPhase.LobbyExit:
+                    // 두 선수·소품은 준비가 확정된 자리에 멈춰 있다(화면 전용 퇴장 연출). 시간이 다 되면 1라운드.
+                    if (lobbyArena == null)
+                        throw new InvalidOperationException("로비 설정 없이 LobbyExit 단계에 들어옴");
+                    if (s.Match.PhaseTick >= Config.Match.LobbyExitTicks)
+                        SimState.StartNewMatch(ref s, Config, arenas[s.Match.Rotation.Current]);
                     break;
                 case MatchPhase.MatchEnd:
                     if (resultsArena != null)

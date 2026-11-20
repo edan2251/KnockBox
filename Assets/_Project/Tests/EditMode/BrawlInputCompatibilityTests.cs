@@ -194,6 +194,38 @@ namespace Knockbox.Tests.EditMode
             Assert.IsFalse(runner.FindRecordedConfig(restored).Combat.Weapons.ThrowEnabled);
         }
 
+        /// <summary>
+        /// 2026-11-19: Main의 온라인 설정(결과 공간·로비·VS 소개 없음·로비 → 첫 경기 전환)으로 남긴 기록도 재생할 때 같은 설정을 찾는다.
+        /// 전환이 없던 그 전 로비 기록의 설정도 그대로 찾는다.
+        /// </summary>
+        [Test]
+        public void ConfigLookup_FindsMainLobbyExitFlow_AndEarlierLobbyFlow()
+        {
+            var so = new SerializedObject(runner);
+            so.FindProperty("resultsMap").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Knockbox.Game.Maps.MapDefinition>("Assets/_Project/Data/Maps/Results/Results_Stage.asset");
+            so.FindProperty("lobbyMap").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Knockbox.Game.Maps.MapDefinition>("Assets/_Project/Data/Maps/Lobby/Lobby_Stage.asset");
+            so.ApplyModifiedPropertiesWithoutUndo();
+            runner.FrontendEnabled = true;
+            runner.OnlineRematch = true;
+            var main = runner.CreateConfig();
+            Assert.IsTrue(main.Match.LobbySpace && main.Match.ResultsSpace);
+            Assert.AreEqual(CardCollectionRules.LobbyExitTicks, main.Match.LobbyExitTicks, "Main 온라인 로비는 전환을 쓴다");
+            var found = runner.FindRecordedConfig(Recording(main));
+            Assert.IsNotNull(found);
+            Assert.AreEqual(main.ComputeChecksum(), found.ComputeChecksum());
+            Assert.AreEqual(main.Match.ResultsCeremonyTicks, Map().ResultsStage.unlockTick, "Main 결과 공간은 결과 발표 잠금을 쓴다");
+            // 결과 발표 전 기록: 발표 잠금도 숫자 발판 물리도 없던 설정.
+            var noCeremony = main.Match; noCeremony.ResultsCeremonyTicks = 0; noCeremony.ResultsPropReleaseTick = 0;
+            Assert.IsNotNull(runner.FindRecordedConfig(Recording(new SimConfig(main.Movement, noCeremony, main.Combat, main.Rules, main.Augments))), "결과 발표 전 기록");
+            var earlierMatch = main.Match; earlierMatch.LobbyExitTicks = 0;
+            var earlier = new SimConfig(main.Movement, earlierMatch, main.Combat, main.Rules, main.Augments);
+            var foundEarlier = runner.FindRecordedConfig(Recording(earlier));
+            Assert.IsNotNull(foundEarlier, "전환 전 로비 기록");
+            Assert.AreEqual(0, foundEarlier.Match.LobbyExitTicks);
+        }
+
+        static Knockbox.Game.Maps.MapDefinition Map() => AssetDatabase.LoadAssetAtPath<Knockbox.Game.Maps.MapDefinition>("Assets/_Project/Data/Maps/Results/Results_Stage.asset");
+
         [Test]
         public void V8CombinedAttackAndThrowing_RoundTripWithoutChangingFrameSize()
         {

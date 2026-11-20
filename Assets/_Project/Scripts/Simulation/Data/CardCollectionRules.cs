@@ -25,6 +25,12 @@ namespace Knockbox.Simulation
         public const int ResultsUnlockTick = ResultsDropTick + 60;
         public const int ResultsRespawnTicks = 60;
         public const float ResultsDropHeight = 7f;
+        /// <summary>로비 → 첫 경기 전환(눌림·도약·낙하 퇴장) 1.2초. 이 시간 동안 두 선수의 조작을 멈춘다.</summary>
+        public const int LobbyExitTicks = 72;
+        /// <summary>결과 발표(빈 시상대 상승 → 두 선수 낙하 → 결과 글자 낙하)의 기본 조작 잠금 3.2초. 결과 맵의 발표 값이 덮어쓴다.</summary>
+        public const int ResultsCeremonyTicks = 192;
+        /// <summary>결과 글자가 떨어지기 시작하는 기본 단계 틱(점수 숫자 발판 물리가 이 틱부터 움직인다).</summary>
+        public const int ResultsSignTick = 146;
 
         /// <param name="resultsSpace">
         /// 2026-11-16 게임 흐름 CP1: 경기가 끝나면 결과 공간에서 자유 조작한다. 맵 목록의 마지막에 결과 공간 맵이 있어야 한다.
@@ -34,8 +40,15 @@ namespace Knockbox.Simulation
         /// 거짓이면 첫 라운드도 다른 라운드와 같은 재구성·3·2·1·GO만 하고 VS 소개(222틱)를 하지 않는다(2026-11-17 사용자 요청, Main 기본).
         /// 그 전 기록·검사는 참(VS 소개 있음)으로 재현한다.
         /// </param>
+        /// <param name="resultsCeremonyTicks">결과 발표 잠금 틱(0이면 그 전 결과 공간). 결과 공간 설정이 없으면 쓰지 않는다(2026-11-20).</param>
+        /// <param name="resultsPropReleaseTick">결과 공간 물리 시작 틱(0이면 물리 없음, 점수 숫자 발판용). 결과 공간 설정이 없으면 쓰지 않는다.</param>
+        /// <param name="lobbyExit">
+        /// 참이면 로비에서 둘 다 준비한 뒤 LobbyExitTicks 동안 퇴장 연출을 하고 1라운드로 간다(2026-11-19 로비 화면 수정, Main 기본).
+        /// 그 전 기록은 거짓(바로 1라운드)으로 재현한다. 로비 설정이 없으면 쓰지 않는다.
+        /// </param>
         public static SimConfig Apply(SimConfig source, bool motion = true, bool cinematic = true, bool extendedIntro = true, bool longPickHold = true,
-            bool resultsSpace = false, bool lobbySpace = false, bool vsIntro = true)
+            bool resultsSpace = false, bool lobbySpace = false, bool vsIntro = true, bool lobbyExit = false,
+            int resultsCeremonyTicks = 0, int resultsPropReleaseTick = 0)
         {
             var match = source.Match;
             if (resultsSpace || lobbySpace)
@@ -46,6 +59,13 @@ namespace Knockbox.Simulation
                 match.ResultsUnlockTick = ResultsUnlockTick;
                 match.ResultsRespawnTicks = ResultsRespawnTicks;
                 match.ResultsDropHeight = ResultsDropHeight;
+            }
+            if (lobbySpace && lobbyExit)
+                match.LobbyExitTicks = LobbyExitTicks;
+            if (resultsSpace)
+            {
+                match.ResultsCeremonyTicks = resultsCeremonyTicks > 0 ? resultsCeremonyTicks : 0;
+                match.ResultsPropReleaseTick = resultsPropReleaseTick > 0 ? resultsPropReleaseTick : 0;
             }
             match.CollectCardsOnly = true;
             match.RoundsToWinSet = 2;

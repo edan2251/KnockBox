@@ -38,31 +38,17 @@ namespace Knockbox.Game.UI
                 int k = riseOrder[i];
                 var baseCenter = World(basePositions[i]);
                 if (Due(2 + k, entrance.RumbleAt(k)))
-                {
-                    // 땅속 울림: 낮은 소리, 흔들림, 가운데서 피어오르는 먼지.
-                    presenter.Dust.Burst(baseCenter, 5, 1.8f, 0);
-                    if (sfx != null) sfx.Play(Sfx.HitWeak, .4f, .4f);
-                    if (rig != null) rig.AddTrauma(settings.grindShake * 2.5f);
-                }
+                    MonolithRiseBeats.Rumble(presenter, baseCenter, settings); // 땅속 울림(결과 공간 시상대와 공용).
                 // 땅을 가르며 솟는 동안 박자마다: 양옆으로 튀는 먼지, 위로 튀는 돌 부스러기, 갈리는 낮은 소리, 계속되는 흔들림.
                 for (int beat = grindFired[i] + 1; beat < entrance.GrindBeats && stageTime >= entrance.GrindAt(k, beat); beat++)
                 {
                     grindFired[i] = beat;
                     if (stageTime - entrance.GrindAt(k, beat) >= .3f) continue;
                     float fade = 1 - beat / (float)entrance.GrindBeats * .6f;
-                    BaseDust(i, 2, 2.6f * fade);
-                    presenter.Fx.Shards(baseCenter + Vector2.up * .15f, Vector2.up, 110f, 2, PaletteAsset.MonolithDefaults.Rim, 7f * fade, .13f, .4f);
-                    if (sfx != null) sfx.Play(Sfx.HitWeak, .3f * fade, .34f + .05f * (beat % 3));
-                    if (rig != null) rig.AddTrauma(settings.grindShake * fade);
+                    MonolithRiseBeats.Grind(presenter, baseCenter, BaseEdge(i, -1), BaseEdge(i, 1), beat, fade, settings);
                 }
                 if (Due(5 + k, entrance.LandAt(k)))
-                {
-                    // 쾅 멈춤: 큰 먼지, 돌 조각, 강한 흔들림과 아래로 꺼지는 반동, 묵직한 소리.
-                    BaseDust(i, 7, 5.4f);
-                    presenter.Fx.Shards(baseCenter + Vector2.up * .2f, Vector2.up, 120f, 9, PaletteAsset.MonolithDefaults.Rim, 11f, .17f, .6f);
-                    if (rig != null) { rig.AddTrauma(settings.impactShake); rig.Kick(Vector2.down, .14f, .012f, .2f); }
-                    if (sfx != null) { sfx.Play(Sfx.HitStrong, .7f, .5f); sfx.Play(Sfx.Land, .9f, .62f); }
-                }
+                    MonolithRiseBeats.Land(presenter, baseCenter, BaseEdge(i, -1), BaseEdge(i, 1), settings); // 쾅 멈춤(공용).
             }
             // 조명이 팍 켜지는 순간: 경기 GO처럼 밝은 신호음(선택 중 표시도 이때 튀어나온다).
             if (Due(11, entrance.LightAt(usedCount)) && sfx != null) sfx.Play(Sfx.Countdown, .7f, 1.5f);
@@ -173,6 +159,9 @@ namespace Knockbox.Game.UI
         }
 
         /// <summary>비석 밑 양 끝에서 바깥쪽으로 먼지를 낸다.</summary>
+        /// <summary>비석 밑동의 왼쪽(side -1)·오른쪽(+1) 끝(월드).</summary>
+        Vector2 BaseEdge(int index, int side) => World(basePositions[index] + Vector3.right * side * monoliths[index].Width * .5f);
+
         void BaseDust(int index, int count, float spread)
         {
             float half = monoliths[index].Width * .5f;

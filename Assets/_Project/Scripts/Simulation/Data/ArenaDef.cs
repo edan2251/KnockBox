@@ -61,6 +61,19 @@ namespace Knockbox.Simulation
         public ref readonly GraphRope GetGraphRope(int index) => ref graphRopes[index];
         public bool HasConnectorBodies { get { foreach(var p in props) if(p.IsConnector)return true;return false; } }
         public bool HasPropGraph => GraphRopeCount>0 || HasConnectorBodies;
+        /// <summary>결과 공간 숫자 발판(모양 있는 몸·점수 몸)이 있는지(2026-11-20). 있을 때만 지형 해시에 그 모양을 더한다.</summary>
+        public bool HasScoreBodies { get { foreach(var p in props) if(p.HasShape || p.ScoreSlot!=0 || p.ReleaseSpeed!=0) return true; return false; } }
+
+        /// <summary>두 강체가 독립 로프로 직접 이어져 있는지(결과 공간 숫자와 콜론 점은 서로 상자 접촉을 하지 않는다).</summary>
+        public bool GraphLinked(int a, int b)
+        {
+            for(int k=0;k<graphRopes.Length;k++)
+            {
+                ref readonly var r=ref graphRopes[k];
+                if((r.Body==a&&r.Joint.OtherBody==b)||(r.Body==b&&r.Joint.OtherBody==a))return true;
+            }
+            return false;
+        }
         readonly bool hasConvexTerrain;
         readonly PropDef[] props = new PropDef[0];
         /// <summary>강체로 움직이는 구조물(지금 구현된 단계 이하)의 번호와 연결. 나머지는 임시 물체 상자.</summary>
@@ -329,6 +342,25 @@ namespace Knockbox.Simulation
         }
 
         public uint ComputeGeometryChecksum()
+        {
+            uint graph=ComputeGraphGeometryChecksum();
+            if(!HasScoreBodies)return graph;
+            // 결과 공간 숫자 발판(2026-11-20): 모양·점수 몸이 있는 맵만 더한다(그 밖의 맵 해시는 그대로).
+            var h=Hasher.Create();h.AddInt(9);h.AddUInt(graph);
+            foreach(var p in props)
+            {
+                h.AddByte(p.ScoreSlot);h.AddInt(p.ScoreDigit);h.AddFloat(p.ReleaseSpeed);
+                int pieces=p.HasShape?p.Shape.Length:0;h.AddInt(pieces);
+                for(int k=0;k<pieces;k++)
+                {
+                    var piece=p.Shape[k];h.AddInt(piece.Count);
+                    for(int v=0;v<piece.Count;v++){var q=piece.Point(v);h.AddFloat(q.X);h.AddFloat(q.Y);}
+                }
+            }
+            return h.Hash;
+        }
+
+        uint ComputeGraphGeometryChecksum()
         {
             uint legacy=ComputePreGraphGeometryChecksum();
             if(!HasPropGraph)return legacy;

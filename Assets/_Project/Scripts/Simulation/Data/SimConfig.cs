@@ -188,6 +188,21 @@ namespace Knockbox.Simulation
         public int ResultsRespawnTicks;
         /// <summary>결과 공간: 자리 위 몇 유닛에서 떨어지는지(맵 경계 안으로 줄인다).</summary>
         public float ResultsDropHeight;
+        /// <summary>
+        /// 로비 → 첫 경기 전환(2026-11-19, MatchPhase.LobbyExit)의 틱 수. 0이면 예전처럼 둘 다 준비한 틱에 바로 1라운드로 간다.
+        /// </summary>
+        public int LobbyExitTicks;
+        /// <summary>
+        /// 결과 발표(2026-11-20): 0보다 크면 결과 공간의 조작 잠금이 이 단계 틱까지다(ResultsUnlockTick 대신, 로비는 그대로).
+        /// 두 선수는 처음부터 자기 자리(승자는 시상대 위)에 서 있고, 빈 시상대 상승·하늘에서 낙하·결과 글자 낙하는 화면 연출이다.
+        /// 0이면 그 전 결과 공간 규칙(승자는 시상대 위, 패자는 낙하, ResultsUnlockTick에 풀림).
+        /// </summary>
+        public int ResultsCeremonyTicks;
+        /// <summary>
+        /// 결과 공간 물리(2026-11-20 점수 숫자 발판): 0보다 크면 결과 공간 맵의 물리 상자·로프가 이 단계 틱부터 중력·로프로 움직인다.
+        /// 0이면 결과 공간(MatchEnd)에서는 물리를 진행하지 않는다(그 전 규칙).
+        /// </summary>
+        public int ResultsPropReleaseTick;
 
         public static MatchParams Default => new MatchParams
         {
@@ -231,6 +246,13 @@ namespace Knockbox.Simulation
                 v.Value(nameof(ResultsRespawnTicks), ResultsRespawnTicks);
                 v.Value(nameof(ResultsDropHeight), ResultsDropHeight);
             }
+            if (LobbyExitTicks != 0)
+                v.Value(nameof(LobbyExitTicks), LobbyExitTicks);
+            // 결과 발표·결과 공간 물리는 결과 공간이 켜졌을 때만 동작하므로 그때만 넣는다(결과 공간을 끈 설정의 해시는 그대로).
+            if (ResultsSpace && ResultsCeremonyTicks != 0)
+                v.Value(nameof(ResultsCeremonyTicks), ResultsCeremonyTicks);
+            if (ResultsSpace && ResultsPropReleaseTick != 0)
+                v.Value(nameof(ResultsPropReleaseTick), ResultsPropReleaseTick);
         }
     }
 

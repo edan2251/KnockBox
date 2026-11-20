@@ -1,0 +1,406 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2c402aa8ef1cbe048a3fc3c608dfafa5, type: 3}
+  m_Name: Results_Glyphs
+  m_EditorClassIdentifier: Knockbox.Game::Knockbox.Game.Maps.MapDefinition
+  stableId: result-glyphs
+  displayName: "Result glyphs (\uACB0\uACFC \uAE00\uC790 \uD2C0)"
+  preservedBaseline: 0
+  revision: 12
+  columns: 36
+  rows: 20
+  boundary: 0
+  spawn0: {x: -16.5, y: -9}
+  spawn1: {x: 16.5, y: -9}
+  boxes:
+  - id: box-000
+    kind: 0
+    minX: -18
+    minY: -10
+    maxX: 18
+    maxY: -9
+    vertices: []
+  - id: glyph-0-0
+    kind: 0
+    minX: -15.5
+    minY: 0.53999996
+    maxX: -13.5
+    maxY: 1
+    vertices:
+    - {x: -15.5, y: 0.53999996}
+    - {x: -13.5, y: 0.53999996}
+    - {x: -13.5, y: 0.79999995}
+    - {x: -13.7, y: 1}
+    - {x: -15.3, y: 1}
+    - {x: -15.5, y: 0.79999995}
+  - id: glyph-0-1
+    kind: 0
+    minX: -15.5
+    minY: -2
+    maxX: -13.5
+    maxY: -1.54
+    vertices:
+    - {x: -15.3, y: -2}
+    - {x: -13.7, y: -2}
+    - {x: -13.5, y: -1.8}
+    - {x: -13.5, y: -1.54}
+    - {x: -15.5, y: -1.54}
+    - {x: -15.5, y: -1.8}
+  - id: glyph-0-2
+    kind: 0
+    minX: -15.5
+    minY: -1.54
+    maxX: -15.04
+    maxY: 0.53999996
+    vertices:
+    - {x: -15.5, y: -1.54}
+    - {x: -15.04, y: -1.54}
+    - {x: -15.04, y: 0.53999996}
+    - {x: -15.5, y: 0.53999996}
+  - id: glyph-0-3
+    kind: 0
+    minX: -13.96
+    minY: -1.54
+    maxX: -13.5
+    maxY: 0.53999996
+    vertices:
+    - {x: -13.96, y: -1.54}
+    - {x: -13.5, y: -1.54}
+    - {x: -13.5, y: 0.53999996}
+    - {x: -13.96, y: 0.53999996}
+  - id: glyph-1-0
+    kind: 0
+    minX: -11.58
+    minY: -2
+    maxX: -11.12
+    maxY: 1
+    vertices:
+    - {x: -11.58, y: -2}
+    - {x: -11.12, y: -2}
+    - {x: -11.12, y: 0.79999995}
+    - {x: -11.32, y: 1}
+    - {x: -11.58, y: 1}
+  - id: glyph-1-1
+    kind: 0
+    minX: -12.150001
+    minY: 0.20000005
+    maxX: -11.58
+    maxY: 1
+    vertices:
+    - {x: -12.150001, y: 0.20000005}
+    - {x: -11.58, y: 0.48000002}
+    - {x: -11.58, y: 1}
+    - {x: -12.150001, y: 0.72}
+  - id: glyph-1-2
+    kind: 0
+    minX: -12.08
+    minY: -2
+    maxX: -10.4800005
+    maxY: -1.5
+    vertices:
+    - {x: -11.940001, y: -2}
+    - {x: -10.62, y: -2}
+    - {x: -10.4800005, y: -1.86}
+    - {x: -10.4800005, y: -1.5}
+    - {x: -12.08, y: -1.5}
+    - {x: -12.08, y: -1.86}
+  - id: glyph-2-0
+    kind: 0
+    minX: -9.28
+    minY: 0.53999996
+    maxX: -7.2799997
+    maxY: 1
+    vertices:
+    - {x: -9.28, y: 0.53999996}
+    - {x: -7.2799997, y: 0.53999996}
+    - {x: -7.2799997, y: 0.79999995}
+    - {x: -7.4799995, y: 1}
+    - {x: -9.08, y: 1}
+    - {x: -9.28, y: 0.79999995}
+  - id: glyph-2-1
+    kind: 0
+    minX: -7.74
+    minY: -0.26999998
+    maxX: -7.2799997
+    maxY: 0.53999996
+    vertices:
+    - {x: -7.74, y: -0.26999998}
+    - {x: -7.2799997, y: -0.26999998}
+    - {x: -7.2799997, y: 0.53999996}
+    - {x: -7.74, y: 0.53999996}
+  - id: glyph-2-2
+    kind: 0
+    minX: -9.28
+    minY: -0.73
+    maxX: -7.2799997
+    maxY: -0.26999998
+    vertices:
+    - {x: -9.28, y: -0.73}
+    - {x: -7.2799997, y: -0.73}
+    - {x: -7.2799997, y: -0.26999998}
+    - {x: -9.28, y: -0.26999998}
+  - id: glyph-2-3
+    kind: 0
+    minX: -9.28
+    minY: -1.54
+    maxX: -8.82
+    maxY: -0.73
+    vertices:
+    - {x: -9.28, y: -1.54}
+    - {x: -8.82, y: -1.54}
+    - {x: -8.82, y: -0.73}
+    - {x: -9.28, y: -0.73}
+  - id: glyph-2-4
+    kind: 0
+    minX: -9.28
+    minY: -2
+    maxX: -7.2799997
+    maxY: -1.54
+    vertices:
+    - {x: -9.08, y: -2}
+    - {x: -7.4799995, y: -2}
+    - {x: -7.2799997, y: -1.8}
+    - {x: -7.2799997, y: -1.54}
+    - {x: -9.28, y: -1.54}
+    - {x: -9.28, y: -1.8}
+  - id: glyph-3-0
+    kind: 0
+    minX: -6.08
+    minY: 0.53999996
+    maxX: -4.08
+    maxY: 1
+    vertices:
+    - {x: -6.08, y: 0.53999996}
+    - {x: -4.08, y: 0.53999996}
+    - {x: -4.08, y: 0.79999995}
+    - {x: -4.2799997, y: 1}
+    - {x: -5.88, y: 1}
+    - {x: -6.08, y: 0.79999995}
+  - id: glyph-3-1
+    kind: 0
+    minX: -4.54
+    minY: -1.54
+    maxX: -4.08
+    maxY: 0.53999996
+    vertices:
+    - {x: -4.54, y: -1.54}
+    - {x: -4.08, y: -1.54}
+    - {x: -4.08, y: 0.53999996}
+    - {x: -4.54, y: 0.53999996}
+  - id: glyph-3-2
+    kind: 0
+    minX: -5.6
+    minY: -0.73
+    maxX: -4.54
+    maxY: -0.26999998
+    vertices:
+    - {x: -5.6, y: -0.73}
+    - {x: -4.54, y: -0.73}
+    - {x: -4.54, y: -0.26999998}
+    - {x: -5.6, y: -0.26999998}
+  - id: glyph-3-3
+    kind: 0
+    minX: -6.08
+    minY: -2
+    maxX: -4.08
+    maxY: -1.54
+    vertices:
+    - {x: -5.88, y: -2}
+    - {x: -4.2799997, y: -2}
+    - {x: -4.08, y: -1.8}
+    - {x: -4.08, y: -1.54}
+    - {x: -6.08, y: -1.54}
+    - {x: -6.08, y: -1.8}
+  - id: glyph-4-0
+    kind: 0
+    minX: -2.8799999
+    minY: -0.73
+    maxX: -2.4199998
+    maxY: 1
+    vertices:
+    - {x: -2.8799999, y: -0.73}
+    - {x: -2.4199998, y: -0.73}
+    - {x: -2.4199998, y: 1}
+    - {x: -2.6799998, y: 1}
+    - {x: -2.8799999, y: 0.79999995}
+  - id: glyph-4-1
+    kind: 0
+    minX: -2.4199998
+    minY: -0.73
+    maxX: -1.3399999
+    maxY: -0.26999998
+    vertices:
+    - {x: -2.4199998, y: -0.73}
+    - {x: -1.3399999, y: -0.73}
+    - {x: -1.3399999, y: -0.26999998}
+    - {x: -2.4199998, y: -0.26999998}
+  - id: glyph-4-2
+    kind: 0
+    minX: -1.3399999
+    minY: -2
+    maxX: -0.8799999
+    maxY: 1
+    vertices:
+    - {x: -1.3399999, y: -2}
+    - {x: -1.0799999, y: -2}
+    - {x: -0.8799999, y: -1.8}
+    - {x: -0.8799999, y: 0.79999995}
+    - {x: -1.0799999, y: 1}
+    - {x: -1.3399999, y: 1}
+  - id: glyph-5-0
+    kind: 0
+    minX: 0.32000017
+    minY: 0.53999996
+    maxX: 2.3200002
+    maxY: 1
+    vertices:
+    - {x: 0.32000017, y: 0.53999996}
+    - {x: 2.3200002, y: 0.53999996}
+    - {x: 2.3200002, y: 0.79999995}
+    - {x: 2.1200001, y: 1}
+    - {x: 0.52000016, y: 1}
+    - {x: 0.32000017, y: 0.79999995}
+  - id: glyph-5-1
+    kind: 0
+    minX: 0.32000017
+    minY: -0.26999998
+    maxX: 0.7800002
+    maxY: 0.53999996
+    vertices:
+    - {x: 0.32000017, y: -0.26999998}
+    - {x: 0.7800002, y: -0.26999998}
+    - {x: 0.7800002, y: 0.53999996}
+    - {x: 0.32000017, y: 0.53999996}
+  - id: glyph-5-2
+    kind: 0
+    minX: 0.32000017
+    minY: -0.73
+    maxX: 2.3200002
+    maxY: -0.26999998
+    vertices:
+    - {x: 0.32000017, y: -0.73}
+    - {x: 2.3200002, y: -0.73}
+    - {x: 2.3200002, y: -0.26999998}
+    - {x: 0.32000017, y: -0.26999998}
+  - id: glyph-5-3
+    kind: 0
+    minX: 1.8600001
+    minY: -1.54
+    maxX: 2.3200002
+    maxY: -0.73
+    vertices:
+    - {x: 1.8600001, y: -1.54}
+    - {x: 2.3200002, y: -1.54}
+    - {x: 2.3200002, y: -0.73}
+    - {x: 1.8600001, y: -0.73}
+  - id: glyph-5-4
+    kind: 0
+    minX: 0.32000017
+    minY: -2
+    maxX: 2.3200002
+    maxY: -1.54
+    vertices:
+    - {x: 0.52000016, y: -2}
+    - {x: 2.1200001, y: -2}
+    - {x: 2.3200002, y: -1.8}
+    - {x: 2.3200002, y: -1.54}
+    - {x: 0.32000017, y: -1.54}
+    - {x: 0.32000017, y: -1.8}
+  - id: glyph-colon-0
+    kind: 0
+    minX: 3.5200002
+    minY: -1.5
+    maxX: 4.1400003
+    maxY: -0.88
+    vertices:
+    - {x: 3.6700003, y: -1.5}
+    - {x: 3.9900002, y: -1.5}
+    - {x: 4.1400003, y: -1.35}
+    - {x: 4.1400003, y: -1.03}
+    - {x: 3.9900002, y: -0.88}
+    - {x: 3.6700003, y: -0.88}
+    - {x: 3.5200002, y: -1.03}
+    - {x: 3.5200002, y: -1.35}
+  - id: glyph-colon-1
+    kind: 0
+    minX: 3.5200002
+    minY: -0.120000005
+    maxX: 4.1400003
+    maxY: 0.5
+    vertices:
+    - {x: 3.6700003, y: -0.120000005}
+    - {x: 3.9900002, y: -0.120000005}
+    - {x: 4.1400003, y: 0.029999971}
+    - {x: 4.1400003, y: 0.3499999}
+    - {x: 3.9900002, y: 0.5}
+    - {x: 3.6700003, y: 0.5}
+    - {x: 3.5200002, y: 0.3499999}
+    - {x: 3.5200002, y: 0.029999971}
+  physicalBoxes: []
+  ropes: []
+  theme: 2
+  mapTheme:
+    mode: 0
+    preset: 0
+    gradientTop: {r: 0.043137256, g: 0.20392157, b: 0.25882354, a: 1}
+    gradientBottom: {r: 0.019607844, g: 0.050980393, b: 0.10980392, a: 1}
+    terrain: {r: 0.4862745, g: 0.84705883, b: 0.8, a: 1}
+    prop: {r: 0.14117648, g: 0.29411766, b: 0.3372549, a: 1}
+    highlight: {r: 0.7294118, g: 0.9607843, b: 0.9098039, a: 1}
+    gradientCurve: 1
+  light: {x: 0, y: 25}
+  ceiling: 0
+  shadow: 0.65
+  rewardMap: 0
+  steles: []
+  loserStand: {x: -13.5, y: -9}
+  reward:
+    lightHeight: 29
+    lightOffsetX: 0
+    depthDarken: 0.3
+    litRiseSeconds: 0.38
+    litFallSeconds: 0.2
+    silhouetteSeconds: 0.25
+    leanDegrees: 5
+    breath: 0.025
+    loserDropAt: 0.32
+    loserDropSeconds: 0.34
+    riseAt: 0.76
+    riseStagger: 0.15
+    rumbleSeconds: 0.12
+    riseSeconds: 0.45
+    grindJitter: 0.08
+    grindShake: 0.05
+    impactShake: 0.35
+    energyRecedeSeconds: 0.3
+    lightOnDelay: 0.12
+  usage: 0
+  podiumBoxId: 
+  resultsStage:
+    podiumRumbleTick: 60
+    winnerDropTick: 110
+    loserDropTick: 115
+    fighterFallTicks: 22
+    fighterDropHeight: 19
+    signDropTick: 146
+    unlockTick: 192
+    signCenterX: 0
+    scoreBaselineY: 0.9
+    scoreHeight: 3.2
+    colonSpacing: 0.7
+    ropeTopY: 15
+    signDropHeight: 13
+    signDropSpeed: 30
+    digitMass: 3
+    dotMass: 0.3
+    dotRopeSlack: 1.06
+  resultGlyphs: {fileID: 0}

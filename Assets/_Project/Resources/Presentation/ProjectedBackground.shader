@@ -1,4 +1,5 @@
 // 배경과 모든 그림자가 같은 월드 좌표 색을 쓴다. 겹친 그림자는 누적해서 더 어두워지지 않는다.
+// 정점 색 알파는 그 그림자의 진하기(1 = 기존 그대로, 0 = 그림자 없음). 결과 공간 숫자가 화면에 들어오며 그림자가 서서히 생기는 데 쓴다(2026-11-20).
 Shader "Knockbox/ProjectedBackground"
 {
     Properties
@@ -35,12 +36,12 @@ Shader "Knockbox/ProjectedBackground"
                 float _HalfHeight, _FalloffExponent, _ShadowStrength, _Opacity, _Visible, _LightBoost;
                 half4 _BackgroundColor;
             CBUFFER_END
-            struct Attributes { float3 positionOS : POSITION; };
-            struct Varyings { float4 positionCS : SV_POSITION; float2 world : TEXCOORD0; };
+            struct Attributes { float3 positionOS : POSITION; half4 color : COLOR; };
+            struct Varyings { float4 positionCS : SV_POSITION; float2 world : TEXCOORD0; half shade : TEXCOORD1; };
             Varyings vert(Attributes v)
             {
                 Varyings o; o.positionCS=TransformObjectToHClip(v.positionOS);
-                o.world=TransformObjectToWorld(v.positionOS).xy; return o;
+                o.world=TransformObjectToWorld(v.positionOS).xy; o.shade=v.color.a; return o;
             }
             float Falloff(float2 p, float2 light)
             {
@@ -54,7 +55,7 @@ Shader "Knockbox/ProjectedBackground"
                 clip(min(min(uv.x,uv.y),min(1-uv.x,1-uv.y)));
                 half3 c=SAMPLE_TEXTURE2D(_BackgroundTex,sampler_BackgroundTex,uv).rgb;
                 float k=Falloff(i.world,_LightPosition.xy)/max(.001,Falloff(i.world,_BaseLight.xy));
-                k*=1-_ShadowStrength;
+                k*=1-_ShadowStrength*i.shade;
                 // 원색/그림자 밝기는 유지하고, 빛 받는 배경 레이어에만 짧은 점등 과노출을 준다.
                 k*=1+_LightBoost;
                 #ifndef UNITY_COLORSPACE_GAMMA

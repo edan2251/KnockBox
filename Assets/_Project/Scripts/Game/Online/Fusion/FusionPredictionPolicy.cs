@@ -21,7 +21,11 @@ namespace Knockbox.Game.Online
             // hover1: 카드 선택 호버 RPC가 있는 빌드끼리만 접속한다(RPC 목록이 다르면 서로 맞지 않는다).
             // hold144: 카드 선택 확정 대기가 144틱인 설정끼리만 접속한다(설정 체크섬이 다르면 같은 경기를 진행할 수 없다).
             // carry2: 확정 입력 첫 묶음에 혼자 로비의 P1 이어 가기가 들어가고(묶음 형식 v2), 이어 간 P1이 공유 첫 틱부터 움직이는 빌드끼리만 접속한다.
-            return $"{version.Trim()}-prediction1-snapshot{FusionWorldSnapshot.ByteCount}-tick60-delay{DelayTicks}-hover1-hold{CardCollectionRules.LongPickHoldTicks}-carry2";
+            // exit72: 로비에서 둘 다 준비하면 72틱 퇴장 전환(LobbyExit) 뒤 1라운드로 가는 빌드끼리만 접속한다(2026-11-19).
+            // results1: 결과 공간에서 두 선수가 처음부터 자기 자리에 서고 결과 발표 동안 잠기는(결과 공간 전용 잠금·물리) 빌드끼리만 접속한다(2026-11-20).
+            // results2: 결과 공간 점수가 실제 물리 숫자 발판(깎은 조각 모양 접촉, 점수와 다른 숫자 몸은 없앰)인 빌드끼리만 접속한다(2026-11-20).
+            // results3: 숫자 발판이 낙하 시작 속도를 받고(PropDef.ReleaseSpeed) 줄이 실제 획에 붙는 빌드끼리만 접속한다(2026-11-20).
+            return $"{version.Trim()}-prediction1-snapshot{FusionWorldSnapshot.ByteCount}-tick60-delay{DelayTicks}-hover1-hold{CardCollectionRules.LongPickHoldTicks}-carry2-exit{CardCollectionRules.LobbyExitTicks}-results3";
         }
 
         public static NetworkProjectConfig CreateConfig(NetworkProjectConfig source)

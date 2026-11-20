@@ -413,12 +413,14 @@ namespace Knockbox.Game.UI
         {
             if (motionRunner == null || points == null) return;
             var w = motionRunner.World;var m = w.State.Match;
+            // 결과 글자는 결과 공간(발표가 켜진 설정)에서만 보이고, 새 경기·로비로 나가면 사라진다.
+            if (!ResultsCeremony(w)) HideResultSign();
             if (w.Config.Match.IntroCountdownTicks <= 0)
             {
                 motionPresenter.PresentFrontendStage(1, true, 1, 1, 1, 0, true);
                 points.Root.gameObject.SetActive(false); return;
             }
-            if (w.InFreeSpace)
+            if (w.InFreeSpace || w.InLobbyExit)
             {
                 PresentResultsSpace(w);
                 return;

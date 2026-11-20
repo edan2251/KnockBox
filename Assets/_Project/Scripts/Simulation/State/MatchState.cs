@@ -24,6 +24,12 @@ namespace Knockbox.Simulation
         /// MatchParams.LobbySpace를 켠 온라인 경기에서만 이 단계로 시작한다.
         /// </summary>
         Lobby = 8,
+        /// <summary>
+        /// 로비에서 첫 경기로 나가는 짧은 전환(2026-11-19). 둘 다 준비한 틱에 들어와 MatchParams.LobbyExitTicks 동안 두 선수·조작을 멈추고
+        /// (화면은 로비 맵에서 두 선수가 튀어 올랐다 떨어져 나가는 연출을 보여 준다) 끝나면 1라운드 Countdown으로 간다.
+        /// LobbyExitTicks가 0인 설정(그 전 기록)은 이 단계를 거치지 않는다.
+        /// </summary>
+        LobbyExit = 9,
     }
 
     /// <summary>선택지 번호. 0 없음, 증강(카드)은 AugmentBase + 증강 번호(CP23). 1~3은 폼 시대의 폼 획득 번호였다.</summary>

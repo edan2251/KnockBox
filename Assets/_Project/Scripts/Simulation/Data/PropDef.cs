@@ -97,6 +97,17 @@ namespace Knockbox.Simulation
         public bool IsConnector;
         public float ConnectorSpeedLoss;
         public bool HasAuthoringData => !string.IsNullOrEmpty(Id) || Mass != 0f || StartAwake || PlayerPassThrough || Rope.Enabled || IsConnector;
+        /// <summary>
+        /// 결과 공간 숫자 발판(2026-11-20): 선수와 닿는 모양(몸 좌표, 가운데 원점의 볼록 조각들, 결과 글자 틀에서 만든다).
+        /// null이면 HalfSize 상자 그대로다. 구조물끼리·지형과의 물리와 질량·관성은 HalfSize 상자를 쓴다.
+        /// </summary>
+        public ConvexPolygon[] Shape;
+        /// <summary>결과 공간 점수 몸: 0 없음, 1 = P1 세트 점수, 2 = P2 세트 점수. 결과 공간에 들어올 때 ScoreDigit가 그 점수와 다르면 없앤다.</summary>
+        public byte ScoreSlot;
+        public int ScoreDigit;
+        /// <summary>결과 공간에 들어올 때 주는 아래 방향 속도(유닛/초, 2026-11-20). 결과 공간 물리가 시작되는 틱에 이 속도로 '훅' 떨어지기 시작한다. 0이면 정지에서 시작.</summary>
+        public float ReleaseSpeed;
+        public bool HasShape => Shape != null && Shape.Length > 0;
         /// <summary>떨어진 물체 묶음 번호(04-arena.md 6절 원칙 3). 기둥·연결 구조는 여러 강체가 한 묶음.</summary>
         public int Group;
         public Vec2 Center;

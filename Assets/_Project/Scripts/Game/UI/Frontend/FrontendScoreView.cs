@@ -22,6 +22,64 @@ namespace Knockbox.Game.UI
         public RectTransform Root => root;
         public bool Traveling => travelers[0].gameObject.activeSelf || travelers[1].gameObject.activeSelf;
         public Vector2 TravelerPosition(int slot) => travelers[slot].rectTransform.anchoredPosition;
+        Text[] labels;
+        bool labelsHidden;
+
+        /// <summary>점수판의 "P1"/"P2" 글자(프리팹에서 옮겨도 실제 자리를 쓴다). 없으면 null.</summary>
+        public Text Label(int slot)
+        {
+            if (labels == null)
+            {
+                labels = new Text[2];
+                foreach (var text in root.GetComponentsInChildren<Text>(true))
+                    for (int p = 0; p < 2; p++)
+                        if (labels[p] == null && text.text.Trim() == "P" + (p + 1)) labels[p] = text;
+            }
+            return slot >= 0 && slot < 2 ? labels[slot] : null;
+        }
+
+        /// <summary>
+        /// 로비 → 첫 경기 전환(2026-11-19): 빈 세트 점이 안쪽(가운데)부터 차례로 톡 드러나고, 라운드 점이 한 박자 뒤에 따라온다.
+        /// 이 동안 "P1"/"P2" 글자는 로비 표시의 이름이 맡으므로 숨긴다(이름이 이 자리에 와서 멈춘다). reveal은 0~1.
+        /// </summary>
+        public void RenderLobbyReveal(float reveal)
+        {
+            root.gameObject.SetActive(true);
+            SetLabelsVisible(false);
+            for (int p = 0; p < 2; p++)
+            {
+                for (int i = 0; i < 5; i++)
+                {
+                    int order = p == 0 ? 4 - i : i;
+                    float t = Range(reveal, order * .1f, order * .1f + .34f);
+                    var dot = sets[p*5+i];
+                    dot.color = PaletteAsset.WithAlpha(empty, Out(t * 2));
+                    dot.rectTransform.localScale = Vector3.one * Mathf.Max(0, Pop(t));
+                }
+                for (int i = 0; i < 2; i++)
+                {
+                    int order = p == 0 ? 1 - i : i;
+                    float t = Range(reveal, .42f + order * .1f, .76f + order * .1f);
+                    var dot = rounds[p*2+i];
+                    dot.gameObject.SetActive(true);
+                    dot.color = PaletteAsset.WithAlpha(empty, Out(t * 2));
+                    dot.rectTransform.localScale = Vector3.one * Mathf.Max(0, Pop(t));
+                    dot.rectTransform.anchoredPosition = RoundPoint(p, i);
+                }
+                travelers[p].gameObject.SetActive(false);
+            }
+        }
+
+        void SetLabelsVisible(bool visible)
+        {
+            if (labelsHidden == !visible) return;
+            labelsHidden = !visible;
+            for (int p = 0; p < 2; p++)
+            {
+                var label = Label(p);
+                if (label != null) label.enabled = visible;
+            }
+        }
         public static Vector2 RoundPoint(int slot, int index) => new Vector2((slot == 0 ? 764 : 1120) + index * 36, -140);
         public static Vector2 SetPoint(int slot, int index) => new Vector2((slot == 0 ? 714 : 1070) + index * 34, -94);
 
@@ -99,6 +157,7 @@ namespace Knockbox.Game.UI
         public void Render(in SimState state, SimConfig config, bool visible, Vector2 origin, float alpha)
         {
             root.gameObject.SetActive(visible);
+            SetLabelsVisible(true);
             var m = state.Match;
             float t = m.Phase == MatchPhase.KO ? Range(m.PhaseTick + alpha, CardCollectionRules.HasCountIn(config.Match) ? 84 : 0, config.Match.KoTicks) : 0;
             int winner = m.Phase == MatchPhase.KO ? m.RoundWinner : -1;

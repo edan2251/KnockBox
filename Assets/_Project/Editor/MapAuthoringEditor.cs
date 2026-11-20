@@ -619,7 +619,7 @@ namespace Knockbox.EditorTools
                 Field("mapTheme","맵 테마");Field("theme","기존 테마 번호");Field("light","광원 위치");
                 Field("ceiling","천장 표시");Field("shadow","그림자 농도");
                 Field("rewardMap","보상 맵(카드 선택)");
-                if(!d.IsRewardMap){Field("usage","맵 용도");if(d.Usage==MapUsage.Results)Field("podiumBoxId","시상대 지형 ID");}
+                if(!d.IsRewardMap){Field("usage","맵 용도");if(d.Usage==MapUsage.Results){Field("podiumBoxId","시상대 지형 ID");Field("resultGlyphs","점수 글자 틀 맵");Field("resultsStage","결과 발표 값");Field("reward","시상대 상승 값(모놀리스와 같은 형식)");}}
                 if(d.IsRewardMap){Field("loserStand","패자 자리(P1 배치 발 위치)");Field("reward","보상 장면 값");}
             }
             serializedObject.ApplyModifiedProperties();

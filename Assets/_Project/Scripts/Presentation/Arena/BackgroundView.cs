@@ -101,15 +101,18 @@ namespace Knockbox.Presentation
             width = Mathf.RoundToInt(coverWidth * TexelsPerUnit); height = Mathf.RoundToInt(coverHeight * TexelsPerUnit);
             reach = (coverWidth + coverHeight + lightPosition.magnitude) * 4;
             var boxes = new List<Rect>();var polygons=new List<ConvexPolygon>();
+            var boxSources=new List<int>();var polygonSources=new List<int>();
             for (int i = 0; i < arena.BoxCount; i++)
             {
                 var b = arena.GetBox(i);
                 if (b.Kind == TerrainKind.Spike || b.MaxY >= halfHeight - .001f) continue;
-                if(b.IsPolygon){polygons.Add(b.Polygon);continue;}
+                if(b.IsPolygon){polygons.Add(b.Polygon);polygonSources.Add(i);continue;}
                 float minY = b.Kind == TerrainKind.OneWay ? b.MaxY - ArenaView.OneWayThickness : b.MinY;
-                boxes.Add(Rect.MinMaxRect(b.MinX, minY, b.MaxX, b.MaxY));
+                boxes.Add(Rect.MinMaxRect(b.MinX, minY, b.MaxX, b.MaxY));boxSources.Add(i);
             }
             occluders = boxes.ToArray();polygonOccluders=polygons.ToArray();
+            occluderBoxes=boxSources.ToArray();polygonOccluderBoxes=polygonSources.ToArray();
+            movingBox=-1;movingOffset=Vector2.zero;
             Texture2D texture;
             if (ownedThemeTexture != null)
             {
@@ -145,6 +148,7 @@ namespace Knockbox.Presentation
             }
             terrainShadows?.Dispose();
             terrainShadows = new ProjectedShadowMesh(shadowObject, Mathf.Max(1, occluders.Length+polygonOccluders.Length), ShadowMaterial, 0);
+            movingPoints=new Vector2[ConvexPolygon.MaxVertices];
             Reproject();
             SetTransitionOpacity(transitionOpacity); SetShadowVisibility(ShadowVisibility); ResetMotes();
         }
@@ -173,9 +177,38 @@ namespace Knockbox.Presentation
         void Reproject()
         {
             terrainShadows.Begin();
-            foreach (var rect in occluders) terrainShadows.Box(rect.center, rect.size * .5f, 0, lightPoint, reach);
-            foreach(var polygon in polygonOccluders)terrainShadows.Polygon(polygon,lightPoint,reach);
+            for (int i = 0; i < occluders.Length; i++)
+            {
+                var rect = occluders[i];
+                var offset = occluderBoxes[i] == movingBox ? movingOffset : Vector2.zero;
+                terrainShadows.Box(rect.center + offset, rect.size * .5f, 0, lightPoint, reach);
+            }
+            for (int i = 0; i < polygonOccluders.Length; i++)
+            {
+                var polygon = polygonOccluders[i];
+                if (polygonOccluderBoxes[i] != movingBox) { terrainShadows.Polygon(polygon, lightPoint, reach); continue; }
+                for (int k = 0; k < polygon.Count; k++) { var p = polygon.Point(k); movingPoints[k] = new Vector2(p.X, p.Y) + movingOffset; }
+                terrainShadows.Points(movingPoints, polygon.Count, lightPoint, reach);
+            }
             terrainShadows.Commit();
+        }
+
+        int[] occluderBoxes = System.Array.Empty<int>(), polygonOccluderBoxes = System.Array.Empty<int>();
+        int movingBox = -1;
+        Vector2 movingOffset;
+        Vector2[] movingPoints = new Vector2[ConvexPolygon.MaxVertices];
+
+        /// <summary>지금 그림자를 만드는 광원 위치(움직이는 조형물의 그림자도 같은 광원으로 투영한다).</summary>
+        public Vector2 LightPoint => lightPoint;
+
+        /// <summary>
+        /// 화면에서만 옮긴 지형 하나(결과 공간의 시상대 상승)의 그림자를 같이 옮긴다. boxIndex가 -1이면 되돌린다. 판정과 무관하다.
+        /// </summary>
+        public void SetMovingOccluder(int boxIndex, Vector2 offset)
+        {
+            if (boxIndex == movingBox && offset == movingOffset) return;
+            movingBox = boxIndex; movingOffset = offset;
+            if (terrainShadows != null) Reproject();
         }
 
         public float Falloff(Vector2 point)

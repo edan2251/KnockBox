@@ -133,6 +133,43 @@ namespace Knockbox.Game.Online
             throw new InvalidOperationException("사용 가능한 방 코드를 만들지 못했습니다.");
         }
 
+        /// <summary>같은 코드로 방을 다시 열 때 기다리는 최대 횟수와 간격(직전 방이 Photon에서 닫히는 동안).</summary>
+        const int ReopenAttempts = 12;
+        const int ReopenRetryMilliseconds = 500;
+
+        /// <summary>
+        /// 손님이 로비에서 나간 뒤 방장이 같은 코드로 방을 다시 연다(2026-11-19). 직전 방이 아직 닫히는 중이면(GameIdAlreadyExists)
+        /// 잠깐 기다렸다 다시 시도한다. 끝내 열지 못하면 새 코드로 연다(돌려준 코드가 실제 방 코드다).
+        /// </summary>
+        public static async Task<(FusionTransport transport, string code)> ReopenAsync(string code, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!FusionRoomCode.TryNormalize(code, out var normalized)) return await HostAsync(cancellationToken);
+            await AwaitWarmup();
+            var appSettings = ReadSettings();
+            for (int attempt = 0; attempt < ReopenAttempts; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var connection = Create();
+                try
+                {
+                    var result = await connection.StartAsync(GameMode.Host, normalized, appSettings, cancellationToken);
+                    if (result.Ok) return (connection.transport, normalized);
+                    await connection.ShutdownAsync();
+                    if (result.ShutdownReason != ShutdownReason.GameIdAlreadyExists)
+                        throw new InvalidOperationException("Photon 방 다시 열기에 실패했습니다.");
+                }
+                catch
+                {
+                    await connection.ShutdownAsync();
+                    throw;
+                }
+                await Task.Delay(ReopenRetryMilliseconds, cancellationToken);
+            }
+            Debug.LogWarning("[Knockbox][online] 같은 코드로 방을 다시 열지 못해 새 코드로 엽니다.");
+            return await HostAsync(cancellationToken);
+        }
+
         public static async Task<FusionTransport> JoinAsync(string code, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();

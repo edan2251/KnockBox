@@ -30,6 +30,10 @@ namespace Knockbox.Presentation
         readonly Vector2[] ropePoints = new Vector2[RopePath.Segments+1];
         int dynamicCount;
         SpriteRenderer[][] graphLines=System.Array.Empty<SpriteRenderer[]>();
+        // 독립 로프마다 마지막으로 적용한 표시 상태(-1 모름, 0 숨김, 1 보임, 2 풀리는 중)와 느슨할 때 곧게 그릴지(결과 공간 숫자 발판의 위 줄).
+        // 상태가 바뀔 때만 조각의 켜고 끄기·색을 바꾼다(결과 맵은 점수와 다른 숫자 몸의 줄 24개가 계속 숨겨져 있다, 2026-11-20).
+        sbyte[] graphState=System.Array.Empty<sbyte>();
+        bool[] graphPayOut=System.Array.Empty<bool>();
         readonly float[] touchLeft = new float[PropState.Capacity];
         readonly float[] touchCooldown = new float[PropState.Capacity];
         readonly Vector3[] bodyScale = new Vector3[PropState.Capacity];
@@ -84,6 +88,15 @@ namespace Knockbox.Presentation
         /// <summary>강체 구조물 i가 지금 그려진 위치·회전(그림자, 테스트·캡처 확인용).</summary>
         public Vector2 BodyPosition(int body) => bodies[body].transform.localPosition;
         public Transform BodyTransform(int body) => bodies[body].transform;
+        /// <summary>몸 상자를 그리지 않고 위치·회전만 쓴다(결과 공간 숫자 발판, 2026-11-20). 줄은 그대로 그린다.</summary>
+        public void HideBody(int body, bool hidden)
+        {
+            if (body < 0 || body >= dynamicCount || bodies[body] == null) return;
+            bodies[body].enabled = !hidden;
+            hiddenBodies[body] = hidden;
+        }
+        public bool BodyHidden(int body) => body >= 0 && body < hiddenBodies.Length && hiddenBodies[body];
+        readonly bool[] hiddenBodies = new bool[PropState.Capacity];
         readonly Vector2[] connectorPositions=new Vector2[PropState.Capacity];
         public Vector2 ConnectorPosition(int body) => connectorPositions[body];
         public bool ConnectorVisible(int body) => connectors[body]!=null && connectors[body][0].enabled;
@@ -114,6 +127,14 @@ namespace Knockbox.Presentation
 
             // 강체 구조물: 몸 스프라이트(가운데 기준, 회전), 줄 또는 축 점.
             graphLines=new SpriteRenderer[arena.GraphRopeCount][];
+            graphState=new sbyte[arena.GraphRopeCount];
+            graphPayOut=new bool[arena.GraphRopeCount];
+            for(int i=0;i<graphState.Length;i++)
+            {
+                graphState[i]=-1;
+                ref readonly var r=ref arena.GetGraphRope(i);
+                graphPayOut[i]=r.Joint.OtherBody<0&&arena.GetProp(arena.DynamicProp(r.Body)).HasShape;
+            }
             releaseAge = new float[arena.GraphRopeCount];
             releasedNode = new int[arena.GraphRopeCount];
             releasedPoint = new Vector2[arena.GraphRopeCount];
@@ -124,6 +145,7 @@ namespace Knockbox.Presentation
                 for(int s=0;s<RopePath.Segments;s++)graphLines[i][s]=Rope(shapes);
             }
             dynamicCount = arena.DynamicPropCount;
+            System.Array.Clear(hiddenBodies, 0, hiddenBodies.Length);
             for (int b = 0; b < dynamicCount; b++)
             {
                 ref readonly var p = ref arena.GetProp(arena.DynamicProp(b));
@@ -161,7 +183,6 @@ namespace Knockbox.Presentation
             for(int i=0;i<current.GraphRopeCount;i++)
             {
                 ref readonly var r=ref current.GetGraphRope(i);bool visible=r.Active(now);
-                foreach(var sr in graphLines[i])sr.enabled=visible;
                 if (!visible)
                 {
                     if (releaseAge[i] < RopeReleaseDuration)
@@ -178,14 +199,19 @@ namespace Knockbox.Presentation
                             var sr=graphLines[i][k];sr.enabled=true;Line(sr,ropePoints[k],ropePoints[k+1]);
                             var color=sr.color;color.a=1-t;sr.color=color;
                         }
+                        graphState[i]=2;
+                        continue;
                     }
+                    if(graphState[i]!=0){foreach(var sr in graphLines[i])sr.enabled=false;graphState[i]=0;}
                     continue;
                 }
-                foreach(var sr in graphLines[i]) { var color=sr.color;color.a=1;sr.color=color; }
+                if(graphState[i]!=1){foreach(var sr in graphLines[i]){sr.enabled=true;var color=sr.color;color.a=1;sr.color=color;}graphState[i]=1;}
                 var start=ToVector(r.Joint.WorldAnchor);
                 if(r.Joint.OtherBody>=0)start=GraphPoint(before,now,r.Joint.OtherBody,r.Joint.OtherLocal,alpha);
                 var end=GraphPoint(before,now,r.Body,r.Joint.LocalAnchor,alpha);
-                RopePath.Fill(start,end,r.Joint.Length,ropePoints);
+                // 결과 공간 숫자 발판(2026-11-20)을 화면 위 밖에 매단 긴 줄은 느슨할 때 곧게 그린다(위에서 풀려 나오는 줄).
+                // 처진 고리로 그리면 떨어지기 전부터 화면 위에 줄 고리가 내려와 보인다. 판정 길이는 그대로다.
+                RopePath.Fill(start,end,graphPayOut[i]?Vector2.Distance(start,end):r.Joint.Length,ropePoints);
                 for(int s=0;s<RopePath.Segments;s++)Line(graphLines[i][s],ropePoints[s],ropePoints[s+1]);
             }
         }

@@ -29,11 +29,34 @@ namespace Knockbox.Simulation
         {
             s.Projectiles = default;
             PropPhysics.Init(ref s.Props, resultsArena, Config);
+            KeepScoreBodies(ref s.Props, s.Match, resultsArena);
             BrawlWeapons.Clear(ref s.Weapon);
             // 승자는 시상대 위에 바로 서고(화면에서 시상대와 함께 솟아오름, CP5), 패자는 자기 자리 위에서 떨어진다.
+            // 결과 발표(2026-11-20)가 켜진 설정은 둘 다 처음부터 자기 자리에 서 있고, 낙하는 조작 잠금 동안의 화면 연출이다.
             int winner = ResultsWinner(s.Match);
-            PlaceForDrop(ref s.Fighter0, s.Match, 0, resultsArena, false, winner != 0);
-            PlaceForDrop(ref s.Fighter1, s.Match, 1, resultsArena, false, winner != 1);
+            bool ceremony = Config.Match.ResultsCeremonyTicks > 0;
+            PlaceForDrop(ref s.Fighter0, s.Match, 0, resultsArena, false, !ceremony && winner != 0);
+            PlaceForDrop(ref s.Fighter1, s.Match, 1, resultsArena, false, !ceremony && winner != 1);
+        }
+
+        /// <summary>
+        /// 결과 공간 숫자 발판(2026-11-20): 결과 맵에는 양쪽 점수 자리마다 숫자 0~5 몸이 하나씩 겹쳐 놓여 있다.
+        /// 들어올 때 지금 세트 점수와 같은 숫자만 남기고 나머지는 없앤다(없앤 몸의 로프는 함께 풀린다, 난수 없음). 남은 몸에는 낙하 시작 속도를 준다.
+        /// </summary>
+        static void KeepScoreBodies(ref PropState props, in MatchState m, ArenaDef arena)
+        {
+            for (int b = 0; b < props.Count; b++)
+            {
+                ref readonly var def = ref arena.GetProp(arena.DynamicProp(b));
+                // 숫자·콜론 점은 물리가 시작되는 틱에 이 속도로 떨어지기 시작한다(정지에서 시작하면 스르륵 떨어져 보였다).
+                if (def.ReleaseSpeed > 0f)
+                    PropState.Get(ref props, b).Velocity = new Vec2(0f, -def.ReleaseSpeed);
+                if (def.ScoreSlot == 0)
+                    continue;
+                int score = def.ScoreSlot == 1 ? m.SetScore0 : m.SetScore1;
+                if (def.ScoreDigit != score)
+                    props.Graph.Destroy(b);
+            }
         }
 
         /// <param name="lobby">참이면 로비(자리는 슬롯 번호, 준비되면 1라운드), 거짓이면 결과 공간(자리는 승패, 준비되면 새 경기).</param>
@@ -49,14 +72,15 @@ namespace Knockbox.Simulation
             Respawn(ref s.Fighter0, s.Match, 0, arena, lobby);
             Respawn(ref s.Fighter1, s.Match, 1, arena, lobby);
             bool interact = !AwayInResults(s.Fighter0) && !AwayInResults(s.Fighter1);
-            // 결과 공간은 입장 연출(시상대 상승·승자 점프)이 끝나는 ResultsUnlockTick까지 두 선수 모두 조작을 잠근다(CP5).
-            bool locked = !lobby && s.Match.PhaseTick < match.ResultsUnlockTick;
+            // 결과 공간은 입장 연출(시상대 상승·승자 점프, 결과 발표)이 끝날 때까지 두 선수 모두 조작을 잠근다(CP5, 2026-11-20).
+            int unlock = UnlockTick(match, lobby);
+            bool locked = !lobby && s.Match.PhaseTick < unlock;
             StepFighters(ref s, locked ? default : ResultsInput(s.Fighter0, p1), locked ? default : ResultsInput(s.Fighter1, p2), interact);
             Land(ref s.Fighter0);
             Land(ref s.Fighter1);
             CheckResultsKnockout(ref s);
 
-            if (s.Match.PhaseTick < match.ResultsUnlockTick)
+            if (s.Match.PhaseTick < unlock)
                 return;
             bool ready0 = (p1.Buttons & ReadyButton) != 0;
             bool ready1 = (p2.Buttons & ReadyButton) != 0;
@@ -65,6 +89,15 @@ namespace Knockbox.Simulation
                 return;
             if (lobby)
             {
+                // 2026-11-19 전환이 켜진 설정: 두 선수가 모두 땅 위에 있을 때(낙하·KO 재등장 대기가 아님) 준비를 확정하고
+                // LobbyExit에서 잠깐 멈춘 뒤 1라운드로 간다. 꺼진 설정(그 전 기록)은 바로 1라운드.
+                if (match.LobbyExitTicks > 0)
+                {
+                    if (AwayInResults(s.Fighter0) || AwayInResults(s.Fighter1))
+                        return;
+                    s.Match.SetPhase(MatchPhase.LobbyExit);
+                    return;
+                }
                 // 첫 경기의 맵 순서는 시드로 이미 정해져 있다(CreateMatch와 같은 순환). 난수를 더 쓰지 않는다.
                 SimState.StartNewMatch(ref s, Config, arenas[s.Match.Rotation.Current]);
                 return;

@@ -26,6 +26,11 @@ namespace Knockbox.Game.UI
         bool practiceReadySent;
         // 온라인 연결이 끝나면(상대가 나감·끊김·어긋남) 이유를 잠깐 보여준 뒤 메인으로 돌아간다(2026-11-16 게임 흐름 CP2, 시간은 임시값).
         const float EndedNoticeSeconds = 3.5f;
+        // 로비에서 끝난 경우(방장이 방을 닫음 등)는 로비 상단에 짧게 알린 뒤 메인으로(2026-11-19).
+        const float LobbyEndedNoticeSeconds = 1.6f;
+        // 방장 화면: 손님이 로비에서 나가 혼자 기다리게 되면 잠깐 알린다.
+        const float PeerLeftNoticeSeconds = 2.4f;
+        float peerLeftAt = -10;
         float endedAt = -1;
         bool resultsPreviewPending;
         // 옵션(CP6): 메인 메뉴에서 열고 닫는다. 값은 누를 때마다 바로 적용·저장한다.
@@ -53,6 +58,7 @@ namespace Knockbox.Game.UI
             View.CopyCode+=()=>GUIUtility.systemCopyBuffer=lobby.RoomCode;
             View.CardClicked+=Choose;
             View.Rematch+=ReadyForRematch;
+            online.ReturnedToSoloLobby+=()=>peerLeftAt=Time.unscaledTime;
             runner.PointerOverFrontendButton=View.PointerOverPodiumButton;
             View.Quit+=QuitGame;
             View.Options+=()=>{optionsOpen=true;View.SetOptionLabels(settings.Labels(),GameSettings.ControlsGuide);};
@@ -151,7 +157,7 @@ namespace Knockbox.Game.UI
         {
             if(!online.Ended){endedAt=-1;return;}
             if(endedAt<0){endedAt=Time.unscaledTime;return;}
-            if(Time.unscaledTime-endedAt<EndedNoticeSeconds)return;
+            if(Time.unscaledTime-endedAt<(EndedInLobby?LobbyEndedNoticeSeconds:EndedNoticeSeconds))return;
             endedAt=-1;joinEntry=false;createEntry=false;
             lobby.CancelAndOpen();
         }
@@ -176,11 +182,24 @@ namespace Knockbox.Game.UI
             }
         }
 
+        /// <summary>연결이 로비(혼자·공유 로비 또는 퇴장 전환)에서 끝났는지.</summary>
+        bool EndedInLobby => online.Ended && runner.World != null && (runner.World.InLobby || runner.World.InLobbyExit);
+
         void Update()
         {
             if(View==null || runner.World==null)return;
             var keyboard=Keyboard.current;
-            if(keyboard!=null && keyboard.escapeKey.wasPressedThisFrame && !online.Active)
+            // 로비의 나가기는 Esc 하나(2026-11-19). 방장은 방을 닫고 메인으로(손님도 메인으로 돌아간다),
+            // 손님은 메인으로 가고 방장은 같은 로비에서 같은 코드로 다시 기다린다. 둘 다 준비해 퇴장 전환이 시작된 뒤에는 받지 않는다.
+            bool roomLobby=View.Screen==FrontendScreen.Lobby && (online.Active||lobby.Reopening) && !online.Ended;
+            // 결과 공간의 나가기도 Esc(2026-11-20: 화면 한쪽의 "[Esc] 나가기"). 기존 결과 공간 나가기(X)와 같은 동작이다.
+            if(keyboard!=null && keyboard.escapeKey.wasPressedThisFrame && View.Screen==FrontendScreen.Podium && !online.Ended)
+            {joinEntry=false;createEntry=false;lobby.CancelAndOpen();}
+            else if(keyboard!=null && keyboard.escapeKey.wasPressedThisFrame && roomLobby)
+            {
+                if(!runner.World.InLobbyExit && !runner.FrontendWorld.InLobbyExit){joinEntry=false;createEntry=false;lobby.CancelAndOpen();}
+            }
+            else if(keyboard!=null && keyboard.escapeKey.wasPressedThisFrame && !online.Active)
             {
                 if(optionsOpen) optionsOpen=false;
                 else if(joinEntry||createEntry||lobby.Busy) {joinEntry=false;createEntry=false;lobby.CancelAndOpen();}
@@ -200,9 +219,10 @@ namespace Knockbox.Game.UI
             bool soloLobby=(session==null || session.State==SessionState.WaitingPeer) && runner.AbsentSlot>=0 && runner.World.InLobby;
             if(resultsPreviewPending && runner.World.State.Match.Phase==MatchPhase.Fighting) resultsPreviewPending=!runner.TryDebugMatchWin(0);
             if(soloLobby) desired=FrontendScreen.Lobby;
+            else if(EndedInLobby) desired=FrontendScreen.Lobby;
             else if(session!=null && session.State!=SessionState.Running) desired=FrontendScreen.Waiting;
             else if(!online.Active && lobby.IsOpen) desired=optionsOpen?FrontendScreen.Options:joinEntry?FrontendScreen.Join:createEntry||lobby.Busy?FrontendScreen.Waiting:FrontendScreen.Main;
-            else if(runner.FrontendWorld.InLobby) desired=FrontendScreen.Lobby;
+            else if(runner.FrontendWorld.InLobby || runner.FrontendWorld.InLobbyExit || runner.World.InLobbyExit) desired=FrontendScreen.Lobby;
             else if(m.Phase==MatchPhase.Countdown && m.Round==1 && m.PhaseTick<View.IntroRevealTick) desired=FrontendScreen.Versus;
             else if(m.Phase==MatchPhase.SetPick) desired=MonolithPick?FrontendScreen.Hidden:FrontendScreen.Cards;
             else if(m.Phase==MatchPhase.MatchEnd) desired=runner.FrontendWorld.InResultsSpace?FrontendScreen.Podium:FrontendScreen.Result;
@@ -213,12 +233,12 @@ namespace Knockbox.Game.UI
                 if(desired!=FrontendScreen.Cards)submittedRound=-1;
                 if(desired==FrontendScreen.Versus||desired==FrontendScreen.Cards)presenter.SfxPlayer.Play(Presentation.Sfx.Dash,.25f,1.3f);
             }
-            runner.MenuInputBlocked=!online.Active&&lobby.IsOpen;
+            runner.MenuInputBlocked=!(online.Active||lobby.Reopening)&&lobby.IsOpen;
             UpdatePracticeReady();
             // 과거 리플레이/개발 시나리오는 원래 HUD와 선택 화면을 사용한다.
             bool oldReplay=!runner.World.Config.Match.CollectCardsOnly && !lobby.IsOpen;
             View.Canvas.enabled=!oldReplay;
-            if(oldReplay) {View.Show(FrontendScreen.Hidden);previous=FrontendScreen.Hidden;presenter.SetReadyMarkers(false,false,false);return;}
+            if(oldReplay) {View.Show(FrontendScreen.Hidden);previous=FrontendScreen.Hidden;presenter.SetReadyMarkers(false,false,false);presenter.SetLobbyMarkers(false,false,false);return;}
             View.Inventory(runner.FrontendWorld.State.Fighter0.Augments,runner.FrontendWorld.State.Fighter1.Augments);
             View.Score(m.SetScore0,m.SetScore1);
             if(desired==FrontendScreen.Join||desired==FrontendScreen.Waiting)
@@ -254,17 +274,32 @@ namespace Knockbox.Game.UI
             bool localReady=(podium||lobbyScreen) && (runner.IsReadyToggled(slot) || (practiceReadyWorld!=null && !practiceReadySent));
             if(podium)
                 View.Podium(SimWorld.ResultsWinner(m),m.SetScore0,m.SetScore1,online.Active,localReady);
+            // 준비 표시: 내 쪽은 누른 즉시(의도), 상대는 확정된 입력으로 표시한다.
+            var confirmed=runner.FrontendWorld.State;
+            bool ready0=slot==0?localReady:(confirmed.Fighter0.PrevButtons&SimWorld.ReadyButton)!=0;
+            bool ready1=slot==1?localReady:(confirmed.Fighter1.PrevButtons&SimWorld.ReadyButton)!=0;
             if(lobbyScreen)
             {
                 View.Lobby(soloLobby,localReady);
-                View.Room(soloLobby?"방 만들기":"온라인 로비",lobby.RoomCode,soloLobby?"상대를 기다리는 중…":"P1 · P2 입장 완료",false,session!=null&&session.LocalSlot==0);
+                bool host=session!=null?session.LocalSlot==0:lobby.Reopening;
+                string notice="";
+                if(EndedInLobby) notice=session!=null&&session.LocalSlot==1&&session.Reason==EndReason.PeerLeft?"방장이 방을 닫았습니다":EndMessage(session);
+                else if(soloLobby&&Time.unscaledTime-peerLeftAt<PeerLeftNoticeSeconds) notice="상대가 나갔습니다 · 같은 코드로 다시 들어올 수 있어요";
+                View.LobbyHud(new FrontendView.LobbyHudState
+                {
+                    Solo=soloLobby, Reopening=lobby.Reopening,
+                    ShowCode=host&&soloLobby&&session!=null&&session.State==SessionState.WaitingPeer&&!string.IsNullOrEmpty(lobby.RoomCode),
+                    Code=lobby.RoomCode, Ready0=ready0, Ready1=ready1, Notice=notice,
+                });
             }
-            // 머리 위 준비 표식: 내 쪽은 누른 즉시(의도), 상대는 확정된 입력으로 표시한다. 혼자 기다리는 로비에는 띄우지 않는다.
-            var confirmed=runner.FrontendWorld.State;
-            presenter.SetReadyMarkers((podium||lobbyScreen) && !soloLobby && runner.FrontendWorld.InFreeSpace
-                && runner.FrontendWorld.State.Match.PhaseTick>=runner.FrontendWorld.Config.Match.ResultsUnlockTick,
-                slot==0?localReady:(confirmed.Fighter0.PrevButtons&SimWorld.ReadyButton)!=0,
-                slot==1?localReady:(confirmed.Fighter1.PrevButtons&SimWorld.ReadyButton)!=0);
+            // 머리 위 준비 표식: 로비는 "P1/P2 + 삼각형"(2026-11-19, 혼자 기다릴 때도 내 머리 위). 결과 발표가 켜진 결과 공간(2026-11-20)도
+            // 조작이 풀리면 같은 표시로 내 머리 위 "[R] 재대전"·상대 "준비 전"(연습은 상대 상태 없음)을 띄운다. 그 전 설정은 기존 고리.
+            var fw=runner.FrontendWorld;
+            bool ceremony=podium && fw.InResultsSpace && fw.Config.Match.ResultsCeremonyTicks>0;
+            bool resultsOpen=podium && fw.InFreeSpace && fw.State.Match.PhaseTick>=fw.FreeSpaceUnlockTick;
+            presenter.SetReadyMarkers(resultsOpen && !ceremony, ready0, ready1);
+            if(ceremony) presenter.SetLobbyMarkers(resultsOpen && !online.Ended, ready0, ready1, slot, View.PodiumReadyVisible, false, "[R] 재대전", online.Active);
+            else presenter.SetLobbyMarkers(lobbyScreen && !EndedInLobby, ready0, ready1, slot, View.PodiumReadyVisible, soloLobby);
             if(desired==FrontendScreen.Result)
                 View.Result(m.SetScore0>=m.SetScore1?0:1,m.SetScore0,m.SetScore1,online.Active,
                     (runner.FrontendWorld.State.Fighter0.PrevButtons&InputButtons.Attack)!=0 || (practiceReadyWorld!=null && slot==0),

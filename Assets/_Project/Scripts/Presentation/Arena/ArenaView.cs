@@ -188,10 +188,23 @@ namespace Knockbox.Presentation
         /// 화면에서만 한 지형 상자를 위아래로 옮긴다(결과 공간의 시상대 상승 등). PresentTransition 뒤 같은 프레임에 부르며 판정 위치는 그대로다.
         /// 경계 상자나 없는 번호는 무시한다.
         /// </summary>
-        public void OffsetBox(int boxIndex, float dy)
+        public void OffsetBox(int boxIndex, float dy) => OffsetBox(boxIndex, 0f, dy);
+
+        /// <summary>좌우 떨림까지 더한다(결과 공간 시상대가 모놀리스처럼 갈리며 솟을 때, 2026-11-20).</summary>
+        public void OffsetBox(int boxIndex, float dx, float dy)
         {
             if (motionParts == null || !boxGroups.TryGetValue(boxIndex, out int group) || group >= motionParts.Length) return;
-            motionParts[group].localPosition += new Vector3(0f, dy, 0f);
+            motionParts[group].localPosition += new Vector3(dx, dy, 0f);
+        }
+
+        /// <summary>
+        /// 한 지형 상자를 맵 재구성 연출(위에서 떨어져 들어옴)과 무관하게 제자리 + 오프셋에 둔다(결과 공간 시상대는 재구성 동안 땅속에 숨어 있다가
+        /// 따로 솟는다. 재구성 오프셋에 더하면 하늘에서 내려왔다가 땅속으로 사라져 보였다, 2026-11-20).
+        /// </summary>
+        public void PlaceBox(int boxIndex, float dx, float dy)
+        {
+            if (motionParts == null || !boxGroups.TryGetValue(boxIndex, out int group) || group >= motionParts.Length) return;
+            motionParts[group].localPosition = motionPositions[group] + new Vector3(dx, dy, 0f);
         }
 
         void Rect(ShapeLibrary shapes, Color color, string layer, int order, float minX, float minY, float maxX, float maxY)

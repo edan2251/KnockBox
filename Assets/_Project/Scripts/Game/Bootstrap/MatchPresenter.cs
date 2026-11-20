@@ -291,6 +291,10 @@ namespace Knockbox.Game
             builtArena = arena;
             var light = meta.HasLight ? meta.Light : BackgroundView.DefaultLight(arena);
             CurrentTheme = ThemeOverride >= 0 ? palette.Theme(Mathf.Clamp(ThemeOverride, 0, palette.ThemeCount - 1)) : meta.ResolveTheme(palette);
+            // 결과 공간(2026-11-20): 배경은 승자 색의 색조로 바뀐다(재구성 연출로 서서히 들어온다). 지형·구조물 색은 맵 테마 그대로.
+            var world = runner.World;
+            if (ThemeOverride < 0 && world != null && world.InResultsSpace && arena == world.ResultsArena)
+                CurrentTheme = palette.ResultsTheme(CurrentTheme, SimWorld.ResultsWinner(world.State.Match));
             background.Build(arena, CurrentTheme, palette, shapes, light, meta.Shadow);
             propShadows.SetMaterial(background.ShadowMaterial);
             fighterShadows.SetMaterial(background.ShadowMaterial);
@@ -372,7 +376,7 @@ namespace Knockbox.Game
             if (cameraRig != null)
                 cameraRig.ResetEffects();
             renderedRound = r.World.State.Match.Round;
-            renderedResults = r.World.InFreeSpace;
+            renderedResults = r.World.InFreeSpace || r.World.InLobbyExit;
             queued = 0;
             lastSimTime = SimTime();
         }
@@ -433,7 +437,8 @@ namespace Knockbox.Game
             float alpha = runner.RenderAlpha;
             // 결과 공간에서 새 경기로 나간 순간도 새 라운드로 본다. 1라운드에 끝난 경기(검수 단축키)는 재시작 뒤에도
             // 라운드 번호가 1로 같아, 번호만 비교하면 결과 공간 맵을 계속 그렸다(2026-11-16 CP1 버그).
-            bool inResults = world.InFreeSpace;
+            // 로비 → 첫 경기 전환(LobbyExit)도 로비 맵을 그대로 그린다. 1라운드 Countdown이 되면 새 경기로 보고 경기 맵을 만든다.
+            bool inResults = world.InFreeSpace || world.InLobbyExit;
             bool leftResults = renderedResults && !inResults;
             renderedResults = inResults;
             if (current.Match.Round != renderedRound || leftResults)
@@ -543,6 +548,63 @@ namespace Knockbox.Game
             else worldBrightness.SetBrightness(1);
             if (stage) cardPickStage.Present();
             RenderReadyMarkers(current, world.Config);
+            RenderLobbyMarkers(current, world);
+        }
+
+        UI.LobbyHeadMarkers lobbyMarkers;
+        bool lobbyMarkersVisible, lobbyReady0, lobbyReady1, lobbyMarkersSolo, lobbyCanReady, lobbyShowOther = true;
+        int lobbyLocalSlot;
+        string lobbyReadyLabel = "[R] 준비";
+        readonly Vector2[] markerHeads = new Vector2[2];
+        readonly bool[] markerShown = new bool[2];
+
+        /// <summary>
+        /// 로비의 머리 위 "준비 상태 + P1/P2 + 삼각형" 표시(2026-11-19). 화면(FrontendController)이 내 준비 의도와 상대의 확정 입력으로 매 프레임 정한다.
+        /// 내 머리 위는 "[R] 준비"(아직 준비할 수 없으면 흐리게), 상대는 "준비 전", 준비하면 "준비 완료". 혼자 기다릴 때는 상태 줄을 띄우지 않는다.
+        /// </summary>
+        /// <param name="readyLabel">내 선수의 준비 안내(로비 "[R] 준비", 결과 공간 "[R] 재대전").</param>
+        /// <param name="showOther">상대 머리 위에 "준비 전"을 띄울지(연습 결과 공간은 한쪽 준비로 다시 시작하므로 띄우지 않는다).</param>
+        public void SetLobbyMarkers(bool visible, bool readyP1, bool readyP2, int localSlot = 0, bool canReady = false, bool solo = true,
+            string readyLabel = "[R] 준비", bool showOther = true)
+        {
+            lobbyReadyLabel = readyLabel; lobbyShowOther = showOther;
+            lobbyMarkersVisible = visible;
+            lobbyReady0 = readyP1;
+            lobbyReady1 = readyP2;
+            lobbyLocalSlot = localSlot; lobbyCanReady = canReady; lobbyMarkersSolo = solo;
+        }
+
+        void RenderLobbyMarkers(in SimState s, SimWorld world)
+        {
+            if (lobbyMarkers == null)
+            {
+                if (!lobbyMarkersVisible) return;
+                lobbyMarkers = new UI.LobbyHeadMarkers(transform, shapes, palette, UI.FrontendTheme.Load());
+            }
+            // 둘 다 준비해 퇴장 전환이 시작되면 몸을 누르는 동안 빠르게 사라진다.
+            float fade = world.InLobbyExit ? 1f - UI.FrontendMotion.Out(UI.FrontendMotion.Range(s.Match.PhaseTick + runner.RenderAlpha, 0f, 7f)) : 1f;
+            float half = world.Config.Movement.BodySize * 0.5f;
+            for (int k = 0; k < 2; k++)
+            {
+                var view = Fighter(k);
+                // 비어 있는 자리(혼자 로비의 P2)·KO로 조각난 동안·낙하 전(숨김)에는 표시도 숨긴다.
+                markerShown[k] = lobbyMarkersVisible && s.GetFighter(k).Action != ActionState.KO && view.transform.localScale.x > .5f;
+                markerHeads[k] = view.BodyCenter + new Vector2(0f, half);
+            }
+            // 이름·상태 글자는 언제나 자기 머리 바로 위에 둔다(2026-11-20 사용자 지시: 가까이 서도 서로 밀어내지 않는다).
+            for (int k = 0; k < 2; k++)
+            {
+                bool ready = k == 0 ? lobbyReady0 : lobbyReady1;
+                string status = ""; Color statusColor = PaletteAsset.Neutral;
+                if (!lobbyMarkersSolo)
+                {
+                    if (ready) { status = "준비 완료"; statusColor = palette.FighterBody(k); }
+                    // 내 준비 안내("[R] 준비"·"[R] 재대전")는 준비할 수 있게 되면 천천히 숨 쉬듯 밝아졌다 어두워져 눈길을 끈다.
+                    else if (k == lobbyLocalSlot) { status = lobbyReadyLabel; statusColor = PaletteAsset.WithAlpha(PaletteAsset.Neutral, lobbyCanReady ? .72f + .28f * (.5f + .5f * Mathf.Sin(Time.unscaledTime * Mathf.PI * 2f / 1.4f)) : .45f); }
+                    else if (lobbyShowOther) { status = "준비 전"; statusColor = PaletteAsset.WithAlpha(PaletteAsset.Neutral, .55f); }
+                }
+                lobbyMarkers.Render(markerShown[k], k, markerHeads[k], ready, fade, Time.unscaledTime, status, statusColor);
+            }
         }
 
         ReadyMarkers readyMarkers;
@@ -771,6 +833,33 @@ namespace Knockbox.Game
 
         /// <summary>화면에서만 지형 상자 하나를 옮긴다(결과 공간의 시상대 상승). 판정 위치는 그대로다.</summary>
         public void OffsetTerrainBox(int boxIndex, float dy) => arenaView.OffsetBox(boxIndex, dy);
+
+        /// <summary>맵 재구성 연출과 무관하게 지형 상자 하나를 제자리 + 오프셋에 둔다(결과 공간 시상대). 그림자도 같이 옮긴다.</summary>
+        public void PlaceTerrainBox(int boxIndex, float dx, float dy)
+        {
+            arenaView.PlaceBox(boxIndex, dx, dy);
+            background.SetMovingOccluder(boxIndex, new Vector2(dx, dy));
+        }
+
+        /// <summary>시상대 그림자 이동을 되돌린다.</summary>
+        public void ClearMovingTerrainShadow() => background.SetMovingOccluder(-1, Vector2.zero);
+
+        /// <summary>구조물 그림(결과 글자 몸체를 숨기고 위치만 읽는다).</summary>
+        public PropView Props => propView;
+
+        /// <summary>
+        /// 화면에서만 선수의 크기를 바꾼다(로비 퇴장의 눌림·늘어남, 2026-11-19). 발이 같은 높이에 남도록 몸 가운데 기준을 보정한다. 판정과 무관하다.
+        /// </summary>
+        public void ScaleFighterVisual(int fighter, float scaleX, float scaleY, float halfBody)
+        {
+            var view = Fighter(fighter).transform;
+            var s = view.localScale;
+            view.localScale = new Vector3(s.x * scaleX, s.y * scaleY, s.z);
+            view.localPosition += Vector3.up * (scaleY - 1f) * halfBody;
+        }
+
+        /// <summary>화면에서만 두 선수의 바닥 그림자를 숨긴다(로비 퇴장에서 선수가 튀어 올라 떠난 뒤 그림자가 바닥에 남지 않게).</summary>
+        public void HideFighterShadows() => fighterShadows.gameObject.SetActive(false);
 
         /// <summary>화면에서만 선수를 위아래로 옮긴다(시상대와 함께 솟음·자동 점프). 판정 위치는 그대로다.</summary>
         public void OffsetFighterVisual(int fighter, float dy)

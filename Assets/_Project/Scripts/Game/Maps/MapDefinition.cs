@@ -81,11 +81,19 @@ namespace Knockbox.Game.Maps
         [SerializeField] MapUsage usage;
         [Tooltip("결과 공간: 승자 자리(P1 시작 위치) 아래의 시상대 지형 ID. 연출(시상대 상승)에만 쓰며 판정과 무관합니다.")]
         [SerializeField] string podiumBoxId;
+        // 결과 공간 전용(2026-11-20 결과 발표). 화면 연출 값과 결과 글자 틀 맵. 조작이 풀리는 틱만 시뮬레이션 설정이 된다.
+        [SerializeField] ResultsStageSettings resultsStage=new ResultsStageSettings();
+        [Tooltip("결과 공간: 세트 점수 숫자(0~5)·콜론 모양을 가져올 글자 틀 맵(Results_Glyphs). 정점·두점자르기로 다듬은 볼록 조각을 그대로 쓴다.")]
+        [SerializeField] MapDefinition resultGlyphs;
         /// <summary>맵 용도. 보상 맵 설정이 켜져 있으면 보상 맵이다.</summary>
         public MapUsage Usage=>rewardMap?MapUsage.Reward:usage;
         /// <summary>점수 없이 자유롭게 움직이는 공간(로비·결과 공간) 맵.</summary>
         public bool IsSpaceMap=>Usage==MapUsage.Lobby||Usage==MapUsage.Results;
         public string PodiumBoxId=>podiumBoxId;
+        /// <summary>결과 발표 값(결과 공간 맵). 다른 용도 맵에서는 쓰지 않는다.</summary>
+        public ResultsStageSettings ResultsStage=>resultsStage??=new ResultsStageSettings();
+        /// <summary>결과 글자 틀 맵(없으면 결과 글자를 그리지 않는다).</summary>
+        public MapDefinition ResultGlyphs=>resultGlyphs;
         /// <summary>용도에 따른 두 발 위치의 뜻(제작기 표시용).</summary>
         public string SpotLabel(int player)=>Usage==MapUsage.Results?(player==0?"승자 자리(시상대 위)":"패자 자리")
             :Usage==MapUsage.Lobby?"P"+(player+1)+" 입장·재등장 자리":"P"+(player+1)+" 시작 위치";
@@ -132,7 +140,9 @@ namespace Knockbox.Game.Maps
             var arena=new ArenaDef(MatchName,columns,rows,boundary,ordered,new Vec2(spawn0.x,spawn0.y),new Vec2(spawn1.x,spawn1.y));
             if(PhysicalBoxCount==0)return arena;
             var props=new PropDef[PhysicalBoxCount];
-            for(int i=0;i<props.Length;i++)props[i]=physicalBoxes[i].ToProp(i);
+            // 결과 공간 숫자 발판(2026-11-20): 글자 몸은 이 맵의 결과 글자 틀 조각으로 선수와 닿는 모양을 만든다.
+            var glyphLibrary=resultGlyphs!=null&&Array.Exists(physicalBoxes,b=>b.HasGlyph)?new ResultGlyphLibrary(resultGlyphs):null;
+            for(int i=0;i<props.Length;i++)props[i]=physicalBoxes[i].ToProp(i,glyphLibrary);
             var graph=new List<GraphRope>();
             for(int i=0;i<RopeCount;i++)
             {
@@ -179,13 +189,17 @@ namespace Knockbox.Game.Maps
                 if(b.connector && (b.playerPassThrough || !Finite(b.connectorSpeedLoss) || b.connectorSpeedLoss<0 || b.connectorSpeedLoss>1))
                     errors.Add("연결 상자는 플레이어 통과를 끄고 관통 감속을 0~100%로 지정해주세요. 순서: "+i);
                 float inset=boundary?1:0;
+                // 결과 공간(2026-11-20 점수 숫자 발판): 숫자 몸은 화면 위 밖에서 매달려 기다리다 떨어진다.
+                float top=Usage==MapUsage.Results?rows*.5f+rows:rows*.5f-inset;
                 if(bounds.minX< -columns*.5f+inset || bounds.maxX>columns*.5f-inset
-                    ||bounds.minY< -rows*.5f+inset || bounds.maxY>rows*.5f-inset)
+                    ||bounds.minY< -rows*.5f+inset || bounds.maxY>top)
                     errors.Add("물리 상자가 경기장 밖에 있습니다. 순서: "+i);
                 foreach(var ground in boxes)
                     if(ground.kind!=TerrainKind.OneWay && Overlaps(bounds,ground))
                     {errors.Add("물리 상자가 고정 지형과 겹칩니다. 순서: "+i);break;}
-                for(int j=0;j<i;j++)if(Overlaps(bounds,physicalBoxes[j].Bounds))
+                // 결과 공간 점수 숫자(2026-11-20)는 같은 점수 자리의 다른 숫자와 겹쳐 둔다(결과 공간에 들어올 때 점수와 맞는 하나만 남는다).
+                for(int j=0;j<i;j++)if(Overlaps(bounds,physicalBoxes[j].Bounds)
+                    &&!(physicalBoxes[i].scoreSlot!=0&&physicalBoxes[i].scoreSlot==physicalBoxes[j].scoreSlot&&physicalBoxes[i].scoreDigit!=physicalBoxes[j].scoreDigit))
                     {errors.Add("물리 상자가 서로 겹칩니다. 순서: "+j+" / "+i);break;}
             }
             if(RopeCount>GraphRope.Capacity)errors.Add("로프는 최대 "+GraphRope.Capacity+"개입니다.");
@@ -266,7 +280,21 @@ namespace Knockbox.Game.Maps
         {
             var errors=new List<string>();
             string what=Usage==MapUsage.Lobby?"로비 맵":"결과 공간 맵";
-            if(PhysicalBoxCount>0||RopeCount>0)errors.Add(what+"에는 물리 상자·로프를 두지 않습니다.");
+            // 결과 공간은 점수 숫자 발판(2026-11-20, 로프로 매단 물리 상자)을 위해 물리 상자·로프를 허용한다(로비는 그대로 금지).
+            if(Usage==MapUsage.Lobby&&(PhysicalBoxCount>0||RopeCount>0))errors.Add(what+"에는 물리 상자·로프를 두지 않습니다.");
+            if(Usage==MapUsage.Results)
+            {
+                ResultGlyphLibrary library=null;
+                foreach(var b in physicalBoxes??Array.Empty<MapPhysicalBox>())
+                {
+                    if(!b.HasGlyph)continue;
+                    if(resultGlyphs==null){errors.Add("글자 몸("+b.id+")을 쓰려면 결과 글자 틀 맵을 연결해야 합니다.");break;}
+                    library??=new ResultGlyphLibrary(resultGlyphs);
+                    if(!MapPhysicalBox.TryGlyphPieces(library,b.glyph,out _))errors.Add("결과 글자 틀에 '"+b.glyph+"' 글자가 없습니다("+b.id+").");
+                }
+                bool scoreBodies=Array.Exists(physicalBoxes??Array.Empty<MapPhysicalBox>(),b=>b.scoreSlot!=0);
+                if(scoreBodies&&!Array.Exists(ropes??Array.Empty<MapRope>(),r=>r.graph))errors.Add("점수 숫자 몸은 독립 로프로 매달아야 합니다.");
+            }
             float h=bodySize*.5f, top=rows*.5f-1f-h-.5f;
             for(int p=0;p<2;p++)
             {
@@ -382,6 +410,8 @@ namespace Knockbox.Game.Maps
             }
             return true;
         }
+        /// <summary>결과 발표 값 전체를 바꾼다(결과 공간 첫 조형 도구, 2026-11-20).</summary>
+        public void SetResultsStage(ResultsStageSettings settings)=>resultsStage=(settings??new ResultsStageSettings()).Copy();
         public void MakeEditableCopy(string newId,string title){stableId=newId;displayName=title;preservedBaseline=false;revision=1;}
         /// <summary>맵 용도와 시상대 지정(결과 공간). 보상 맵은 기존 보상 맵 설정으로 바꾼다.</summary>
         public void SetUsage(MapUsage value,string podium)

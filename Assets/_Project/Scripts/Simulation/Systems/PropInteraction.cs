@@ -216,81 +216,99 @@ namespace Knockbox.Simulation
                 ref readonly var def = ref arena.GetProp(arena.DynamicProp(i));
                 if (props.IsDestroyed(i) || def.PlayerPassThrough)
                     continue;
-                if (!Overlap(f.Position, prev.Position, half, b, def.HalfSize, out var n, out float depth))
+                // 결과 공간 숫자 발판(2026-11-20)은 깎은 조각마다 따로 닿는다(같은 몸에 돌진·맞기는 한 틱에 한 번). 모양 없는 몸은 상자 하나 그대로다.
+                // 조각은 모두 몸 상자 안에 있으므로 몸 상자와 겹치지 않으면 어느 조각과도 겹치지 않는다. 멀리 있을 때 조각마다의 분리축 검사를 건너뛴다
+                // (같은 결과, 온라인 예측은 한 화면 프레임에 여러 틱을 다시 돌려 이 검사가 그만큼 반복된다).
+                if (def.HasShape && !Overlap(f.Position, prev.Position, half, b, def.HalfSize, out _, out _))
                     continue;
-                bool stableConnector = def.IsConnector && c.StableConnectorContacts;
-                var point = stableConnector ? ContactPoint(f.Position, half, b, def.HalfSize, n) : f.Position - n * half;
-                float m = PropPhysics.Mass(def, c);
-                float invI = 1f / PropPhysics.Inertia(def, m);
-                var r = point - b.Position;
-                float rn = PropBody.Cross(r, n);
-                float kProp = 1f / m + invI * rn * rn;
-                var vp = b.PointVelocity(point);
-                float vn = Vec2.Dot(f.Velocity - vp, n);
-                bool onThis = wasOn == i + 1;
-
-                // 1) 돌진이 구조물을 침: 공격성 위력 × 1.0을 충격량으로. 무거우면 지형처럼 반사 × 0.6, 가벼우면 계속 나아감.
-                float power = frozen ? 0f : FighterCombat.Power(f, -n, config);
-                if (f.Action == ActionState.Lunge && power > 0f && b.GetStrikeCooldown(index) == 0)
+                int pieces = def.HasShape ? def.Shape.Length : 1;
+                bool struck = false, hit = false, weighted = false;
+                for (int piece = 0; piece < pieces; piece++)
                 {
-                    impulses.Add(i, -n * (power * c.LungeImpulseScale), point, b, index);
-                    impulses.Strike(i, index, c.StrikeCooldownTicks);
-                    float gap = SimMath.Abs(b.Position.Y - f.Position.Y);
-                    if (power >= c.KnockoutPower && PropPhysics.IsBox(def.Kind) && gap < knockoutGap)
+                    if (!(def.HasShape
+                            ? OverlapPiece(f.Position, prev.Position, half, b, def.Shape[piece], out var n, out float depth)
+                            : Overlap(f.Position, prev.Position, half, b, def.HalfSize, out n, out depth)))
+                        continue;
+                    bool stableConnector = def.IsConnector && c.StableConnectorContacts;
+                    var point = stableConnector ? ContactPoint(f.Position, half, b, def.HalfSize, n) : f.Position - n * half;
+                    float m = PropPhysics.Mass(def, c);
+                    float invI = 1f / PropPhysics.Inertia(def, m);
+                    var r = point - b.Position;
+                    float rn = PropBody.Cross(r, n);
+                    float kProp = 1f / m + invI * rn * rn;
+                    var vp = b.PointVelocity(point);
+                    float vn = Vec2.Dot(f.Velocity - vp, n);
+                    bool onThis = wasOn == i + 1;
+
+                    // 1) 돌진이 구조물을 침: 공격성 위력 × 1.0을 충격량으로. 무거우면 지형처럼 반사 × 0.6, 가벼우면 계속 나아감.
+                    float power = frozen ? 0f : FighterCombat.Power(f, -n, config);
+                    if (f.Action == ActionState.Lunge && power > 0f && b.GetStrikeCooldown(index) == 0 && !struck)
                     {
-                        knockout = i;
-                        knockoutGap = gap;
-                        knockoutPower = power;
-                        knockoutDirection = -n;
+                        struck = true;
+                        impulses.Add(i, -n * (power * c.LungeImpulseScale), point, b, index);
+                        impulses.Strike(i, index, c.StrikeCooldownTicks);
+                        float gap = SimMath.Abs(b.Position.Y - f.Position.Y);
+                        if (power >= c.KnockoutPower && PropPhysics.IsBox(def.Kind) && gap < knockoutGap)
+                        {
+                            knockout = i;
+                            knockoutGap = gap;
+                            knockoutPower = power;
+                            knockoutDirection = -n;
+                        }
+                        if (m >= c.LungeHeavyMass)
+                            f.Velocity = (f.Velocity - n * (2f * Vec2.Dot(f.Velocity, n))) * c.LungeHeavyRestitution;
+                        events.Add(new SimEvent(tick, SimEventType.PropStrike, index, point, -n, power));
                     }
-                    if (m >= c.LungeHeavyMass)
-                        f.Velocity = (f.Velocity - n * (2f * Vec2.Dot(f.Velocity, n))) * c.LungeHeavyRestitution;
-                    events.Add(new SimEvent(tick, SimEventType.PropStrike, index, point, -n, power));
-                }
-                // 2) 구조물이 캐릭터를 침: 상대 법선 속도 10 이상, 구조물이 다가오는 쪽, 그 위에 서 있지 않음, 쌍마다 20틱.
-                else if (-vn >= c.HitMinSpeed && Vec2.Dot(vp, n) > Vec2.Dot(f.Velocity, -n) && !onThis
-                         && b.GetHitCooldown(index) == 0 && FighterCombat.CanBeHit(f, config)
-                         && !(PropPhysics.IsBox(def.Kind) && f.BoxDamageSum >= c.BoxDamageCap))
-                {
-                    PropHit(ref f, -vn, m, n, point, index, i, b, PropPhysics.IsBox(def.Kind), ref impulses, config, tick, events);
-                }
-                // 3) 그 밖: 질량 비에 따른 운동량 교환(반발 0.15). 날아가던 캐릭터가 무거운 구조물에 세게 부딪히면 벽꽝.
-                else if (vn < 0f)
-                {
-                    if (stableConnector && !onThis && -vn >= 1.5f)
-                        events.Add(new SimEvent(tick, SimEventType.ConnectorContact, index, point, -n, -vn) { PropIndex = i });
-                    float j = -(1f + c.FighterRestitution) * vn / (1f / c.FighterMass + kProp);
-                    bool splat = f.IsLaunched && m >= c.SplatMinMass && -vn >= config.Combat.WallSplatSpeed;
-                    if (!frozen)
-                        f.Velocity += n * (j / c.FighterMass);
-                    // 서 있는 캐릭터의 잔떨림은 무시하되 현재 경기는 옆에서 천천히 미는 힘도 전달한다.
-                    // 구 기록은 모든 방향에 1을 적용했던 휴면 조건을 그대로 사용한다.
-                    float wakeSpeed = c.SmoothBoxRelease && n.Y < c.StandCos && SimMath.Abs(n.X) >= c.StandCos ? c.SleepSpeed : 1f;
-                    if (!PropPhysics.IsBox(def.Kind) || -vn >= wakeSpeed)
-                        impulses.Add(i, -n * j, point, b, index);
-                    else if (!PropPhysics.Asleep(b, c))
-                        impulses.Press(i, -n * j, point, b);
-                    if (splat)
-                        Splat(ref f, n, -vn, point, index, config, tick, events);
-                }
+                    // 2) 구조물이 캐릭터를 침: 상대 법선 속도 10 이상, 구조물이 다가오는 쪽, 그 위에 서 있지 않음, 쌍마다 20틱.
+                    else if (-vn >= c.HitMinSpeed && Vec2.Dot(vp, n) > Vec2.Dot(f.Velocity, -n) && !onThis
+                             && b.GetHitCooldown(index) == 0 && FighterCombat.CanBeHit(f, config)
+                             && !(PropPhysics.IsBox(def.Kind) && f.BoxDamageSum >= c.BoxDamageCap) && !hit)
+                    {
+                        hit = true;
+                        PropHit(ref f, -vn, m, n, point, index, i, b, PropPhysics.IsBox(def.Kind), ref impulses, config, tick, events);
+                    }
+                    // 3) 그 밖: 질량 비에 따른 운동량 교환(반발 0.15). 날아가던 캐릭터가 무거운 구조물에 세게 부딪히면 벽꽝.
+                    else if (vn < 0f)
+                    {
+                        if (stableConnector && !onThis && -vn >= 1.5f)
+                            events.Add(new SimEvent(tick, SimEventType.ConnectorContact, index, point, -n, -vn) { PropIndex = i });
+                        float j = -(1f + c.FighterRestitution) * vn / (1f / c.FighterMass + kProp);
+                        bool splat = f.IsLaunched && m >= c.SplatMinMass && -vn >= config.Combat.WallSplatSpeed;
+                        if (!frozen)
+                            f.Velocity += n * (j / c.FighterMass);
+                        // 서 있는 캐릭터의 잔떨림은 무시하되 현재 경기는 옆에서 천천히 미는 힘도 전달한다.
+                        // 구 기록은 모든 방향에 1을 적용했던 휴면 조건을 그대로 사용한다.
+                        float wakeSpeed = c.SmoothBoxRelease && n.Y < c.StandCos && SimMath.Abs(n.X) >= c.StandCos ? c.SleepSpeed : 1f;
+                        if (!PropPhysics.IsBox(def.Kind) || -vn >= wakeSpeed)
+                            impulses.Add(i, -n * j, point, b, index);
+                        else if (!PropPhysics.Asleep(b, c))
+                            impulses.Press(i, -n * j, point, b);
+                        if (splat)
+                            Splat(ref f, n, -vn, point, index, config, tick, events);
+                    }
 
-                // 겹침 해소: 캐릭터만 밀어낸다(히트스탑 중에도 위치는 밀어낸다: 구조물은 멈추지 않으므로 그대로 두면 몸을 지나간다).
-                // 위쪽 50° 이내 법선이면 그 구조물 위에 선 것.
-                Displace(ref f.Position, n * depth, half, arena, config);
-                if (n.Y >= c.StandCos && f.Velocity.Y <= vp.Y + 0.5f)
-                {
-                    standing = i + 1;
-                    // 구조물의 위 방향 속도는 0.5 이상일 때만 이어받는다(부드러운 접촉이 상자를 0.01~0.03 밀어 올리는 것까지 받으면 접지가 풀렸다, CP16).
-                    float carry = vp.Y >= 0.5f ? vp.Y : SimMath.Min(vp.Y, 0f);
-                    if (f.Velocity.Y < carry)
-                        f.Velocity.Y = carry;
-                    // 캐릭터 무게만큼 누른다(밟으면 기운다). 상자는 무게로 깨우지 않는다(CP16: 잠든 상자는 움직이지 않는 받침,
-                    // 깨어 있으면 무게만 전하고 잠들기는 그대로 세어 위에 서 있어도 다시 잠든다).
-                    var weight = new Vec2(0f, -c.FighterMass * c.Gravity * SimConfig.Dt);
-                    if (!PropPhysics.IsBox(def.Kind))
-                        impulses.Add(i, weight, point, b, index);
-                    else if (!stableConnector && !PropPhysics.Asleep(b, c))
-                        impulses.Press(i, weight, point, b);
+                    // 겹침 해소: 캐릭터만 밀어낸다(히트스탑 중에도 위치는 밀어낸다: 구조물은 멈추지 않으므로 그대로 두면 몸을 지나간다).
+                    // 위쪽 50° 이내 법선이면 그 구조물 위에 선 것.
+                    Displace(ref f.Position, n * depth, half, arena, config);
+                    if (n.Y >= c.StandCos && f.Velocity.Y <= vp.Y + 0.5f)
+                    {
+                        standing = i + 1;
+                        // 구조물의 위 방향 속도는 0.5 이상일 때만 이어받는다(부드러운 접촉이 상자를 0.01~0.03 밀어 올리는 것까지 받으면 접지가 풀렸다, CP16).
+                        float carry = vp.Y >= 0.5f ? vp.Y : SimMath.Min(vp.Y, 0f);
+                        if (f.Velocity.Y < carry)
+                            f.Velocity.Y = carry;
+                        // 캐릭터 무게만큼 누른다(밟으면 기운다). 상자는 무게로 깨우지 않는다(CP16: 잠든 상자는 움직이지 않는 받침,
+                        // 깨어 있으면 무게만 전하고 잠들기는 그대로 세어 위에 서 있어도 다시 잠든다).
+                        // 여러 조각에 함께 서 있어도 무게는 한 번만 준다.
+                        var weight = new Vec2(0f, -c.FighterMass * c.Gravity * SimConfig.Dt);
+                        if (weighted)
+                            continue;
+                        weighted = true;
+                        if (!PropPhysics.IsBox(def.Kind))
+                            impulses.Add(i, weight, point, b, index);
+                        else if (!stableConnector && !PropPhysics.Asleep(b, c))
+                            impulses.Press(i, weight, point, b);
+                    }
                 }
             }
             if (knockout >= 0)
@@ -303,9 +321,16 @@ namespace Knockbox.Simulation
             {
                 ref readonly var under = ref PropState.At(in props, wasOn - 1);
                 var probe = new Vec2(0f, config.Movement.GroundProbeDistance);
-                var halfSize = arena.GetProp(arena.DynamicProp(wasOn - 1)).HalfSize;
-                if (Overlap(f.Position - probe, prev.Position - probe, half, under, halfSize, out var n, out _) && n.Y >= c.StandCos)
-                    standing = wasOn;
+                ref readonly var underDef = ref arena.GetProp(arena.DynamicProp(wasOn - 1));
+                if (!underDef.HasShape)
+                {
+                    if (Overlap(f.Position - probe, prev.Position - probe, half, under, underDef.HalfSize, out var n, out _) && n.Y >= c.StandCos)
+                        standing = wasOn;
+                }
+                else
+                    for (int piece = 0; piece < underDef.Shape.Length && standing == 0; piece++)
+                        if (OverlapPiece(f.Position - probe, prev.Position - probe, half, under, underDef.Shape[piece], out var n, out _) && n.Y >= c.StandCos)
+                            standing = wasOn;
             }
             f.OnProp = standing;
         }
@@ -424,6 +449,73 @@ namespace Knockbox.Simulation
             float side = prior > 0f ? 1f : prior < 0f ? -1f : (d >= 0f ? 1f : -1f);
             normal = axisVector * side;
             depth = r - side * d;
+            return true;
+        }
+
+        /// <summary>
+        /// 캐릭터 몸(축 정렬 정사각형)과 회전한 몸의 볼록 조각 하나(몸 좌표, 결과 공간 숫자 발판 2026-11-20): 분리축 검사. 법선은 조각 → 캐릭터.
+        /// 축은 조각의 변 법선(몸과 함께 회전)과 월드 x·y. 고르는 방식은 상자(Overlap)와 같다: 직전 틱에 떨어져 있던 축 중 가장 늦게 겹친 축,
+        /// 없으면 가장 얕은 축. 방향은 들어온 축이면 직전 위치 쪽, 아니면 얕은 쪽.
+        /// </summary>
+        public static bool OverlapPiece(Vec2 position, Vec2 previous, float half, in PropBody b, ConvexPolygon piece, out Vec2 normal, out float depth)
+        {
+            var u = b.Rotation;
+            var v = new Vec2(-u.Y, u.X);
+            normal = Vec2.Zero;
+            depth = 0f;
+            int count = piece.Count;
+            float shallow = float.MaxValue, latest = float.MinValue, enteredDepth = 0f;
+            var shallowNormal = Vec2.Zero; var enteredNormal = Vec2.Zero;
+            for (int axis = 0; axis < count + 2; axis++)
+            {
+                Vec2 a;
+                if (axis < count) { var n = piece.Normal(axis); a = u * n.X + v * n.Y; }
+                else a = axis == count ? new Vec2(1f, 0f) : new Vec2(0f, 1f);
+                float lo = float.MaxValue, hi = float.MinValue;
+                for (int k = 0; k < count; k++)
+                {
+                    var p = piece.Point(k);
+                    float d = Vec2.Dot(b.Position + u * p.X + v * p.Y, a);
+                    lo = SimMath.Min(lo, d);
+                    hi = SimMath.Max(hi, d);
+                }
+                float r = half * (SimMath.Abs(a.X) + SimMath.Abs(a.Y));
+                float c = Vec2.Dot(position, a), cPrev = Vec2.Dot(previous, a);
+                // 위(+a)로 밀어낼 깊이와 아래(-a)로 밀어낼 깊이. 둘 중 작은 쪽이 이 축의 겹침.
+                float up = hi - (c - r), down = (c + r) - lo;
+                float now = SimMath.Min(up, down);
+                if (now <= 0f)
+                    return false;
+                if (now < shallow - 1e-5f)
+                {
+                    shallow = now;
+                    shallowNormal = up <= down ? a : -a;
+                }
+                float wasUp = hi - (cPrev - r), wasDown = (cPrev + r) - lo;
+                float was = SimMath.Min(wasUp, wasDown);
+                if (was <= 0f)
+                {
+                    float t = -was / (now - was);
+                    if (t > latest)
+                    {
+                        latest = t;
+                        // 직전 틱에 있던 쪽으로 밀어낸다.
+                        bool fromAbove = wasUp <= wasDown;
+                        enteredNormal = fromAbove ? a : -a;
+                        enteredDepth = fromAbove ? up : down;
+                    }
+                }
+            }
+            if (latest > float.MinValue && enteredDepth <= shallow + EntrySlack)
+            {
+                normal = enteredNormal;
+                depth = enteredDepth;
+            }
+            else
+            {
+                normal = shallowNormal;
+                depth = shallow;
+            }
             return true;
         }
 

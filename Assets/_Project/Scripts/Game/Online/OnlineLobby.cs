@@ -17,6 +17,7 @@ namespace Knockbox.Game.Online
         [SerializeField] MatchPresenter presenter;
         bool open = true;
         bool busy;
+        bool reopening;
         string code = "";
         string joinCode = "";
         string status = "";
@@ -26,6 +27,8 @@ namespace Knockbox.Game.Online
         MatchRunner Runner => runner != null ? runner : (runner=GetComponent<MatchRunner>());
         public bool IsOpen => open;
         public bool Busy => busy;
+        /// <summary>손님이 로비에서 나가 방장이 같은 코드로 방을 다시 여는 중(혼자 로비는 계속 조작된다).</summary>
+        public bool Reopening => reopening;
         public string RoomCode => code;
         public string JoinCode { get => joinCode; set => joinCode = value ?? ""; }
         public string StatusMessage => status;
@@ -55,7 +58,8 @@ namespace Knockbox.Game.Online
         {
             CancelPendingConnection();
             busy=false; status=""; code="";
-            if (online.Active) online.LeaveToPractice();
+            if (online.Active || reopening) online.LeaveToPractice();
+            reopening=false;
             open=true;
             Runner.Running=false;
             Runner.MenuInputBlocked=true;
@@ -72,6 +76,8 @@ namespace Knockbox.Game.Online
         void Awake()
         {
             online ??= GetComponent<OnlineMatch>();
+            // 손님이 경기 확정 전에 로비를 나가면 방장은 혼자 로비로 돌아오고, 같은 코드로 방을 다시 연다(2026-11-19).
+            online.ReturnedToSoloLobby += ReopenSameRoom;
             // 개발 빌드의 디버그 글자(틱, 상태 이름, 아래쪽 규칙 줄)는 친구 시험 화면에서 숨긴다.
             presenter ??= GetComponent<MatchPresenter>();
             if (presenter != null)
@@ -88,9 +94,11 @@ namespace Knockbox.Game.Online
 
         public async void CreateRoom() => await ConnectAsync(true);
         public async void Join() => await ConnectAsync(false);
+        async void ReopenSameRoom() => await ConnectAsync(true, code);
 
         // UI commands converge here; only the connection layer knows Photon APIs.
-        async Task ConnectAsync(bool host)
+        /// <param name="reopenCode">손님이 나간 뒤 같은 코드로 방을 다시 열 때 그 코드(혼자 로비는 그대로 이어 간다).</param>
+        async Task ConnectAsync(bool host, string reopenCode = null)
         {
             if (Runner.IsAuthoringPreview) { status="제작기 시험은 로컬 전용입니다. 시험 종료 후 Main에서 연결해주세요."; return; }
             if (busy || online.Active) return;
@@ -104,15 +112,19 @@ namespace Knockbox.Game.Online
             var cancellation = new CancellationTokenSource();
             connectionRequest = cancellation;
             ITransport connection = null;
+            bool reopen = host && !string.IsNullOrEmpty(reopenCode);
             busy = true;
+            reopening = reopen;
             code = "";
-            status = host ? "방을 만드는 중…" : "방에 참가하는 중…";
+            status = reopen ? "방을 다시 여는 중…" : host ? "방을 만드는 중…" : "방에 참가하는 중…";
             try
             {
                 string roomCode;
                 if (host)
                 {
-                    var created = await FusionConnection.HostAsync(cancellation.Token);
+                    var created = reopen
+                        ? await FusionConnection.ReopenAsync(reopenCode, cancellation.Token)
+                        : await FusionConnection.HostAsync(cancellation.Token);
                     connection = created.transport;
                     roomCode = created.code;
                 }
@@ -135,6 +147,15 @@ namespace Knockbox.Game.Online
             catch (Exception e)
             {
                 if(this == null || request != requestVersion) return;
+                if (reopen)
+                {
+                    // 다시 열지 못하면 혼자 로비를 정리하고 메인으로 돌아가 이유를 보여 준다.
+                    reopening = false;
+                    CancelAndOpen();
+                    status = "방을 다시 열지 못했습니다. 연결을 확인하고 다시 만들어주세요.";
+                    Debug.LogWarning($"[Knockbox][online] 방 다시 열기 실패: {e.GetType().Name}");
+                    return;
+                }
                 status = e is FusionSetupException ? e.Message : host
                     ? "방을 만들지 못했습니다. 연결을 확인하고 다시 시도해주세요."
                     : "참가하지 못했습니다. 방 코드와 연결을 확인해주세요.";
@@ -146,6 +167,7 @@ namespace Knockbox.Game.Online
                 if (this != null && request == requestVersion)
                 {
                     busy = false;
+                    reopening = false;
                     connectionRequest = null;
                 }
                 cancellation.Dispose();

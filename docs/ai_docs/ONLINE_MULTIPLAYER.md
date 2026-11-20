@@ -11,7 +11,7 @@
 | SDK | Fusion 2.1.4 Stable Build 2500, 저장소의 `Assets/Photon`과 `.meta` 포함 |
 | 역할 | 방 생성 PC = Host/P1, 참가 PC = Client/P2, 최대 2인 |
 | 지역·기본 버전 | `kr`, `knockbox-fusion-1` |
-| 실제 접속 버전 | `knockbox-fusion-1-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry2` |
+| 실제 접속 버전 | `knockbox-fusion-1-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry2-exit72-results3` |
 | 틱·송신 설정 | 전투·SDK Client/Server·송신 모두 60Hz |
 | 입력 지연 | SDK 최소 입력 지연 0틱(2026-11-17, 이전 3틱), 자동 추가 지연 끔, 앱 지연 큐 중복 적용 없음 |
 | 접속 UI | 기존 방 생성·8자리 코드 참가, 이름 설정 없이 P1/P2 |
@@ -84,8 +84,11 @@
 결과 공간·로비(2026-11-16)의 준비·재대결은 별도 RPC가 아니라 입력의 `SimWorld.ReadyButton`(SwitchForm 비트)을 켜 둔 상태로 확정 입력에 싣는다. 결과 공간·로비 맵은 `PrepareMatchArenas`가 경기 맵 뒤에 붙이므로 `OnlineMapManifest`와 시작 합의에 함께 들어간다.
 
 - **로비:** 로비 맵이 있으면 `BeginMatch`가 `MatchPhase.Lobby`로 공유 월드를 시작하고 둘 다 준비하면 같은 틱에 1라운드로 간다. 방장은 상대를 기다리는 동안(WaitingPeer) `StartSoloLobby`의 로컬 월드에서 움직이며, 이 월드는 Fusion·기록과 무관하다. 시작 합의가 끝나도 방장은 이 월드를 다시 만들지 않는다(`MatchRunner.ContinueSoloLobbyOnline`, `MatchBegan` 없음). `FusionPredictionSession`이 `PendingLobbyStart` 동안 예측 모드에 들어가지 않아 혼자 로비가 공유 첫 틱(`StartTick`)까지 계속 돌고, 그 틱에 `BeginSharedLobby`가 P1을 `LobbyCarry`(위치·속도·방향)로 이어 공유 시작 상태를 만든다. 이 값은 `FusionConfirmedJournal` v2의 첫 묶음(first 0)에 실려 손님 확정 기록에 같은 시작 상태를 만들고, 입력 기록은 이어 간 값이 있을 때만 v10이다. 손님은 Host의 첫 공유 상태(`LatestServerTick ≥ StartTick`)를 받기 전에는 예측·표시하지 않고 P1을 숨긴다(`HideUntilPredicted`). 그 사이 방장 혼자 로비의 틱은 체크섬·경기 수에 넣지 않는다. 메모리 전송 검사 경로는 예전처럼 새 공유 로비로 시작한다. 공유 로비는 단계 틱이 0부터 다시 시작하므로 방장 화면은 `MatchRunner.LobbySceneContinued`로 로비 입장 연출(지형 솟음·조명·이어 간 P1 등장)을 다시 틀지 않는다(화면 전용).
-- **종료:** 어느 단계에서든 상대가 나가거나 끊기면 남은 쪽은 이유를 3.5초 보여준 뒤 메인으로 돌아간다(FrontendController). 내가 X·돌아가기로 나가면 바로 메인이다.
-- 방장 혼자 대기에는 시간 제한이 없다(방장이 나가기로 끝낸다). 호스트 이전·재접속·로비에서의 상대 재입장은 미구현이다.
+- **로비 → 첫 경기(2026-11-19):** 둘 다 준비하면 `MatchPhase.LobbyExit`(72틱, 조작·선수 정지)를 거쳐 1라운드로 간다. 확정 입력·예측·스냅숏 형식은 그대로이고 설정 해시와 접속 버전(`-exit72`)으로 그 전 빌드와 섞이지 않는다. 화면 전환은 두 PC가 각자 같은 단계 틱으로 한 번씩 그린다.
+- **결과 발표(2026-11-20):** 결과 공간에 들어오면 두 선수가 처음부터 자기 자리(승자 시상대 위·패자 옆 바닥)에 서고, `MatchParams.ResultsCeremonyTicks`(결과 맵 `unlockTick`, Main 192틱)까지 조작·준비가 잠긴다(`SimWorld.FreeSpaceUnlockTick`). 시상대 상승·선수 낙하·매단 점수는 두 PC가 결과 단계 틱으로 각자 그리는 화면 전용이다. 잠금이 풀리면 둘 다 "[R] 재대전"을 켜야 재경기, Esc는 나가기다. 세트 점수는 결과 맵의 실제 물리 숫자 발판(점수와 맞는 숫자만 남김, 깎은 조각 모양 접촉)이라 선수와의 상호작용·숫자 흔들림이 시뮬레이션 상태(`SimState.Props`)에 들어가 예측·스냅숏·체크섬으로 맞춘다. 확정 입력·예측·스냅숏 형식은 그대로이고 설정 해시(`ResultsCeremonyTicks`·`ResultsPropReleaseTick`)·결과 맵 지형 해시(숫자 조각 모양 포함)와 접속 버전(`-results3`: 숫자 낙하 시작 속도·실제 획 연결점)으로 그 전 빌드와 섞이지 않는다. `unlockTick`·`signDropTick`이나 숫자 발판을 바꾸면 해시가 달라지므로 두 PC가 같은 결과 맵을 써야 한다(맵 목록 합의에 이미 들어간다).
+- **로비에서 나가기(2026-11-19):** Esc. 손님이 경기 확정 전에 나가면(Host가 `EndReason.PeerLeft`를 받고 월드가 Lobby) `OnlineMatch.ReturnToSoloLobby`가 기록을 저장하고 세션을 닫은 뒤 P1을 이어 혼자 로비로 돌아가고(`ResumeSoloLobby`), `OnlineLobby`가 `FusionConnection.ReopenAsync`로 같은 코드의 방을 다시 연다(직전 방이 닫히는 동안 `GameIdAlreadyExists`면 0.5초 간격 최대 12번, 끝내 안 되면 새 코드). 다시 연 방에 손님이 들어오면 지금 혼자 로비를 그대로 이어 공유 로비가 된다(로비 입장 A안과 같다). 방장이 나가면 방이 닫히고 손님은 로비 상단 알림 뒤 메인으로 간다.
+- **종료:** 그 밖의 단계에서 상대가 나가거나 끊기면 남은 쪽은 이유를 3.5초 보여준 뒤 메인으로 돌아간다(FrontendController). 내가 나가면 바로 메인이다.
+- 방장 혼자 대기에는 시간 제한이 없다(방장이 나가기로 끝낸다). 호스트 이전·경기 중 재접속은 미구현이다.
 
 - **능력:** 설정과 보유 카드에서 Simulation이 계산한다. UI 클릭·애니메이션 종료·별도 RPC에서 체력이나 카드를 증감하지 않는다. 타이머·스택·쿨다운·소환물·결과에 관여하는 난수는 복원 가능한 SimState에 둔다.
 - **규칙:** 중첩 상한·적용 순서·반올림·상충 효과 우선순위를 먼저 정한다. 경기 RNG의 소비 순서를 보존하고 프레임 시각이나 UI 랜덤으로 판정하지 않는다. 새 밸런스는 사용자와 확정한다.

@@ -15,61 +15,19 @@ MonoBehaviour:
   stableId: lobby-stage
   displayName: Lobby stage
   preservedBaseline: 0
-  revision: 1
+  revision: 2
   columns: 36
   rows: 20
   boundary: 0
   spawn0: {x: -9, y: -9}
   spawn1: {x: 9, y: -9}
   boxes:
-  - id: box-000
-    kind: 0
-    minX: -18
-    minY: 9
-    maxX: 18
-    maxY: 10
-    vertices: []
-  - id: box-001
-    kind: 0
-    minX: -18
-    minY: -9
-    maxX: -17
-    maxY: 9
-    vertices: []
-  - id: box-002
-    kind: 0
-    minX: 17
-    minY: -9
-    maxX: 18
-    maxY: 9
-    vertices: []
   - id: box-003
     kind: 0
     minX: -18
     minY: -10
     maxX: 18
     maxY: -9
-    vertices: []
-  - id: box-004
-    kind: 0
-    minX: -4
-    minY: -5
-    maxX: 4
-    maxY: -4
-    vertices: []
-  - id: box-005
-    kind: 0
-    minX: -14
-    minY: -1
-    maxX: -9
-    maxY: 0
-    vertices: []
-  - id: box-006
-    kind: 0
-    minX: 9
-    minY: -1
-    maxX: 14
-    maxY: 0
     vertices: []
   physicalBoxes: []
   ropes: []
@@ -84,7 +42,7 @@ MonoBehaviour:
     highlight: {r: 0.7294118, g: 0.9607843, b: 0.9098039, a: 1}
     gradientCurve: 1
   light: {x: 0, y: 25}
-  ceiling: 1
+  ceiling: 0
   shadow: 0.65
   rewardMap: 0
   steles: []

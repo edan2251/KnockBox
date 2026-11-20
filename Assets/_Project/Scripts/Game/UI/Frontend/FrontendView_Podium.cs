@@ -31,14 +31,14 @@ namespace Knockbox.Game.UI
 
         /// <summary>결과 공간·로비에서 준비를 켜고 끌 수 있는지(두 선수가 착지한 뒤, 상대가 있을 때).</summary>
         public bool PodiumReadyVisible => FreeSpaceScreen && !lobbySolo && motionRunner.FrontendWorld.InFreeSpace
-            && motionRunner.FrontendWorld.State.Match.PhaseTick >= motionRunner.FrontendWorld.Config.Match.ResultsUnlockTick;
+            && motionRunner.FrontendWorld.State.Match.PhaseTick >= motionRunner.FrontendWorld.FreeSpaceUnlockTick;
 
         /// <summary>마우스가 결과 공간·로비의 화면 버튼 위에 있는지. 버튼을 누른 클릭은 펀치로 보내지 않는다.</summary>
         public bool PointerOverPodiumButton()
         {
             if (!FreeSpaceScreen || Mouse.current == null) return false;
             var point = Mouse.current.position.ReadValue();
-            return Over(resultReady, point) || Over(resultBack, point) || Over(copy, point) || Over(lobbyBack, point);
+            return Over(resultReady, point) || Over(resultBack, point) || Over(copy, point) || Over(lobbyBack, point) || Over(lobbyCopy, point);
         }
 
         static bool Over(Button button, Vector2 point) => button != null && button.gameObject.activeInHierarchy
@@ -70,8 +70,10 @@ namespace Knockbox.Game.UI
             if (on)
             {
                 setScore.gameObject.SetActive(podium);
-                pickHint.gameObject.SetActive(true);
+                pickHint.gameObject.SetActive(podium);
             }
+            if (lobbyHud != null) lobbyHud.gameObject.SetActive(lobbyScreen);
+            if (!podium) HideResultsHud();
             // 로비 화면은 메뉴의 방 패널을 쓰되, 메뉴 배경·바닥·큰 캐릭터는 숨겨 월드가 보이게 한다.
             // 메뉴에서 바로 들어온 경우는 큰 캐릭터의 퇴장(AnimateMainExit)이 끝날 때까지 배경을 남긴다.
             menuBackdrop ??= new[] { menu.Find("Background")?.gameObject, menu.Find("Floor")?.gameObject };
@@ -116,18 +118,19 @@ namespace Knockbox.Game.UI
             bool lobbyScreen = Screen == FrontendScreen.Lobby;
             float tick = w.InFreeSpace ? w.State.Match.PhaseTick + motionRunner.RenderAlpha : 0;
             float title = Out(Range(tick, match.ResultsDropTick, match.ResultsDropTick + 20));
-            float question = Out(Range(tick, match.ResultsUnlockTick, match.ResultsUnlockTick + 20));
+            float question = Out(Range(tick, w.FreeSpaceUnlockTick, w.FreeSpaceUnlockTick + 20));
             if (lobbyScreen)
             {
+                // 로비(2026-11-19): 방 패널·하단 준비/나가기 버튼 없이 상단 표시만 쓴다. 준비는 R, 나가기는 Esc.
                 AnimateMainExit();
-                // 방 패널: 메뉴 화면과 같은 자리에 바로 보인다. 혼자 기다리는 동안도 안내를 띄운다.
-                lobbyAlpha.alpha = 1; lobbyAlpha.interactable = lobbyAlpha.blocksRaycasts = true;
-                lobby.anchoredPosition = new Vector2(900, -230);
-                foreach (var group in roomEntryAlpha) group.alpha = 1;
-                for (int i = 0; i < roomEntries.Length; i++) roomEntries[i].anchoredPosition = roomEntryPositions[i];
-                if (lobbySolo || (motionRunner.LobbySceneContinued && w.InLobby)) question = 1;
+                AnimateLobbyHud();
+                pickHintAlpha.alpha = 0;
+                resultReady.gameObject.SetActive(false);
+                resultBack.gameObject.SetActive(false);
+                return;
             }
-            else
+            if (ResultsCeremony(w)) { AnimateResultsHud(w); return; }
+            HideResultsHud();
             {
                 setScore.color = PaletteAsset.WithAlpha(playerColors[podiumWinner], title);
                 setScore.rectTransform.anchoredPosition = new Vector2(740, -62 + (1 - title) * 40);
@@ -161,20 +164,40 @@ namespace Knockbox.Game.UI
         {
             var match = w.Config.Match;
             float tick = w.State.Match.PhaseTick + motionRunner.RenderAlpha;
+            // 결과 발표(2026-11-20): 빈 시상대 상승 → 두 선수 낙하 → 결과 글자 낙하. 그 전 설정(기록 재생 등)은 아래 기존 연출.
+            if (ResultsCeremony(w)) { PresentResultsCeremony(w, tick); return; }
+            HideResultSign();
             // 방장 혼자 로비를 이어 간 공유 로비: 맵·조명은 이미 다 켜진 상태로 두고, 이어 간 선수는 등장 연출 없이 그대로 보인다.
-            bool continued = motionRunner.LobbySceneContinued && w.InLobby;
+            // 로비 → 첫 경기 전환(LobbyExit)도 다 켜진 로비 장면 위에서 두 선수만 퇴장한다.
+            bool exit = w.InLobbyExit;
+            bool continued = (motionRunner.LobbySceneContinued && w.InLobby) || exit;
             float sceneTick = continued ? tick + ContinuedSceneTicks : tick;
             float build = Range(sceneTick, 0, CardCollectionRules.RebuildTicks);
             float spawn = Pop(Range(tick, match.ResultsDropTick, match.ResultsDropTick + 12));
             bool lit = build >= 1;
             int absent = motionRunner.AbsentSlot;
-            float spawn0 = absent == 0 ? 0 : continued && motionRunner.ContinuedLobbySlot == 0 ? 1 : spawn;
-            float spawn1 = absent == 1 ? 0 : continued && motionRunner.ContinuedLobbySlot == 1 ? 1 : spawn;
-            points.Root.gameObject.SetActive(false);
+            float spawn0 = absent == 0 ? 0 : continued && (exit || motionRunner.ContinuedLobbySlot == 0) ? 1 : spawn;
+            float spawn1 = absent == 1 ? 0 : continued && (exit || motionRunner.ContinuedLobbySlot == 1) ? 1 : spawn;
+            if (!exit) points.Root.gameObject.SetActive(false);
             startCue.gameObject.SetActive(false);
-            motionPresenter.PresentFrontendStage(build, true, Out(build), spawn0, spawn1, 0, true, lit ? 1f : 0f, false, false);
-            motionPresenter.Background.SetRoundLightPulse(lit ? (sceneTick - CardCollectionRules.RebuildTicks) / 60f : -1);
+            // 로비 → 첫 경기 전환: 선수가 발판을 지나 떨어진 뒤에는 경기 라운드가 바뀔 때(KO 퇴장)와 같은 방식으로 로비 장면을 내보낸다.
+            // 지형 조각이 아래로 빠지고 배경이 서서히 걷히며 조명이 꺼진다. 다 걷힌 뒤 1라운드가 기존 재구성(지형 솟음·배경 켜짐)으로 이어져
+            // 로비 배경이 한 프레임에 사라지는 끊김이 없다.
+            float leave = exit ? Range(tick, LobbySceneLeaveStart, match.LobbyExitTicks) : 0;
+            if (leave > 0)
+            {
+                motionPresenter.PresentFrontendStage(leave, false, 1 - Smooth(leave), spawn0, spawn1, 0, false,
+                    FrontendView.RoundLight(MatchPhase.KO, true, true, leave, false), false, false);
+                motionPresenter.Background.SetRoundLightPulse(-1);
+            }
+            else
+            {
+                // 퇴장 중에는 조준선·경계 표시를 끈다(조작이 잠겼다).
+                motionPresenter.PresentFrontendStage(build, true, Out(build), spawn0, spawn1, 0, !exit, lit ? 1f : 0f, false, false);
+                motionPresenter.Background.SetRoundLightPulse(lit ? (sceneTick - CardCollectionRules.RebuildTicks) / 60f : -1);
+            }
             if (w.InResultsSpace) PresentPodiumRise(w, tick);
+            if (exit) PresentLobbyExit(w, tick);
         }
 
         // 결과 공간 입장(CP5 기본 구조, 수치·곡선은 임시): 시상대가 낮게 묻혀 있다가 승자를 태우고 솟아오르고(0.5초),

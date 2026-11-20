@@ -549,6 +549,10 @@ namespace Knockbox.Simulation
         }
 
         /// <summary>두 몸이 줄로 바로 이어졌는지(이어진 부품끼리는 충돌하지 않는다).</summary>
+        /// <summary>결과 공간 숫자 발판(2026-11-20): 독립 로프로 이은 모양 있는 두 몸(숫자와 콜론 점)은 서로 상자 접촉을 하지 않는다. 모양 없는 기존 맵은 해당 없음.</summary>
+        static bool LinkedShapes(ArenaDef arena, int a, int b) =>
+            arena.GetProp(arena.DynamicProp(a)).HasShape && arena.GetProp(arena.DynamicProp(b)).HasShape && arena.GraphLinked(a, b);
+
         static bool Connected(ArenaDef arena, in PropState props, int a, int b) =>
             (arena.GetJoint(a).OtherBody == b && PropState.At(in props, a).Broken == 0)
             || (arena.GetJoint(b).OtherBody == a && PropState.At(in props, b).Broken == 0);
@@ -631,7 +635,7 @@ namespace Knockbox.Simulation
                 {
                     bool awakeA = scratch.Awake[i], awakeB = scratch.Awake[j];
                     if (props.IsDestroyed(i) || props.IsDestroyed(j) || awakeA == awakeB || (awakeA ? scratch.Still[i] : scratch.Still[j]) || !NearCached(scratch, i, j, c)
-                        || Connected(arena, props, i, j))
+                        || Connected(arena, props, i, j) || LinkedShapes(arena, i, j))
                         continue;
                     ref var a = ref PropState.Get(ref props, i);
                     ref var bb = ref PropState.Get(ref props, j);
@@ -688,7 +692,7 @@ namespace Knockbox.Simulation
             {
                 for (int j = i + 1; j < props.Count; j++)
                 {
-                    if (props.IsDestroyed(i) || props.IsDestroyed(j) || (!scratch.Awake[i] && !scratch.Awake[j]) || !NearCached(scratch, i, j, c) || Connected(arena, props, i, j))
+                    if (props.IsDestroyed(i) || props.IsDestroyed(j) || (!scratch.Awake[i] && !scratch.Awake[j]) || !NearCached(scratch, i, j, c) || Connected(arena, props, i, j) || LinkedShapes(arena, i, j))
                         continue;
                     Collide(i, PropState.At(in props, i), scratch.Half[i], j, j, PropState.At(in props, j), scratch.Half[j], PairSpeculative(scratch, i, j, c), -1f, scratch);
                 }

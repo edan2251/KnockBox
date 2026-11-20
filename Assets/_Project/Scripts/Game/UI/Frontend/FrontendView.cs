@@ -208,6 +208,7 @@ namespace Knockbox.Game.UI
             }
             veil=Image(stage,"Transition",new Rect(0,0,1920,1080),PaletteAsset.Transparent);
             BuildMotionUI();
+            BuildLobbyHud();
             Show(FrontendScreen.Main);
             SetLocalSlot(0);
             for (int p=0;p<2;p++) for(int i=0;i<4;i++) ownedCardReferences[p*4+i]=ownedCards[p,i];
@@ -240,7 +241,8 @@ namespace Knockbox.Game.UI
             bool podium=screen==FrontendScreen.Podium, lobbyScreen=screen==FrontendScreen.Lobby;
             bool free=podium||lobbyScreen;
             bool options=screen==FrontendScreen.Options;
-            menu.gameObject.SetActive(main||room||lobbyScreen||options);menuAlpha.gameObject.SetActive(main);lobby.gameObject.SetActive(room||lobbyScreen);
+            // 로비는 기존 방 패널을 쓰지 않는다(2026-11-19: 좌측 상단 코드 줄과 상단 두 자리, FrontendView_Lobby).
+            menu.gameObject.SetActive(main||room||lobbyScreen||options);menuAlpha.gameObject.SetActive(main);lobby.gameObject.SetActive(room);
             ShowOptions(options);
             duel.gameObject.SetActive(vs||pick||result||free);
             matte.gameObject.SetActive(screen!=FrontendScreen.Hidden&&!free);
@@ -258,7 +260,7 @@ namespace Knockbox.Game.UI
             }
             ShowFreeSpace(screen);
             CodeInput.gameObject.SetActive(screen==FrontendScreen.Join);join.gameObject.SetActive(screen==FrontendScreen.Join);
-            roomCode.gameObject.SetActive(screen==FrontendScreen.Waiting||lobbyScreen);copy.gameObject.SetActive(screen==FrontendScreen.Waiting||lobbyScreen);
+            roomCode.gameObject.SetActive(screen==FrontendScreen.Waiting);copy.gameObject.SetActive(screen==FrontendScreen.Waiting);
             CanChoose=false;HoveredCard=-1;
             for(int i=0;i<3;i++) {cardAlpha[i].alpha=pick?0:1;cards[i].interactable=!pick;}
             split.SetSides(Theme.duelLeft,Theme.duelRight);

@@ -54,6 +54,8 @@ namespace Knockbox.Tests.EditMode
             var results = Copy(ResultsPath);
             try
             {
+                // 결과 맵의 점수 숫자 발판(2026-11-20)은 화면 위 밖에서 기다리는 결과 공간 전용 배치라 경기 용도로 바꾸면 범위 밖이 된다. 지형만 남기고 본다.
+                results.SaveLayout(Boxes(results), Array.Empty<MapPhysicalBox>(), Array.Empty<MapRope>(), results.Spawn(0), results.Spawn(1));
                 uint hash = results.ToArena().ComputeGeometryChecksum();
                 results.SetUsage(MapUsage.Match, "");
                 Assert.AreEqual(hash, results.ToArena().ComputeGeometryChecksum(), "용도는 판정 해시에 들어가지 않는다");

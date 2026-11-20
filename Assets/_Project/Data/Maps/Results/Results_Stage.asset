@@ -15,57 +15,693 @@ MonoBehaviour:
   stableId: results-stage
   displayName: Results stage
   preservedBaseline: 0
-  revision: 1
+  revision: 21
   columns: 36
   rows: 20
   boundary: 0
-  spawn0: {x: 0, y: -6}
-  spawn1: {x: 8, y: -9}
+  spawn0: {x: 0, y: -6.6}
+  spawn1: {x: 5.6, y: -9}
   boxes:
   - id: box-000
-    kind: 0
-    minX: -18
-    minY: 9
-    maxX: 18
-    maxY: 10
-    vertices: []
-  - id: box-001
-    kind: 0
-    minX: -18
-    minY: -9
-    maxX: -17
-    maxY: 9
-    vertices: []
-  - id: box-002
-    kind: 0
-    minX: 17
-    minY: -9
-    maxX: 18
-    maxY: 9
-    vertices: []
-  - id: box-003
     kind: 0
     minX: -18
     minY: -10
     maxX: 18
     maxY: -9
     vertices: []
-  - id: box-004
+  - id: podium
     kind: 0
-    minX: -2.5
+    minX: -2.2
     minY: -9
-    maxX: 2.5
-    maxY: -6
-    vertices: []
-  - id: box-005
-    kind: 0
-    minX: -5
-    minY: -9
-    maxX: -2.5
-    maxY: -7.5
-    vertices: []
-  physicalBoxes: []
-  ropes: []
+    maxX: 2.2
+    maxY: -6.6
+    vertices:
+    - {x: -2.2, y: -9}
+    - {x: 2.2, y: -9}
+    - {x: 1.95, y: -7.0499997}
+    - {x: 1.5, y: -6.6}
+    - {x: -1.5, y: -6.6}
+    - {x: -1.95, y: -7.0499997}
+  physicalBoxes:
+  - id: score-p1-0
+    center: {x: -3.4839997, y: 16.2}
+    size: {x: 3.4666665, y: 5.2}
+    mass: 6
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+    glyph: 0
+    scoreSlot: 1
+    scoreDigit: 0
+    releaseSpeed: 30
+  - id: score-p1-1
+    center: {x: -3.4839997, y: 16.2}
+    size: {x: 2.8946667, y: 5.2}
+    mass: 6
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+    glyph: 1
+    scoreSlot: 1
+    scoreDigit: 1
+    releaseSpeed: 30
+  - id: score-p1-2
+    center: {x: -3.4839997, y: 16.2}
+    size: {x: 3.4666665, y: 5.2}
+    mass: 6
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+    glyph: 2
+    scoreSlot: 1
+    scoreDigit: 2
+    releaseSpeed: 30
+  - id: score-p1-3
+    center: {x: -3.4839997, y: 16.2}
+    size: {x: 3.4666665, y: 5.2}
+    mass: 6
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+    glyph: 3
+    scoreSlot: 1
+    scoreDigit: 3
+    releaseSpeed: 30
+  - id: score-p1-4
+    center: {x: -3.4839997, y: 16.2}
+    size: {x: 3.4666665, y: 5.2}
+    mass: 6
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+    glyph: 4
+    scoreSlot: 1
+    scoreDigit: 4
+    releaseSpeed: 30
+  - id: score-p1-5
+    center: {x: -3.4839997, y: 16.2}
+    size: {x: 3.4666665, y: 5.2}
+    mass: 6
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+    glyph: 5
+    scoreSlot: 1
+    scoreDigit: 5
+    releaseSpeed: 30
+  - id: score-p2-0
+    center: {x: 3.4839997, y: 16.2}
+    size: {x: 3.4666665, y: 5.2}
+    mass: 6
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+    glyph: 0
+    scoreSlot: 2
+    scoreDigit: 0
+    releaseSpeed: 30
+  - id: score-p2-1
+    center: {x: 3.4839997, y: 16.2}
+    size: {x: 2.8946667, y: 5.2}
+    mass: 6
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+    glyph: 1
+    scoreSlot: 2
+    scoreDigit: 1
+    releaseSpeed: 30
+  - id: score-p2-2
+    center: {x: 3.4839997, y: 16.2}
+    size: {x: 3.4666665, y: 5.2}
+    mass: 6
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+    glyph: 2
+    scoreSlot: 2
+    scoreDigit: 2
+    releaseSpeed: 30
+  - id: score-p2-3
+    center: {x: 3.4839997, y: 16.2}
+    size: {x: 3.4666665, y: 5.2}
+    mass: 6
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+    glyph: 3
+    scoreSlot: 2
+    scoreDigit: 3
+    releaseSpeed: 30
+  - id: score-p2-4
+    center: {x: 3.4839997, y: 16.2}
+    size: {x: 3.4666665, y: 5.2}
+    mass: 6
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+    glyph: 4
+    scoreSlot: 2
+    scoreDigit: 4
+    releaseSpeed: 30
+  - id: score-p2-5
+    center: {x: 3.4839997, y: 16.2}
+    size: {x: 3.4666665, y: 5.2}
+    mass: 6
+    playerPassThrough: 0
+    connector: 0
+    connectorSpeedLoss: 0
+    glyph: 5
+    scoreSlot: 2
+    scoreDigit: 5
+    releaseSpeed: 30
+  - id: score-dot-0
+    center: {x: 0, y: 15.004}
+    size: {x: 1.0746669, y: 1.0746666}
+    mass: 0.05
+    playerPassThrough: 1
+    connector: 0
+    connectorSpeedLoss: 0
+    glyph: colon:0
+    scoreSlot: 0
+    scoreDigit: 0
+    releaseSpeed: 30
+  - id: score-dot-1
+    center: {x: 0, y: 17.396}
+    size: {x: 1.0746669, y: 1.0746666}
+    mass: 0.05
+    playerPassThrough: 1
+    connector: 0
+    connectorSpeedLoss: 0
+    glyph: colon:1
+    scoreSlot: 0
+    scoreDigit: 0
+    releaseSpeed: 30
+  ropes:
+  - id: rope-score-p1-0
+    boxId: score-p1-0
+    graph: 1
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: -3.4839997, y: 12.5}
+    localAnchor: {x: 0, y: 2.6}
+    length: 8.7
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-p1-1
+    boxId: score-p1-1
+    graph: 1
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: -3.4839997, y: 12.5}
+    localAnchor: {x: 0, y: 2.5913346}
+    length: 8.708666
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-p1-2
+    boxId: score-p1-2
+    graph: 1
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: -3.4839997, y: 12.5}
+    localAnchor: {x: 0, y: 2.6}
+    length: 8.7
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-p1-3
+    boxId: score-p1-3
+    graph: 1
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: -3.4839997, y: 12.5}
+    localAnchor: {x: 0, y: 2.6}
+    length: 8.7
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-p1-4
+    boxId: score-p1-4
+    graph: 1
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: -3.4839997, y: 12.5}
+    localAnchor: {x: 0, y: 0.39866668}
+    length: 10.901334
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-p1-5
+    boxId: score-p1-5
+    graph: 1
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: -3.4839997, y: 12.5}
+    localAnchor: {x: 0, y: 2.6}
+    length: 8.7
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-p2-0
+    boxId: score-p2-0
+    graph: 1
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: 3.4839997, y: 12.5}
+    localAnchor: {x: 0, y: 2.6}
+    length: 8.7
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-p2-1
+    boxId: score-p2-1
+    graph: 1
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: 3.4839997, y: 12.5}
+    localAnchor: {x: 0, y: 2.5913346}
+    length: 8.708666
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-p2-2
+    boxId: score-p2-2
+    graph: 1
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: 3.4839997, y: 12.5}
+    localAnchor: {x: 0, y: 2.6}
+    length: 8.7
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-p2-3
+    boxId: score-p2-3
+    graph: 1
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: 3.4839997, y: 12.5}
+    localAnchor: {x: 0, y: 2.6}
+    length: 8.7
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-p2-4
+    boxId: score-p2-4
+    graph: 1
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: 3.4839997, y: 12.5}
+    localAnchor: {x: 0, y: 0.39866668}
+    length: 10.901334
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-p2-5
+    boxId: score-p2-5
+    graph: 1
+    sourceBoxId: 
+    sourceLocalAnchor: {x: 0, y: 0}
+    anchor: {x: 3.4839997, y: 12.5}
+    localAnchor: {x: 0, y: 2.6}
+    length: 8.7
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-0-score-p1-0
+    boxId: score-dot-0
+    graph: 1
+    sourceBoxId: score-p1-0
+    sourceLocalAnchor: {x: 1.7333332, y: -0.28600013}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: -0.5373334, y: 0}
+    length: 1.895833
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-0-score-p1-1
+    boxId: score-dot-0
+    graph: 1
+    sourceBoxId: score-p1-1
+    sourceLocalAnchor: {x: 0.3380011, y: -0.07149998}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: -0.5373334, y: 0}
+    length: 3.5508876
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-0-score-p1-2
+    boxId: score-dot-0
+    graph: 1
+    sourceBoxId: score-p1-2
+    sourceLocalAnchor: {x: 1.7333332, y: -0.28600013}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: -0.5373334, y: 0}
+    length: 1.895833
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-0-score-p1-3
+    boxId: score-dot-0
+    graph: 1
+    sourceBoxId: score-p1-3
+    sourceLocalAnchor: {x: 1.7333332, y: -0.28600013}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: -0.5373334, y: 0}
+    length: 1.895833
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-0-score-p1-4
+    boxId: score-dot-0
+    graph: 1
+    sourceBoxId: score-p1-4
+    sourceLocalAnchor: {x: 1.7333332, y: -0.28600013}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: -0.5373334, y: 0}
+    length: 1.895833
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-0-score-p1-5
+    boxId: score-dot-0
+    graph: 1
+    sourceBoxId: score-p1-5
+    sourceLocalAnchor: {x: 1.7333332, y: -0.28600013}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: -0.5373334, y: 0}
+    length: 1.895833
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-0-score-p2-0
+    boxId: score-dot-0
+    graph: 1
+    sourceBoxId: score-p2-0
+    sourceLocalAnchor: {x: -1.7333332, y: -0.28600013}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: 0.5373334, y: 0}
+    length: 1.895833
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-0-score-p2-1
+    boxId: score-dot-0
+    graph: 1
+    sourceBoxId: score-p2-1
+    sourceLocalAnchor: {x: -0.45933226, y: -0.07149998}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: 0.5373334, y: 0}
+    length: 3.4121406
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-0-score-p2-2
+    boxId: score-dot-0
+    graph: 1
+    sourceBoxId: score-p2-2
+    sourceLocalAnchor: {x: -1.7333332, y: -0.28600013}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: 0.5373334, y: 0}
+    length: 1.895833
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-0-score-p2-3
+    boxId: score-dot-0
+    graph: 1
+    sourceBoxId: score-p2-3
+    sourceLocalAnchor: {x: -0.9013333, y: -0.28600013}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: 0.5373334, y: 0}
+    length: 2.7982938
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-0-score-p2-4
+    boxId: score-dot-0
+    graph: 1
+    sourceBoxId: score-p2-4
+    sourceLocalAnchor: {x: -1.7333332, y: -0.28600013}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: 0.5373334, y: 0}
+    length: 1.895833
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-0-score-p2-5
+    boxId: score-dot-0
+    graph: 1
+    sourceBoxId: score-p2-5
+    sourceLocalAnchor: {x: -1.7333332, y: -0.28600013}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: 0.5373334, y: 0}
+    length: 1.895833
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-1-score-p1-0
+    boxId: score-dot-1
+    graph: 1
+    sourceBoxId: score-p1-0
+    sourceLocalAnchor: {x: 1.7333332, y: 2.1059997}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: -0.5373334, y: 0}
+    length: 1.895833
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-1-score-p1-1
+    boxId: score-dot-1
+    graph: 1
+    sourceBoxId: score-p1-1
+    sourceLocalAnchor: {x: 0.3380011, y: 2.253333}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: -0.5373334, y: 0}
+    length: 3.5184975
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-1-score-p1-2
+    boxId: score-dot-1
+    graph: 1
+    sourceBoxId: score-p1-2
+    sourceLocalAnchor: {x: 1.7333332, y: 2.1059997}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: -0.5373334, y: 0}
+    length: 1.895833
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-1-score-p1-3
+    boxId: score-dot-1
+    graph: 1
+    sourceBoxId: score-p1-3
+    sourceLocalAnchor: {x: 1.7333332, y: 2.1059997}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: -0.5373334, y: 0}
+    length: 1.895833
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-1-score-p1-4
+    boxId: score-dot-1
+    graph: 1
+    sourceBoxId: score-p1-4
+    sourceLocalAnchor: {x: 1.7333332, y: 2.1059997}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: -0.5373334, y: 0}
+    length: 1.895833
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-1-score-p1-5
+    boxId: score-dot-1
+    graph: 1
+    sourceBoxId: score-p1-5
+    sourceLocalAnchor: {x: 1.7333332, y: 2.1059997}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: -0.5373334, y: 0}
+    length: 1.895833
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-1-score-p2-0
+    boxId: score-dot-1
+    graph: 1
+    sourceBoxId: score-p2-0
+    sourceLocalAnchor: {x: -1.7333332, y: 2.1059997}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: 0.5373334, y: 0}
+    length: 1.895833
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-1-score-p2-1
+    boxId: score-dot-1
+    graph: 1
+    sourceBoxId: score-p2-1
+    sourceLocalAnchor: {x: -1.365878, y: 2.1546795}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: 0.5373334, y: 0}
+    length: 2.3109648
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-1-score-p2-2
+    boxId: score-dot-1
+    graph: 1
+    sourceBoxId: score-p2-2
+    sourceLocalAnchor: {x: -1.7333332, y: 2.1059997}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: 0.5373334, y: 0}
+    length: 1.895833
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-1-score-p2-3
+    boxId: score-dot-1
+    graph: 1
+    sourceBoxId: score-p2-3
+    sourceLocalAnchor: {x: -1.7333332, y: 2.1059997}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: 0.5373334, y: 0}
+    length: 1.895833
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-1-score-p2-4
+    boxId: score-dot-1
+    graph: 1
+    sourceBoxId: score-p2-4
+    sourceLocalAnchor: {x: -1.7333332, y: 2.1059997}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: 0.5373334, y: 0}
+    length: 1.895833
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
+  - id: rope-score-dot-1-score-p2-5
+    boxId: score-dot-1
+    graph: 1
+    sourceBoxId: score-p2-5
+    sourceLocalAnchor: {x: -1.7333332, y: 2.1059997}
+    anchor: {x: 0, y: 0}
+    localAnchor: {x: 0.5373334, y: 0}
+    length: 1.895833
+    breakable: 0
+    breakForce: 0
+    mode: 1
+    connectorPosition: 0
+    connectorSize: 0
+    connectorSpeedLoss: 0
   theme: 2
   mapTheme:
     mode: 0
@@ -77,7 +713,7 @@ MonoBehaviour:
     highlight: {r: 0.7294118, g: 0.9607843, b: 0.9098039, a: 1}
     gradientCurve: 1
   light: {x: 0, y: 25}
-  ceiling: 1
+  ceiling: 0
   shadow: 0.65
   rewardMap: 0
   steles: []
@@ -103,4 +739,23 @@ MonoBehaviour:
     energyRecedeSeconds: 0.3
     lightOnDelay: 0.12
   usage: 3
-  podiumBoxId: box-004
+  podiumBoxId: podium
+  resultsStage:
+    podiumRumbleTick: 60
+    winnerDropTick: 110
+    loserDropTick: 115
+    fighterFallTicks: 22
+    fighterDropHeight: 19
+    signDropTick: 146
+    unlockTick: 192
+    signCenterX: 0
+    scoreBaselineY: -1.4
+    scoreHeight: 5.2
+    colonSpacing: 0.7
+    ropeTopY: 12.5
+    signDropHeight: 15
+    signDropSpeed: 30
+    digitMass: 6
+    dotMass: 0.05
+    dotRopeSlack: 1.25
+  resultGlyphs: {fileID: 11400000, guid: e14d7eb1258521c42a3d2c887ceaefd6, type: 2}

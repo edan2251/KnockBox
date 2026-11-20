@@ -167,6 +167,24 @@ namespace Knockbox.Presentation
         public Color FighterBody(int fighter) => fighter == 0 ? p1Body : p2Body;
         public Color FighterShade(int fighter) => fighter == 0 ? p1Shade : p2Shade;
 
+        /// <summary>
+        /// 결과 공간 테마(2026-11-20): 맵 테마의 지형·구조물 색은 그대로 두고, 배경 그라데이션과 빛 먼지를 승자 색의 색조로 바꾼다
+        /// (위는 어둡고 진한 승자 색, 아래는 거의 검정에 가까운 같은 색조). 선수와 지형이 배경에 묻히지 않게 밝기를 낮춘다.
+        /// </summary>
+        public ArenaTheme ResultsTheme(ArenaTheme mapTheme, int winner)
+        {
+            Color.RGBToHSV(FighterBody(winner), out float h, out float s, out _);
+            var theme = mapTheme;
+            theme.name = mapTheme.name + "_results_winner" + winner;
+            theme.backgroundGradient = true;
+            theme.gradientTop = Color.HSVToRGB(h, Mathf.Clamp01(s * .95f), .23f);
+            theme.gradientBottom = Color.HSVToRGB(h, Mathf.Clamp01(s * .9f), .07f);
+            theme.gradientCurve = mapTheme.backgroundGradient ? mapTheme.gradientCurve : 1f;
+            theme.light = theme.gradientTop;
+            theme.highlight = Color.HSVToRGB(h, Mathf.Clamp01(s * .55f), .9f);
+            return theme;
+        }
+
         /// <summary>색의 밝기만 배율로 바꾼 것(알파 유지). 상자마다 다른 밝기, 이음매·축 같은 어두운 면(CP13).</summary>
         public static Color Scaled(Color color, float scale)
         {

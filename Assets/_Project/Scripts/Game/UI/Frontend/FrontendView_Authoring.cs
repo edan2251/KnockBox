@@ -36,6 +36,7 @@ namespace Knockbox.Game.UI
                 cardHover[i].Hover=point=>{if(Screen==FrontendScreen.Cards && selectingSlot==localSlot && VisualCard<0)HoveredCard=index;};
                 cardHover[i].Leave=()=>{if(VisualCard<0 && HoveredCard==index)HoveredCard=-1;};
             }
+            BuildLobbyHud();
             Show(FrontendScreen.Main); SetLocalSlot(0);
         }
         static void Bind(Button button, UnityEngine.Events.UnityAction action)

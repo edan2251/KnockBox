@@ -63,7 +63,8 @@ namespace Knockbox.Game
             var errors = map.Validate(config.Movement.BodySize);
             if (errors.Count > 0) throw new InvalidOperationException(map.name + ": " + string.Join("\n", errors));
             var arena = map.ToArena();
-            if (arena.PropCount != 0) throw new InvalidOperationException(map.name + ": " + label + " 맵에는 물리 상자를 두지 않습니다.");
+            // 결과 공간은 점수 숫자 발판(2026-11-20)의 물리 상자·로프를 허용한다. 로비는 그대로 금지.
+            if (arena.PropCount != 0 && usage != Maps.MapUsage.Results) throw new InvalidOperationException(map.name + ": " + label + " 맵에는 물리 상자를 두지 않습니다.");
             return arena;
         }
 

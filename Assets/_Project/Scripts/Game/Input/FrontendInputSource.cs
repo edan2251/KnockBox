@@ -41,7 +41,7 @@ namespace Knockbox.Game
         public bool ToggleReady()
         {
             var w = world();
-            if (w == null || blocked() || !w.InFreeSpace || w.State.Match.PhaseTick < w.Config.Match.ResultsUnlockTick) return false;
+            if (w == null || blocked() || !w.InFreeSpace || w.State.Match.PhaseTick < w.FreeSpaceUnlockTick) return false;
             if (ReadyToggled) { readyWorld = null; readyRound = -1; }
             else { readyWorld = w; readyRound = w.State.Match.Round; }
             return true;
@@ -51,10 +51,11 @@ namespace Knockbox.Game
         InputFrame ResultsFrame(SimWorld w, int tick, bool entered)
         {
             var m = w.State.Match;
-            if (automaticPick && w.Config.Match.RematchBothHold && m.PhaseTick >= w.Config.Match.ResultsUnlockTick + 15 && !ReadyToggled) ToggleReady();
+            if (automaticPick && w.Config.Match.RematchBothHold && m.PhaseTick >= w.FreeSpaceUnlockTick + 15 && !ReadyToggled) ToggleReady();
             var frame = combat?.Poll(tick) ?? default;
             var raw = frame.Buttons;
-            if (entered) awaitingRelease = raw;
+            // 결과 공간의 조작 잠금 동안 누르기 시작한 버튼도 잠금이 풀린 뒤 한 번 뗄 때까지 막는다(2026-11-20: 발표 중 누르고 있던 키가 풀리는 순간 펀치·잡기로 나가지 않게).
+            if (entered || (w.InResultsSpace && m.PhaseTick < w.FreeSpaceUnlockTick)) awaitingRelease = raw;
             else
             {
                 const InputButtons pointerButtons = InputButtons.Attack | InputButtons.Grab | InputButtons.Charge;

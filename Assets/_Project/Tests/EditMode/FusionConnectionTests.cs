@@ -15,7 +15,11 @@ namespace Knockbox.Tests.EditMode
         public void DefaultPredictionVersion_IsTrimmedAndIsolatesEarlierComparisonBuilds()
         {
             string version = FusionPredictionPolicy.ConnectionVersion("same");
-            Assert.AreEqual("same-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry2", version);
+            Assert.AreEqual("same-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry2-exit72-results3", version);
+            Assert.AreNotEqual("same-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry2-exit72-results2", version, "숫자 낙하 시작 속도가 없던 빌드와는 접속하지 않는다");
+            Assert.AreNotEqual("same-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry2-exit72-results1", version, "결과 점수가 계산 연출이던(숫자 발판 없음) 빌드와는 접속하지 않는다");
+            Assert.AreNotEqual("same-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry2-exit72", version, "결과 발표(결과 공간 전용 잠금) 전 빌드와는 접속하지 않는다");
+            Assert.AreNotEqual("same-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry2", version, "준비 확정 뒤 바로 1라운드로 가던(로비 퇴장 전환 없음) 빌드와는 접속하지 않는다");
             Assert.AreNotEqual("same-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry1", version, "이어 간 P1이 재구성 대기에 묶이던 빌드와는 접속하지 않는다");
             Assert.AreNotEqual("same-prediction1-snapshot8700-tick60-delay0-hover1-hold144", version, "확정 입력 묶음 v1(로비 이어 가기 없음) 빌드와는 접속하지 않는다");
             Assert.AreNotEqual("same-prediction1-snapshot8700-tick60-delay3-hover1-hold144", version, "입력 지연 3틱 빌드와는 접속하지 않는다(SDK 시간 설정이 다름)");

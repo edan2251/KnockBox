@@ -330,6 +330,22 @@ namespace Knockbox.Game
                                                     if (vs == 0 && space == 0) continue; // 위의 기본 카드 설정과 같다.
                                                     var flow = CardCollectionRules.Apply(config, resultsSpace: (space & 1) != 0, lobbySpace: (space & 2) != 0, vsIntro: vs == 0);
                                                     if (flow.ComputeChecksum() == recording.ConfigChecksum) return flow;
+                                                    // 2026-11-19부터 로비 → 첫 경기 전환(LobbyExit)이 있는 기록.
+                                                    if ((space & 2) != 0)
+                                                    {
+                                                        var exit = CardCollectionRules.Apply(config, resultsSpace: (space & 1) != 0, lobbySpace: true, vsIntro: vs == 0, lobbyExit: true);
+                                                        if (exit.ComputeChecksum() == recording.ConfigChecksum) return exit;
+                                                    }
+                                                    // 2026-11-20부터 결과 발표(결과 공간 전용 잠금)와 결과 공간 물리 실험이 있는 기록.
+                                                    if ((space & 1) == 0) continue;
+                                                    foreach (int ceremony in ResultsCeremonyCandidates())
+                                                    foreach (int release in ResultsPropReleaseCandidates())
+                                                    for (int lobbyExit = 0; lobbyExit < ((space & 2) != 0 ? 2 : 1); lobbyExit++)
+                                                    {
+                                                        var stage = CardCollectionRules.Apply(config, resultsSpace: true, lobbySpace: (space & 2) != 0, vsIntro: vs == 0,
+                                                            lobbyExit: lobbyExit == 1, resultsCeremonyTicks: ceremony, resultsPropReleaseTick: release);
+                                                        if (stage.ComputeChecksum() == recording.ConfigChecksum) return stage;
+                                                    }
                                                 }
                                                 // 2026-11-14 전 기록: 확정 대기 84틱.
                                                 var previousHold = CardCollectionRules.Apply(config, longPickHold: false);
@@ -555,6 +571,26 @@ namespace Knockbox.Game
             AbsentSlot = 1;
         }
 
+        /// <summary>
+        /// 손님이 경기 확정 전에 로비를 나갔다(2026-11-19): 방장은 지금 로비의 P1(위치·속도·방향)을 이어 혼자 로비로 돌아간다.
+        /// 맵을 다시 만들지 않고(이어 간 장면), P2 자리는 비우며 두 선수의 준비는 처음부터다. 기록·전송하지 않는 로컬 월드다.
+        /// P1을 이어 갈 수 없으면(낙하·KO 중) P1만 자기 자리 위에서 다시 떨어진다.
+        /// </summary>
+        public void ResumeSoloLobby(SimConfig config, ArenaDef[] arenas, uint localSeed)
+        {
+            if (!config.Match.LobbySpace) throw new InvalidOperationException("로비 맵이 연결되지 않았습니다.");
+            var carry = World != null && World.InLobby && World.LobbyArena != null
+                ? LobbyCarry.Capture(config, World.LobbyArena, World.State.Fighter0) : default;
+            var state = SimState.CreateMatch(config, arenas, localSeed, MatchPhase.Lobby);
+            carry.Apply(config, arenas, ref state);
+            MakeAbsent(ref state.Fighter1);
+            Player1Input = RouteFrontendInput(new MouseAimInputSource(() => World, 0), 0);
+            Player2Input = RouteFrontendInput(new IdleInputSource(), 1);
+            Begin(config, arenas, state);
+            AbsentSlot = 1;
+            MarkLobbyContinued(carry.Has ? 0 : -1);
+        }
+
         void StartPreparedMatch(SimConfig config, ArenaDef[] arenas, uint matchSeed, bool allowLocalFastStart=true, MatchPhase onlinePhase=MatchPhase.Countdown)
         {
             var phase = allowLocalFastStart && skipCountdown ? MatchPhase.Fighting : onlinePhase;
@@ -585,7 +621,30 @@ namespace Knockbox.Game
                 smoothBoxes: combatTuning == null || combatTuning.SmoothBoxRelease,
                 stableConnectors: combatTuning == null || combatTuning.StableConnectorContacts);
             return includeFrontend && brawlExperiment
-                ? CardCollectionRules.Apply(config, resultsSpace: resultsMap != null, lobbySpace: lobbyMap != null, vsIntro: false) : config;
+                ? CardCollectionRules.Apply(config, resultsSpace: resultsMap != null, lobbySpace: lobbyMap != null, vsIntro: false, lobbyExit: true,
+                    resultsCeremonyTicks: ResultsCeremonyTicksFor(resultsMap), resultsPropReleaseTick: ResultsPropReleaseTickFor(resultsMap)) : config;
+        }
+
+        /// <summary>결과 발표 잠금 틱(2026-11-20): 결과 맵의 발표 값. 결과 맵이 없으면 0.</summary>
+        static int ResultsCeremonyTicksFor(Maps.MapDefinition results) =>
+            results == null ? 0 : Mathf.Max(1, results.ResultsStage.unlockTick);
+
+        /// <summary>결과 공간 물리 시작 틱: 결과 맵에 물리 상자(점수 숫자 발판, 2026-11-20)가 있을 때만 글자 낙하 틱. 아니면 0(물리 없음).</summary>
+        static int ResultsPropReleaseTickFor(Maps.MapDefinition results) =>
+            results == null || results.PhysicalBoxCount == 0 ? 0 : Mathf.Max(1, results.ResultsStage.signDropTick);
+
+        System.Collections.Generic.IEnumerable<int> ResultsCeremonyCandidates()
+        {
+            yield return CardCollectionRules.ResultsCeremonyTicks;
+            int current = ResultsCeremonyTicksFor(resultsMap);
+            if (current > 0 && current != CardCollectionRules.ResultsCeremonyTicks) yield return current;
+        }
+
+        System.Collections.Generic.IEnumerable<int> ResultsPropReleaseCandidates()
+        {
+            yield return 0;
+            int current = ResultsPropReleaseTickFor(resultsMap);
+            yield return current > 0 ? current : CardCollectionRules.ResultsSignTick;
         }
 
         SimConfig CreateConfig(CombatTuning combat, in RuleSet ruleSet, bool onlineRematch = false,
@@ -717,7 +776,8 @@ namespace Knockbox.Game
             for (int i = 0; i < World.Events.Count; i++)
             {
                 ref readonly var e = ref World.Events[i];
-                if (e.Type == SimEventType.OutOfBounds)
+                // 로비 맵(2026-11-19)은 카드 선택 무대처럼 바닥만 있어 맵 끝에서 멈추는 것이 정상이다(경계 튕김 피해를 쓰지 않으려고 경계를 끔).
+                if (e.Type == SimEventType.OutOfBounds && !World.InLobby)
                     Debug.LogWarning($"[Knockbox] 경기장 밖으로 나가 되돌림(버그 신호): {e}");
                 else if (e.Type == SimEventType.RoundTransition)
                     roundTransition = true;

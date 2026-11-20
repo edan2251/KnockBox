@@ -57,6 +57,11 @@ namespace Knockbox.Game.Online
         public bool Ended => session != null && session.State == SessionState.Ended;
         /// <summary>방 화면이 보여 줄 짧은 상태(오류 등).</summary>
         public string Notice { get; private set; } = "";
+        /// <summary>
+        /// 경기 확정 전(로비)에 손님이 나가 방장이 혼자 로비로 돌아왔다(2026-11-19). 방 화면(OnlineLobby)이 같은 코드로 방을 다시 연다.
+        /// 받는 쪽이 없으면 예전처럼 연결 종료로 끝난다.
+        /// </summary>
+        public event Action ReturnedToSoloLobby;
 
         /// <summary>
         /// 씬이 뜬 뒤: 일반 Brawl 실행/에디터 Play에는 공통 UI를 붙인다.
@@ -152,7 +157,9 @@ namespace Knockbox.Game.Online
             // 로비 맵이 있으면 방장은 상대를 기다리는 동안 혼자 로비에서 움직인다(로컬 월드, 기록·전송 없음).
             if (host && runner.FrontendEnabled && preparedConfig.Match.LobbySpace)
             {
-                runner.StartSoloLobby(preparedConfig, preparedArenas, seed);
+                // 손님이 나간 뒤 같은 코드로 다시 연 방은 지금 돌고 있는 혼자 로비를 그대로 이어 간다(P1 계속 조작).
+                if (!runner.InSoloLobby)
+                    runner.StartSoloLobby(preparedConfig, preparedArenas, seed);
                 runner.MenuInputBlocked = false;
                 runner.Running = true;
             }
@@ -203,11 +210,38 @@ namespace Knockbox.Game.Online
                 BeginMatch();
             prediction?.Pump();
             if (session.State == SessionState.Ended && !finished)
+            {
+                if (CanReturnToSoloLobby()) { ReturnToSoloLobby(); return; }
                 Finish();
+            }
             if (quitAt > 0 && now >= quitAt)
                 Quit(ExitCode());
             if (UnityEngine.InputSystem.Keyboard.current != null && UnityEngine.InputSystem.Keyboard.current.tabKey.wasPressedThisFrame)
                 showControls = !showControls;
+        }
+
+        /// <summary>
+        /// 방장 화면에서 손님이 나갔고(PeerLeft) 아직 경기가 확정되지 않았다: 혼자 기다리는 로비, 또는 둘 다 준비하기 전의 공유 로비.
+        /// 둘 다 준비해 퇴장 전환(LobbyExit)·경기에 들어간 뒤에는 예전처럼 연결 종료다.
+        /// </summary>
+        bool CanReturnToSoloLobby() =>
+            ReturnedToSoloLobby != null && session.LocalSlot == 0 && session.Reason == EndReason.PeerLeft
+            && fusionTransport != null && runner.FrontendEnabled && preparedConfig != null && preparedConfig.Match.LobbySpace
+            && targetMatches == 0 && runner.World != null && runner.World.InLobby;
+
+        void ReturnToSoloLobby()
+        {
+            var config = preparedConfig; var arenas = preparedArenas; uint seed = session.Seed;
+            bool solo = runner.InSoloLobby;
+            finished = true;
+            if (started) SaveRecords($"{session.Reason}: {session.EndDetail}");
+            Debug.Log("[Knockbox][online] 손님이 로비에서 나감: 방장은 혼자 로비로 돌아가 같은 코드로 방을 다시 엽니다.");
+            EndSession();
+            // 이미 혼자 기다리던 중(손님이 연결 도중 나감)이면 그 월드를 그대로 둔다.
+            if (!solo) runner.ResumeSoloLobby(config, arenas, seed);
+            runner.MenuInputBlocked = false;
+            runner.Running = true;
+            ReturnedToSoloLobby?.Invoke();
         }
 
         SimState StartShared()

@@ -413,13 +413,15 @@ namespace Knockbox.Tests.PlayMode
             }
             FinishMatch();yield return null;
             Assert.AreEqual(FrontendScreen.Podium,View.Screen);Assert.IsTrue(runner.World.InResultsSpace);
-            for(int i=0;i<runner.World.Config.Match.ResultsUnlockTick+5;i++)runner.StepOnce();
+            // 결과 발표(2026-11-20)가 끝나 조작이 풀리는 틱(Main은 결과 맵의 unlockTick)까지.
+            for(int i=0;i<runner.World.FreeSpaceUnlockTick+5;i++)runner.StepOnce();
             yield return null;yield return null;
             Assert.AreSame(runner.World.Arena,presenter.BuiltArena,"결과 공간 맵을 그림");
             Assert.IsFalse(runner.World.State.Fighter0.Arriving||runner.World.State.Fighter1.Arriving,"두 선수 모두 착지");
             Assert.IsTrue(View.PodiumReadyVisible);
+            // 결과 발표부터 화면의 O/X 대신 머리 위 "[R] 재대전"과 왼쪽 아래 "[Esc] 나가기"를 쓴다. 숨긴 버튼의 처리는 R·Esc와 같으므로 그 이벤트로 부른다.
             var ready=ButtonAt("Shared_VS_and_cards/Ready_for_rematch");
-            Assert.IsTrue(ready.gameObject.activeInHierarchy&&ready.interactable);
+            Assert.IsFalse(ready.gameObject.activeInHierarchy,"결과 발표 화면에는 O 버튼 대신 머리 위 [R] 재대전");
             // 연습: 켠 뒤 짧은 표시 중 다시 누르면 취소된다.
             ready.onClick.Invoke();yield return null;ready.onClick.Invoke();
             yield return new WaitForSecondsRealtime(.75f);for(int i=0;i<5;i++)runner.StepOnce();yield return null;
@@ -436,7 +438,7 @@ namespace Knockbox.Tests.PlayMode
             Assert.AreSame(runner.World.Arena,presenter.BuiltArena,"화면도 경기 맵을 다시 그림");
             Assert.IsFalse(ready.gameObject.activeInHierarchy,"결과 공간 버튼은 새 경기로 돌아오면 숨김");
             Assert.AreEqual(PodiumButtonFontRestored(),true,"기존 결과 화면 버튼 글자 크기를 되돌림");
-            FinishMatch();for(int i=0;i<runner.World.Config.Match.ResultsUnlockTick+5;i++)runner.StepOnce();
+            FinishMatch();for(int i=0;i<runner.World.FreeSpaceUnlockTick+5;i++)runner.StepOnce();
             yield return null;yield return null;
             ButtonAt("Shared_VS_and_cards/Return_to_menu").onClick.Invoke();yield return null;
             Assert.AreEqual(FrontendScreen.Main,View.Screen);LogAssert.NoUnexpectedReceived();

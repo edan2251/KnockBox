@@ -14,12 +14,12 @@ namespace Knockbox.Tests.EditMode
         static ArenaDef ResultsArena => Load("Assets/_Project/Data/Maps/Results/Results_Stage.asset");
         static ArenaDef LobbyArena => Load("Assets/_Project/Data/Maps/Lobby/Lobby_Stage.asset");
 
-        static SimConfig Config(bool results = true)
+        static SimConfig Config(bool results = true, bool exit = false)
         {
             var combat = BrawlParams.Combat(CombatParams.Default, weaponsEnabled: false, combinedAttackInput: true);
             combat.MaxHealth = 1;
             var original = CardCollectionRules.Apply(new SimConfig(BrawlParams.Movement(MovementParams.Default),
-                BrawlParams.Match(MatchParams.Default), combat, RuleSet.Brawl), resultsSpace: results, lobbySpace: true);
+                BrawlParams.Match(MatchParams.Default), combat, RuleSet.Brawl), resultsSpace: results, lobbySpace: true, lobbyExit: exit);
             var match = original.Match;
             match.IntroCountdownTicks = 6; match.CountdownTicks = 6; match.KoTicks = 6; match.PickHoldTicks = 4;
             match.RematchBothHold = true;
@@ -88,10 +88,12 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(2, w.State.Match.Rotation.Count);
         }
 
-        [Test]
-        public void ConfirmedLobbyToMatch_SameOnBothPeers_AndRecordingReplaysFromLobby()
+        /// <summary>exit: 2026-11-19 로비 → 첫 경기 전환(LobbyExit)이 있는 설정도 두 피어·기록 재생이 같다.</summary>
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ConfirmedLobbyToMatch_SameOnBothPeers_AndRecordingReplaysFromLobby(bool exit)
         {
-            var config = Config(); var maps = Maps();
+            var config = Config(exit: exit); var maps = Maps();
             var initial = SimState.CreateMatch(config, maps, 21u, MatchPhase.Lobby);
             var host = new FusionConfirmedJournal(config, maps, initial);
             var client = new FusionConfirmedJournal(config, maps, initial);
@@ -236,6 +238,138 @@ namespace Knockbox.Tests.EditMode
             outside.Write(batch, 6 + 4 * 8);
             Assert.Throws<System.InvalidOperationException>(() => client.AcceptBatch(batch));
             Assert.AreEqual(0, client.Recording.Count);
+        }
+
+        /// <summary>
+        /// 2026-11-19 로비 → 첫 경기 전환: 둘 다 준비한 틱에 LobbyExit로 들어가 LobbyExitTicks 동안 두 선수가 그 자리에 멈추고(입력 무시),
+        /// 끝나면 시드 순환의 첫 경기 맵으로 1라운드 Countdown. 맵은 그동안 로비 맵이다.
+        /// </summary>
+        [Test]
+        public void LobbyExit_BothReady_HoldsBothStillForExitTicks_ThenRoundOne()
+        {
+            var config = Config(exit: true); var maps = Maps();
+            Assert.AreEqual(CardCollectionRules.LobbyExitTicks, config.Match.LobbyExitTicks);
+            var w = new SimWorld(config, maps, SimState.CreateMatch(config, maps, 5u, MatchPhase.Lobby));
+            var plain = SimState.CreateMatch(config, maps, 5u, MatchPhase.Countdown);
+            uint rngBefore = w.State.Rng.State;
+            StepTo(w, config.Match.ResultsUnlockTick);
+            for (int i = 0; i < 12; i++) w.Step(new InputFrame(127, 0, InputButtons.None), default);
+            w.Step(new InputFrame(127, 0, SimWorld.ReadyButton), Ready);
+            Assert.AreEqual(MatchPhase.LobbyExit, w.State.Match.Phase, "둘 다 준비한 틱에 전환 시작");
+            Assert.IsTrue(w.InLobbyExit && !w.InLobby && !w.InFreeSpace);
+            Assert.AreSame(w.LobbyArena, w.Arena, "전환 동안은 로비 맵");
+            var still0 = w.State.Fighter0; var still1 = w.State.Fighter1;
+            var mash = new InputFrame(127, 127, InputButtons.Attack | InputButtons.Jump | InputButtons.Grab | SimWorld.ReadyButton, 3);
+            for (int i = 1; i < config.Match.LobbyExitTicks; i++)
+            {
+                w.Step(mash, mash);
+                Assert.AreEqual(MatchPhase.LobbyExit, w.State.Match.Phase, "tick " + i);
+                Assert.AreEqual(still0.Position, w.State.Fighter0.Position, "P1은 준비가 확정된 자리에 멈춘다");
+                Assert.AreEqual(still1.Position, w.State.Fighter1.Position);
+                Assert.AreEqual(still0.Action, w.State.Fighter0.Action);
+            }
+            w.Step(mash, mash);
+            Assert.AreEqual(MatchPhase.Countdown, w.State.Match.Phase);
+            Assert.AreEqual(1, w.State.Match.Round);
+            Assert.AreEqual(plain.Match.Rotation.Current, w.State.Match.Rotation.Current, "첫 경기 맵은 시드 순환 그대로");
+            Assert.AreEqual(rngBefore, w.State.Rng.State, "로비·전환은 난수를 쓰지 않는다");
+            Assert.AreSame(w.GetArena(w.State.Match.Rotation.Current), w.Arena);
+        }
+
+        /// <summary>전환이 켜진 설정: 준비가 둘 다 켜져 있어도 한 명이 KO(재등장 대기)·낙하 중이면 기다렸다가 둘 다 땅 위에 있을 때 시작한다.</summary>
+        [Test]
+        public void LobbyExit_WaitsUntilBothFightersAreBackOnTheGround()
+        {
+            var config = Config(exit: true); var maps = Maps();
+            var w = new SimWorld(config, maps, SimState.CreateMatch(config, maps, 5u, MatchPhase.Lobby));
+            StepTo(w, config.Match.ResultsUnlockTick);
+            w.State.Fighter1.Health = 0;
+            w.Step(Ready, Ready);
+            Assert.AreEqual(ActionState.KO, w.State.Fighter1.Action);
+            Assert.AreEqual(MatchPhase.Lobby, w.State.Match.Phase, "KO된 선수가 있으면 시작하지 않는다");
+            int waited = 0;
+            while (w.State.Match.Phase == MatchPhase.Lobby && waited < 600) { w.Step(Ready, Ready); waited++; }
+            Assert.AreEqual(MatchPhase.LobbyExit, w.State.Match.Phase);
+            Assert.IsFalse(SimWorld.AwayInResults(w.State.Fighter0) || SimWorld.AwayInResults(w.State.Fighter1), "재등장해 착지한 뒤 시작");
+            Assert.Greater(waited, config.Match.ResultsRespawnTicks);
+        }
+
+        /// <summary>
+        /// 2026-11-19: 손님이 경기 확정 전에 나가면 방장은 지금 P1을 이어 혼자 로비로 돌아간다. 맵을 다시 만들지 않고(이어 간 장면),
+        /// P2는 비우며 준비는 처음부터다.
+        /// </summary>
+        [Test]
+        public void ResumeSoloLobby_KeepsHostP1_ClearsReadyAndEmptiesP2()
+        {
+            var go = new UnityEngine.GameObject("resume_solo_lobby_runner");
+            try
+            {
+                go.SetActive(false);
+                var runner = go.AddComponent<MatchRunner>();
+                runner.FrontendEnabled = true;
+                var config = Config(exit: true); var maps = Maps();
+                runner.StartSoloLobby(config, maps, 9u);
+                Assert.IsTrue(runner.InSoloLobby);
+                StepTo(runner.World, config.Match.ResultsUnlockTick);
+                for (int i = 0; i < 20; i++) runner.World.Step(new InputFrame(127, 0, InputButtons.None), default);
+                Assert.IsTrue(runner.ToggleReady(0), "준비 비트를 켤 수 있는 시점");
+                Assert.IsTrue(runner.IsReadyToggled(0));
+                var before = runner.World.State.Fighter0;
+                runner.ResumeSoloLobby(config, maps, 11u);
+                Assert.IsTrue(runner.InSoloLobby);
+                Assert.AreEqual(1, runner.AbsentSlot);
+                Assert.IsTrue(runner.LobbySceneContinued, "맵·조명을 다시 틀지 않는다");
+                Assert.AreEqual(0, runner.ContinuedLobbySlot);
+                Assert.AreEqual(MatchPhase.Lobby, runner.World.State.Match.Phase);
+                Assert.AreEqual(before.Position, runner.World.State.Fighter0.Position, "P1은 움직이던 자리에서 이어 간다");
+                Assert.AreEqual(before.Velocity, runner.World.State.Fighter0.Velocity);
+                Assert.IsFalse(runner.World.State.Fighter0.Arriving, "P1은 다시 떨어지지 않는다");
+                Assert.AreEqual(ActionState.KO, runner.World.State.Fighter1.Action, "P2 자리는 비운다");
+                Assert.IsFalse(runner.IsReadyToggled(0), "준비는 처음부터");
+                Assert.AreEqual(InputButtons.None, runner.World.State.Fighter0.PrevButtons & SimWorld.ReadyButton);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(go); }
+        }
+
+        /// <summary>
+        /// 2026-11-19 로비 맵은 카드 선택 무대처럼 바닥만 있다. 경계(튕김 피해)를 쓰지 않으므로 맵 끝까지 달리고 뛰어도
+        /// 경계 튕김·피해·KO 없이 맵 끝에서 멈춘다(이 설정은 체력 1이라 피해가 있으면 바로 KO된다).
+        /// </summary>
+        [Test]
+        public void LobbyMap_IsGroundOnly_EdgesStopWithoutBoundaryBounce()
+        {
+            var config = Config(); var maps = Maps();
+            var w = new SimWorld(config, maps, SimState.CreateMatch(config, maps, 5u, MatchPhase.Lobby));
+            Assert.IsFalse(w.LobbyArena.HasBoundary, "경계 튕김을 쓰지 않는다");
+            StepTo(w, config.Match.ResultsUnlockTick);
+            int bounces = 0;
+            for (int t = 0; t < 900; t++)
+            {
+                int dir = t < 450 ? -127 : 127;
+                var jump = t % 40 < 4 ? InputButtons.Jump : InputButtons.None;
+                w.Step(new InputFrame(dir, 0, jump), new InputFrame(-dir, 0, jump));
+                for (int i = 0; i < w.Events.Count; i++)
+                    if (w.Events[i].Type == SimEventType.BoundaryHit) bounces++;
+                Assert.AreNotEqual(ActionState.KO, w.State.Fighter0.Action, "tick " + t);
+                Assert.AreNotEqual(ActionState.KO, w.State.Fighter1.Action, "tick " + t);
+                Assert.LessOrEqual(SimMath.Abs(w.State.Fighter0.Position.X), w.LobbyArena.HalfWidth, "맵 밖으로 나가지 않는다");
+            }
+            Assert.AreEqual(0, bounces);
+            Assert.AreEqual(config.Combat.MaxHealth, w.State.Fighter0.Health);
+            Assert.AreEqual(MatchPhase.Lobby, w.State.Match.Phase);
+        }
+
+        [Test]
+        public void LobbyExitConfig_IsHashedOnlyWithLobbyAndWhenOn()
+        {
+            var original = new SimConfig(BrawlParams.Movement(MovementParams.Default), BrawlParams.Match(MatchParams.Default));
+            uint lobby = CardCollectionRules.Apply(original, resultsSpace: true, lobbySpace: true, vsIntro: false).ComputeChecksum();
+            Assert.AreEqual(lobby, CardCollectionRules.Apply(original, resultsSpace: true, lobbySpace: true, vsIntro: false, lobbyExit: false).ComputeChecksum(),
+                "그 전 로비 기록의 설정 해시는 그대로");
+            Assert.AreNotEqual(lobby, CardCollectionRules.Apply(original, resultsSpace: true, lobbySpace: true, vsIntro: false, lobbyExit: true).ComputeChecksum());
+            Assert.AreEqual(CardCollectionRules.Apply(original, resultsSpace: true).ComputeChecksum(),
+                CardCollectionRules.Apply(original, resultsSpace: true, lobbyExit: true).ComputeChecksum(), "로비가 없으면 전환 설정도 없다");
+            Assert.AreEqual(0, CardCollectionRules.Apply(original, lobbySpace: true).Match.LobbyExitTicks);
         }
 
         [Test]
