@@ -6,6 +6,9 @@
 
 | 자료 | 보관 위치와 목록 |
 |---|---|
+| 2026-11-20 결과 화면 점수 숫자 발판 적용·정리 직전 | `Tools/out/results-digits-before-20261120/`에 숫자 발판 적용 전 `Results_Stage`·`Results_Glyphs`와 정리로 지운 로프 실험 맵 `Results_RopeLab`(각 `.meta` 포함, 6개 파일)을 보관했다. `manifest.sha256`으로 대조한다. `Results_Stage`·`Lobby_Stage`의 커밋 전 원본은 Git `e77112c`에도 있다. |
+| 2026-11-20 결과 화면·로비 빌드와 검수 녹화 | 숫자 발판 적용 전 Windows 개발 빌드 `Builds/Windows_before_20261120_digits/`(약 231MB). 검수·진단 실행 결과 `Recordings/`(약 106MB, 37개): `Results-Review-*`(결과 화면 에디터 촬영 8개), `BuildProbe-*`(빌드 연습·온라인 두 창 진단 로그·캡처 13개, 마지막 확인은 `-142512-practice`·`-142617-host/client`), `FinalSmoke-*`(빌드 실행 확인 6개), `FlickerProbe-*`(시상대 깜빡임 프레임 캡처 2개), `ProbeEditor-*`(에디터 진단 7개), `shadow_check_5_1.png`. 진단 코드는 지웠으므로 다시 만들 수 없는 기록이다. |
+| 2026-11-16 시연 빌드 | `Builds/KnockBox_Demo_20261116_153fb44/`와 같은 이름의 `.zip`·`.zip.sha256`(커밋 `153fb44` 기준). |
 | 2026-11-13 온라인 문서 위치·용도 정리 직전 | `Tools/out/online-docs-before-20261113/`에 당시 docs 20개 파일과 크기·해시를 보관했다. 제거한 일회성 작업 상세는 이 보관본에만 남기고 현행 구조 문서는 ai_docs에서 관리한다. 3틱 검사 XML·빌드·Player·ZIP·보존 확인 JSON은 `Tools/out/fusion-default3-*`이며 전달본은 `Builds/KnockBox_Fusion_3Ticks_20261113.zip`이다. |
 | 2026-11-13 기본 3틱 확정·중복 정리 직전 | `Tools/out/fusion-default3-before-20261113/`에 485개 파일과 크기·해시, 보호 대상 1,386개 해시를 보관했다. 제거한 세 온라인 안내와 긴 PROGRESS 원문도 포함한다. 현행 서버 구조와 확장 계약은 [온라인 구현 기준](ONLINE_MULTIPLAYER.md), 최신 검사 결과는 PROGRESS를 따른다. |
 | 2026-11-13 Fusion 기본 예측 시험 | `Tools/out/fusion-prediction-before-20261113/`에 수정 전 447개 파일과 보호 대상 1,561개 해시를 보관한다. 착수 계획은 완료 후 `Tools/out/fusion-prediction-plan-20261113.md`로 복사·해시 대조해 보관했다. 당시 PROGRESS와 확장 안내 원문은 위 3틱 정리 직전 백업에 있다. 현행 계약은 온라인 개발 기준을 따른다. 전체/런타임 검사 XML·로그와 Player·ZIP·보존 확인 JSON은 같은 `Tools/out/`의 `fusion-prediction-*` 파일이다. |
