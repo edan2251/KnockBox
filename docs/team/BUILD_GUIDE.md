@@ -14,6 +14,18 @@ Unity에서 직접 빌드하고 다른 Windows PC로 옮기는 안내입니다. 
 
 **이 메뉴를 사용하면 Unity를 종료할 필요가 없습니다.** 에디터를 종료해야 하는 경우는 같은 프로젝트를 명령줄 배치 모드로 별도 실행할 때입니다. 두 방식은 동시에 사용하지 않습니다.
 
+## 배포용 빌드(STOVE 데모 제출)
+
+스토어 제출·외부 배포에는 개발 빌드가 아니라 **Knockbox → Build → Windows Release (배포용)**을 씁니다(2026-11-21).
+
+- 제품 정보는 PlayerSettings 값입니다: 회사 **WOMBAT**, 제품 **KnockBox**, 버전 **0.1.0**(Edit → Project Settings → Player). 버전을 올릴 때는 여기의 Version만 바꾸고 빌드합니다. 폴더·ZIP 이름에 버전이 들어갑니다.
+- 결과: `Builds/Release/KnockBox_버전_Windows/`(실행 파일 `KnockBox.exe`)와 같은 이름의 `.zip`. 같은 버전으로 다시 만들면 그 폴더·ZIP을 지우고 새로 만듭니다.
+- 개발 빌드와 다른 점: 디버그 단축키(O/P 즉사, K/L 결과 공간 등)·자동 진행 인수·화면의 Development Build 표시가 빠지고, 게임 폴더에 온라인 입력 기록·예측 진단 CSV를 남기지 않습니다. 배포하지 않는 `*_BurstDebugInformation_DoNotShip` 폴더는 지웁니다.
+- 외부 자료 고지(`Paperlogy_OFL.txt`, `HSJiptokki_NOTICE.txt`, `Box2D_MIT.txt`)를 빌드 안 `Licenses/`에 넣습니다. 고지 원본은 [docs/licenses](../licenses/ASSET_RIGHTS.md)에 있고, 파일이 없으면 빌드가 실패합니다.
+- 온라인은 같은 버전의 배포용 빌드끼리 접속합니다. 개발 빌드와 섞어 시험하지 않습니다.
+- 제출 전 다른 PC에서 ZIP을 모두 풀고 실행해 메인·연습·닉네임·온라인을 직접 확인합니다.
+- STOVE 쪽 절차(STOVE Studio 가입·그룹·프로젝트·상품 등록 → 빌드 관리에서 업로드 → STOVE PC 클라이언트의 스튜디오 테스트)는 STOVE 개발자 문서를 따릅니다. 데모에 STOVE PC SDK 연동이 필수인지는 STOVE에 확인합니다(현재 프로젝트에는 연동하지 않음).
+
 ## 빌드에 포함되는 내용
 
 현재 [빌드 메뉴](../../Assets/_Project/Editor/BuildMenu.cs)는 Windows 64비트 **개발 빌드**를 만들고 **Main 씬 하나만** 포함합니다. Main에 연결된 UI·보상 맵·모놀리스·경기 맵과 Resources 자료는 Unity의 빌드 과정에서 포함됩니다. Sandbox와 MapAuthoring을 시연 시작 씬으로 넣을 필요가 없습니다.
@@ -66,11 +78,11 @@ Unity에서 직접 빌드하고 다른 Windows PC로 옮기는 안내입니다. 
 - **메뉴가 안 보임:** 에디터 임포트·컴파일이 끝났는지, Console에 오류가 있는지, 올바른 프로젝트인지 확인합니다.
 - **빌드가 실패했는데 exe가 있음:** 이전 빌드일 수 있습니다. 최신 성공 메시지와 파일 갱신 시간을 확인합니다. 실패 원인은 Console의 첫 오류를 개발자에게 전달합니다.
 - **빌드 파일을 쓸 수 없음:** 그 폴더에서 실행 중인 Knockbox.exe를 종료하고 다시 빌드합니다. Unity 자체를 종료할 필요는 없습니다.
-- **창 제목이나 로그 폴더가 Project_Brawl:** 현재 PlayerSettings의 제품명이 남아 있기 때문입니다. 실행 파일 이름이 Knockbox.exe인 것과 별개이며 시연 직전 이를 바꾸느라 설정을 일괄 수정하지 않습니다.
+- **창 제목·로그 폴더:** 2026-11-21부터 제품명이 KnockBox(회사 WOMBAT)입니다. 그 전 빌드에서 저장한 닉네임·옵션 값은 예전 이름(Project_Brawl) 아래에 있어 이어지지 않습니다.
 - **다른 PC에서 실행 불가:** ZIP 전체를 해제했는지, Data·DLL·Mono 폴더가 함께 있는지 확인합니다. 시스템 보안 경고가 나오면 사용자가 직접 내용을 확인합니다.
 - **온라인 코드로 참가 불가:** 같은 ZIP인지와 인터넷 연결부터 확인하고 [Photon 설정](../ai_docs/ONLINE_MULTIPLAYER.md#기본-접속과-새-pc-설정)을 봅니다. App ID나 참가 코드를 공개 문서에 적지 않습니다.
 
-기본 실행 로그는 현재 제품 설정 기준 `%USERPROFILE%/AppData/LocalLow/DefaultCompany/Project_Brawl/Player.log`입니다. `-logFile` 인수를 지정한 검사 실행은 지정 경로에 로그를 남깁니다. 로그에는 개인 경로·접속 정보가 포함될 수 있으므로 외부 공유 전 확인합니다.
+기본 실행 로그는 현재 제품 설정 기준 `%USERPROFILE%/AppData/LocalLow/WOMBAT/KnockBox/Player.log`입니다. `-logFile` 인수를 지정한 검사 실행은 지정 경로에 로그를 남깁니다. 로그에는 개인 경로·접속 정보가 포함될 수 있으므로 외부 공유 전 확인합니다.
 
 ## File 메뉴의 Build Profiles
 

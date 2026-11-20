@@ -54,6 +54,8 @@ namespace Knockbox.Game.Online
                 frameTrace = new FrameSample[InitialTrace];
                 inputTrace = new InputSample[InitialTrace];
             }
+            // 배포용 빌드(2026-11-21)는 게임 폴더에 진단 CSV를 쓰지 않는다(개발 빌드·에디터·검사 실행만).
+            if (!Application.isEditor && !Debug.isDebugBuild && !FrameTraceEnabled) return;
             try
             {
                 string folder = Path.Combine(ReplayFiles.Folder, "Network");
