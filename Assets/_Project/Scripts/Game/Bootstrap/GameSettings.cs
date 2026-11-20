@@ -10,7 +10,12 @@ namespace Knockbox.Game
     public sealed class GameSettings
     {
         const string Prefix = "Knockbox.Settings.";
+        /// <summary>닉네임(2026-11-21 메인 화면): 옵션이 아니라 프로필 값이라 기본값으로 되돌리기에서 지우지 않는다.</summary>
+        const string NicknameKey = "Knockbox.Profile.Nickname";
+        public const int NicknameMaxLength = 10;
         public float Volume = 1f;
+        /// <summary>정리된 닉네임. 비어 있으면 자리 이름(P1/P2)을 쓴다.</summary>
+        public string Nickname = "";
         public bool Fullscreen = true;
         /// <summary>0이면 모니터 기본 해상도.</summary>
         public int Width, Height;
@@ -24,7 +29,45 @@ namespace Knockbox.Game
             Height = PlayerPrefs.GetInt(Prefix + "Height", 0),
             ReduceShake = PlayerPrefs.GetInt(Prefix + "ReduceShake", 0) != 0,
             ReduceFlash = PlayerPrefs.GetInt(Prefix + "ReduceFlash", 0) != 0,
+            Nickname = CleanNickname(PlayerPrefs.GetString(NicknameKey, "")),
         };
+
+        /// <summary>
+        /// 화면에 그대로 써도 되는 닉네임으로 정리한다(입력·저장값·상대가 보낸 값 공통): 글자·숫자·공백과 몇 가지 기호만 남기고
+        /// (서식 태그·줄바꿈·이모지처럼 글꼴에 없는 문자는 뺀다) 연속 공백을 하나로, 앞뒤 공백을 지운 뒤 최대 길이로 자른다.
+        /// </summary>
+        public static string CleanNickname(string raw)
+        {
+            if (string.IsNullOrEmpty(raw)) return "";
+            var sb = new System.Text.StringBuilder(NicknameMaxLength);
+            bool space = false;
+            foreach (char c in raw)
+            {
+                if (sb.Length >= NicknameMaxLength) break;
+                if (char.IsWhiteSpace(c)) { space = sb.Length > 0; continue; }
+                bool keep = !char.IsSurrogate(c) && (char.IsLetterOrDigit(c) || "-_.!?~♥".IndexOf(c) >= 0);
+                if (!keep) continue;
+                if (space && sb.Length < NicknameMaxLength - 1) sb.Append(' ');
+                space = false;
+                sb.Append(c);
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>화면에 쓰는 이름: 닉네임이 비어 있으면 자리 이름(P1/P2).</summary>
+        public static string DisplayName(string nickname, int slot) => string.IsNullOrEmpty(nickname) ? SlotName(slot) : nickname;
+
+        static readonly string[] SlotNames = { "P1", "P2" };
+        /// <summary>자리 이름(P1/P2). 매 프레임 쓰므로 미리 만든 글자를 돌려준다.</summary>
+        public static string SlotName(int slot) => SlotNames[slot == 1 ? 1 : 0];
+
+        /// <summary>닉네임만 바꿔 저장한다(옵션 값은 건드리지 않는다).</summary>
+        public void SaveNickname(string value)
+        {
+            Nickname = CleanNickname(value);
+            PlayerPrefs.SetString(NicknameKey, Nickname);
+            PlayerPrefs.Save();
+        }
 
         public void Save()
         {

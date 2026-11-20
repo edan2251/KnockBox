@@ -25,7 +25,7 @@ namespace Knockbox.Game.UI
         int savedReadyFont, savedBackFont;
         string savedReadyText, savedBackText;
         Color savedScoreColor;
-        GameObject[] menuBackdrop;
+        Image menuBackground;
 
         bool FreeSpaceScreen => Screen == FrontendScreen.Podium || Screen == FrontendScreen.Lobby;
 
@@ -74,12 +74,10 @@ namespace Knockbox.Game.UI
             }
             if (lobbyHud != null) lobbyHud.gameObject.SetActive(lobbyScreen);
             if (!podium) HideResultsHud();
-            // 로비 화면은 메뉴의 방 패널을 쓰되, 메뉴 배경·바닥·큰 캐릭터는 숨겨 월드가 보이게 한다.
-            // 메뉴에서 바로 들어온 경우는 큰 캐릭터의 퇴장(AnimateMainExit)이 끝날 때까지 배경을 남긴다.
-            menuBackdrop ??= new[] { menu.Find("Background")?.gameObject, menu.Find("Floor")?.gameObject };
-            foreach (var backdrop in menuBackdrop) if (backdrop != null) backdrop.SetActive(!lobbyScreen || lobbyFromMenu);
-            if (lobbyScreen && !lobbyFromMenu) foreach (var actor in mainActors) actor.SetActive(false);
-            else if (!lobbyScreen) for (int i = 0; i < 2; i++) mainActors[i].SetActive(i == localSlot);
+            // 로비 화면은 메뉴 배경을 숨겨 월드가 보이게 한다(2026-11-21: 메인 화면의 바닥·선수는
+            // 실제 로비 월드가 맡는다. 게임 시작 메뉴에서 방을 만들면 그 공간과 선수가 그대로 로비가 되어 따로 들어오는 연출이 없다).
+            menuBackground ??= menu.Find("Background")?.GetComponent<Image>();
+            if (menuBackground != null) menuBackground.gameObject.SetActive(!lobbyScreen);
             var readyText = resultReady.GetComponentInChildren<Text>(true);
             var backText = resultBack.GetComponentInChildren<Text>(true);
             var readyRect = (RectTransform)resultReady.transform;
@@ -122,7 +120,6 @@ namespace Knockbox.Game.UI
             if (lobbyScreen)
             {
                 // 로비(2026-11-19): 방 패널·하단 준비/나가기 버튼 없이 상단 표시만 쓴다. 준비는 R, 나가기는 Esc.
-                AnimateMainExit();
                 AnimateLobbyHud();
                 pickHintAlpha.alpha = 0;
                 resultReady.gameObject.SetActive(false);
@@ -164,6 +161,9 @@ namespace Knockbox.Game.UI
         {
             var match = w.Config.Match;
             float tick = w.State.Match.PhaseTick + motionRunner.RenderAlpha;
+            // 메인 화면의 로비 공간(2026-11-21, FrontendController가 연 혼자 로비 월드).
+            if (MenuSpaceActive && w.InLobby && MenuScreen) { PresentMenuSpace(w, tick); return; }
+            motionPresenter.LobbyMarkerFade = 1f;
             // 결과 발표(2026-11-20): 빈 시상대 상승 → 두 선수 낙하 → 결과 글자 낙하. 그 전 설정(기록 재생 등)은 아래 기존 연출.
             if (ResultsCeremony(w)) { PresentResultsCeremony(w, tick); return; }
             HideResultSign();
@@ -195,6 +195,8 @@ namespace Knockbox.Game.UI
                 // 퇴장 중에는 조준선·경계 표시를 끈다(조작이 잠겼다).
                 motionPresenter.PresentFrontendStage(build, true, Out(build), spawn0, spawn1, 0, !exit, lit ? 1f : 0f, false, false);
                 motionPresenter.Background.SetRoundLightPulse(lit ? (sceneTick - CardCollectionRules.RebuildTicks) / 60f : -1);
+                // 로비에 떨어지는 선수는 화면 위끝 밖에서 떨어지는 것처럼 그린다(2026-11-21).
+                if (w.InLobby && !exit) LiftArrivals(w, absent);
             }
             if (w.InResultsSpace) PresentPodiumRise(w, tick);
             if (exit) PresentLobbyExit(w, tick);
@@ -230,32 +232,6 @@ namespace Knockbox.Game.UI
                 var f = w.State.GetFighter(winner);
                 motionPresenter.PresentDisplayEvent(new SimEvent(w.State.Tick, SimEventType.Land, winner, f.Position, Vec2.Zero, 18f));
             }
-        }
-
-        // 메인에서 로비로(CP5 기본 구조, 수치는 임시): 메인의 큰 캐릭터가 눌렸다가 튀어 오르고 화면 아래로 떨어져 사라지는 동안
-        // 메뉴 배경이 로비 재구성을 가린다. 캐릭터가 사라지면 배경을 걷어 로비(시뮬레이션의 낙하)가 이어진다.
-        const float MainExitSeconds = .8f;
-        bool lobbyFromMenu;
-
-        void AnimateMainExit()
-        {
-            float age = Time.unscaledTime - enteredAt;
-            var actor = (RectTransform)mainActors[localSlot].transform;
-            bool exiting = lobbyFromMenu && age < MainExitSeconds;
-            foreach (var backdrop in menuBackdrop) if (backdrop != null) backdrop.SetActive(exiting);
-            for (int i = 0; i < mainActors.Length; i++) mainActors[i].SetActive(exiting && i == localSlot);
-            if (!exiting)
-            {
-                actor.localScale = Vector3.one;
-                actor.anchoredPosition = mainPositions[localSlot];
-                lobbyFromMenu = false;
-                return;
-            }
-            float squash = Range(age, 0, .12f), rise = Range(age, .12f, .4f), fall = Range(age, .4f, MainExitSeconds);
-            float y = age < .4f ? 260 * Out(rise) : 260 - 1660 * In(fall);
-            float stretch = age < .12f ? -.15f * Out(squash) : age < .4f ? .12f * (1 - rise) : .08f;
-            actor.localScale = new Vector3(1 - stretch * .7f, 1 + stretch, 1);
-            actor.anchoredPosition = mainPositions[localSlot] + new Vector2(0, y);
         }
     }
 }

@@ -56,6 +56,7 @@ namespace Knockbox.Game.UI
         readonly Image[] lobbyWaitDots = new Image[3];
         Button lobbyCopy;
         readonly Text[] lobbyNames = new Text[2], lobbyStatus = new Text[2];
+        readonly int[] lobbyNameBase = new int[2];
         readonly bool[] lobbyShownReady = new bool[2];
         readonly float[] lobbyReadyAt = { -10f, -10f };
         LobbyHudState lobbyHudState;
@@ -132,7 +133,8 @@ namespace Knockbox.Game.UI
             var label = points != null ? points.Label(slot) : null;
             if (label == null) return FrontendScoreView.SetPoint(slot, slot == 0 ? 0 : 4) + new Vector2(slot == 0 ? -52 : 52, 0);
             var rect = label.rectTransform;
-            Vector2 local = lobbyHud.InverseTransformPoint(rect.TransformPoint(rect.rect.center));
+            // 닉네임이 칸보다 길면 점수판 글자는 한쪽 정렬이라, 실제 글자 가운데로 날아와 멈춘다(2026-11-21).
+            Vector2 local = lobbyHud.InverseTransformPoint(rect.TransformPoint(points.NameCenterLocal(slot)));
             return local;
         }
 
@@ -287,7 +289,15 @@ namespace Knockbox.Game.UI
                 float appearPop = appear < 1 ? Pop(appear) : 1;
                 name.rectTransform.anchoredPosition = at;
                 name.rectTransform.localScale = Vector3.one * scale * (exiting ? 1 : readyPop) * Mathf.Max(0, appearPop);
-                name.text = ready || exiting ? "P" + (p + 1) : local ? "P" + (p + 1) + " · 나" : "P" + (p + 1);
+                // 닉네임(2026-11-21, 없으면 P1/P2). 점수판 글자와 같은 폭 기준으로 줄여 도착 자리에서 크기가 맞는다.
+                string playerName = motionPresenter.PlayerName(p);
+                string nameText = ready || exiting || !local ? playerName : playerName + " · 나";
+                if (name.text != nameText)
+                {
+                    name.text = nameText;
+                    if (lobbyNameBase[p] == 0) lobbyNameBase[p] = name.fontSize;
+                    name.fontSize = FrontendScoreView.FitFontSize(name, lobbyNameBase[p], FrontendScoreView.MaxNameWidth);
+                }
                 name.color = PaletteAsset.WithAlpha(playerColors[p], appear);
                 string line; Color color;
                 if (p == 1 && s.Solo) { line = ""; color = Theme.white; }
@@ -311,19 +321,8 @@ namespace Knockbox.Game.UI
         /// </summary>
         void PresentLobbyExit(SimWorld w, float tick)
         {
-            float half = w.Config.HalfBody;
             int absent = motionRunner.AbsentSlot;
-            float squash = Range(tick, 0, ExitSquashEnd), rise = Range(tick, ExitSquashEnd, ExitApex), fall = Range(tick, ExitApex, ExitFallEnd);
-            float y = tick < ExitApex ? ExitJumpHeight * Out(rise) * (tick < ExitSquashEnd ? 0 : 1) : ExitJumpHeight - ExitFallDistance * In(fall);
-            float stretch = tick < ExitSquashEnd ? -.16f * Out(squash) : tick < ExitApex ? .14f * (1 - rise) : .06f + .12f * fall;
-            for (int k = 0; k < 2; k++)
-            {
-                if (k == absent) continue;
-                motionPresenter.ScaleFighterVisual(k, 1 - stretch * .7f, 1 + stretch, half);
-                motionPresenter.OffsetFighterVisual(k, y);
-            }
-            // 발이 땅을 떠나면 바닥 그림자도 함께 떠난다(그림자는 판정 위치에 그려지므로 남지 않게 숨긴다).
-            if (tick >= ExitSquashEnd) motionPresenter.HideFighterShadows();
+            PoseExitJump(w, tick, absent);
             // 도약하는 순간 한 번: 기존 점프 연출(먼지·소리)을 두 선수 발밑에서 보여 준다.
             int exitStart = w.State.Tick - w.State.Match.PhaseTick;
             if (tick >= ExitSquashEnd && lobbyExitSoundTick != exitStart)
@@ -337,6 +336,27 @@ namespace Knockbox.Game.UI
                 }
             }
             points.RenderLobbyReveal(Range(tick, ExitApex + 4, ExitFallEnd + 8));
+        }
+
+        /// <summary>
+        /// 로비 퇴장의 도약 그림(눌림 → 튀어 오름 → 아래로 가속해 화면 밖으로). 메인 화면에서 연습으로 나갈 때도 같은 박자를 쓴다(2026-11-21).
+        /// 판정 위치는 그대로이고 그림에만 더한다. absent 자리(비어 있는 선수)는 건너뛴다.
+        /// </summary>
+        /// <param name="scale">높이·낙하 거리 배율(메인 화면의 근접 구도에서 작게, 기본 1).</param>
+        void PoseExitJump(SimWorld w, float tick, int absent, float scale = 1f)
+        {
+            float half = w.Config.HalfBody;
+            float squash = Range(tick, 0, ExitSquashEnd), rise = Range(tick, ExitSquashEnd, ExitApex), fall = Range(tick, ExitApex, ExitFallEnd);
+            float y = (tick < ExitApex ? ExitJumpHeight * Out(rise) * (tick < ExitSquashEnd ? 0 : 1) : ExitJumpHeight - ExitFallDistance * In(fall)) * scale;
+            float stretch = tick < ExitSquashEnd ? -.16f * Out(squash) : tick < ExitApex ? .14f * (1 - rise) : .06f + .12f * fall;
+            for (int k = 0; k < 2; k++)
+            {
+                if (k == absent) continue;
+                motionPresenter.ScaleFighterVisual(k, 1 - stretch * .7f, 1 + stretch, half);
+                motionPresenter.OffsetFighterVisual(k, y);
+            }
+            // 발이 땅을 떠나면 바닥 그림자도 함께 떠난다(그림자는 판정 위치에 그려지므로 남지 않게 숨긴다).
+            if (tick >= ExitSquashEnd) motionPresenter.HideFighterShadows();
         }
     }
 }

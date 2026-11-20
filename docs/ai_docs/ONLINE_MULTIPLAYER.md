@@ -11,7 +11,7 @@
 | SDK | Fusion 2.1.4 Stable Build 2500, 저장소의 `Assets/Photon`과 `.meta` 포함 |
 | 역할 | 방 생성 PC = Host/P1, 참가 PC = Client/P2, 최대 2인 |
 | 지역·기본 버전 | `kr`, `knockbox-fusion-1` |
-| 실제 접속 버전 | `knockbox-fusion-1-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry2-exit72-results3` |
+| 실제 접속 버전 | `knockbox-fusion-1-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry2-exit72-results3-name1` |
 | 틱·송신 설정 | 전투·SDK Client/Server·송신 모두 60Hz |
 | 입력 지연 | SDK 최소 입력 지연 0틱(2026-11-17, 이전 3틱), 자동 추가 지연 끔, 앱 지연 큐 중복 적용 없음 |
 | 접속 UI | 기존 방 생성·8자리 코드 참가, 이름 설정 없이 P1/P2 |
@@ -87,6 +87,8 @@
 - **로비 → 첫 경기(2026-11-19):** 둘 다 준비하면 `MatchPhase.LobbyExit`(72틱, 조작·선수 정지)를 거쳐 1라운드로 간다. 확정 입력·예측·스냅숏 형식은 그대로이고 설정 해시와 접속 버전(`-exit72`)으로 그 전 빌드와 섞이지 않는다. 화면 전환은 두 PC가 각자 같은 단계 틱으로 한 번씩 그린다.
 - **결과 발표(2026-11-20):** 결과 공간에 들어오면 두 선수가 처음부터 자기 자리(승자 시상대 위·패자 옆 바닥)에 서고, `MatchParams.ResultsCeremonyTicks`(결과 맵 `unlockTick`, Main 192틱)까지 조작·준비가 잠긴다(`SimWorld.FreeSpaceUnlockTick`). 시상대 상승·선수 낙하·매단 점수는 두 PC가 결과 단계 틱으로 각자 그리는 화면 전용이다. 잠금이 풀리면 둘 다 "[R] 재대전"을 켜야 재경기, Esc는 나가기다. 세트 점수는 결과 맵의 실제 물리 숫자 발판(점수와 맞는 숫자만 남김, 깎은 조각 모양 접촉)이라 선수와의 상호작용·숫자 흔들림이 시뮬레이션 상태(`SimState.Props`)에 들어가 예측·스냅숏·체크섬으로 맞춘다. 확정 입력·예측·스냅숏 형식은 그대로이고 설정 해시(`ResultsCeremonyTicks`·`ResultsPropReleaseTick`)·결과 맵 지형 해시(숫자 조각 모양 포함)와 접속 버전(`-results3`: 숫자 낙하 시작 속도·실제 획 연결점)으로 그 전 빌드와 섞이지 않는다. `unlockTick`·`signDropTick`이나 숫자 발판을 바꾸면 해시가 달라지므로 두 PC가 같은 결과 맵을 써야 한다(맵 목록 합의에 이미 들어간다).
 - **로비에서 나가기(2026-11-19):** Esc. 손님이 경기 확정 전에 나가면(Host가 `EndReason.PeerLeft`를 받고 월드가 Lobby) `OnlineMatch.ReturnToSoloLobby`가 기록을 저장하고 세션을 닫은 뒤 P1을 이어 혼자 로비로 돌아가고(`ResumeSoloLobby`), `OnlineLobby`가 `FusionConnection.ReopenAsync`로 같은 코드의 방을 다시 연다(직전 방이 닫히는 동안 `GameIdAlreadyExists`면 0.5초 간격 최대 12번, 끝내 안 되면 새 코드). 다시 연 방에 손님이 들어오면 지금 혼자 로비를 그대로 이어 공유 로비가 된다(로비 입장 A안과 같다). 방장이 나가면 방이 닫히고 손님은 로비 상단 알림 뒤 메인으로 간다.
+- **메인 화면에서 로비로(2026-11-21):** 게임 시작 메뉴의 공간은 로컬 혼자 로비 월드다. 방 만들기는 `OnlineMatch.StartSession`이 이 월드를 그대로 혼자 로비로 이어 간다(`runner.InSoloLobby`). 코드로 참가는 손님 메뉴 캐릭터가 화면에서만 나간 뒤, 공유 로비의 첫 월드를 '이어 간 장면'으로 표시해(`MatchRunner.KeepLobbySceneOnNextBegin`) 장면을 다시 쌓지 않는다. 판정·확정 입력·스냅숏 형식은 그대로다.
+- **닉네임(2026-11-21, 접속 버전 `-name1`):** 서로 보이게 되면 `FusionConnection.Rpc_PlayerName`(신뢰 채널, UTF-8 최대 64바이트)으로 한 번 보내고, 처음 받은 쪽이 한 번 더 보낸다(상대를 알기 전에 보낸 첫 값이 버려져도 맞춰진다). 받은 값은 `GameSettings.CleanNickname`으로 다시 정리해 `OnlineMatch.PeerName`에 두고, 세션이 끝나면 지운다. 표시 전용이며 시뮬레이션 입력·확정 기록·체크섬·리플레이에는 들어가지 않는다. RPC 목록이 달라져 그 전 빌드와는 접속하지 않는다.
 - **종료:** 그 밖의 단계에서 상대가 나가거나 끊기면 남은 쪽은 이유를 3.5초 보여준 뒤 메인으로 돌아간다(FrontendController). 내가 나가면 바로 메인이다.
 - 방장 혼자 대기에는 시간 제한이 없다(방장이 나가기로 끝낸다). 호스트 이전·경기 중 재접속은 미구현이다.
 

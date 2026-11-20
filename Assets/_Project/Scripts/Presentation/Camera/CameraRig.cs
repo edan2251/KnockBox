@@ -45,6 +45,24 @@ namespace Knockbox.Presentation
         public float ArenaHalfWidth { get; private set; } = ArenaDef.ClassicColumns * 0.5f;
         public float ArenaHalfHeight { get; private set; } = ArenaDef.ClassicRows * 0.5f;
 
+        // 화면 전용 근접 구도(2026-11-21 메인 화면 공간): weight 0이면 경기장 전체, 1이면 closeCenter·closeSize. 판정과 무관하다.
+        Vector2 closeCenter;
+        float closeSize = 1f, closeWeight;
+
+        /// <summary>메인 화면에서 선수를 크게 보이게 하는 구도. weight는 0~1(0이면 원래 구도).</summary>
+        public void SetCloseFraming(Vector2 center, float size, float weight)
+        {
+            closeCenter = center;
+            closeSize = Mathf.Max(.1f, size);
+            closeWeight = Mathf.Clamp01(weight);
+        }
+
+        /// <summary>지금 화면 크기 ÷ 경기장 전체 구도 크기(근접 구도면 1보다 작다). 머리 위 글자 크기를 맞추는 데 쓴다.</summary>
+        public float FramingScale { get; private set; } = 1f;
+
+        /// <summary>지금 근접 구도가 섞인 정도(0~1).</summary>
+        public float CloseWeight => closeWeight;
+
         public void FitArena(ArenaDef arena)
         {
             ArenaHalfWidth = arena.HalfWidth;
@@ -136,7 +154,8 @@ namespace Knockbox.Presentation
             float nx = Mathf.PerlinNoise(noiseTime * NoiseFrequency, 0.37f) * 2f - 1f;
             float ny = Mathf.PerlinNoise(0.71f, noiseTime * NoiseFrequency) * 2f - 1f;
             ShakeOffset = new Vector2(nx, ny) * amount + KickOffset;
-            transform.localPosition = basePosition + (Vector3)ShakeOffset;
+            var framed = closeWeight > 0f ? Vector3.Lerp(basePosition, new Vector3(closeCenter.x, closeCenter.y, basePosition.z), closeWeight) : basePosition;
+            transform.localPosition = framed + (Vector3)ShakeOffset;
             TickLight(dt);
             kickLeft = Mathf.Max(0, kickLeft - dt);
         }
@@ -174,7 +193,12 @@ namespace Knockbox.Presentation
             float aspect = cam.aspect;
             // 세로는 경기장 전체, 가로는 좌우 벽이 SideWallShown만큼 보이도록. 32 × 18은 16:9에 꼭 맞는다.
             float sizeForWidth = (ArenaHalfWidth - 1f + SideWallShown) / Mathf.Max(aspect, 0.01f);
-            cam.orthographicSize = Mathf.Max(ArenaHalfHeight, sizeForWidth) * (1f - Zoom);
+            float size = Mathf.Max(ArenaHalfHeight, sizeForWidth);
+            float full = size;
+            // 근접 구도는 크기 비율(로그)로 섞어 확대 속도가 처음과 끝에서 같게 느껴진다.
+            if (closeWeight > 0f) size = Mathf.Exp(Mathf.Lerp(Mathf.Log(size), Mathf.Log(closeSize), closeWeight));
+            FramingScale = size / Mathf.Max(.01f, full);
+            cam.orthographicSize = size * (1f - Zoom);
         }
     }
 }

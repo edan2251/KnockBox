@@ -15,7 +15,8 @@ namespace Knockbox.Tests.EditMode
         public void DefaultPredictionVersion_IsTrimmedAndIsolatesEarlierComparisonBuilds()
         {
             string version = FusionPredictionPolicy.ConnectionVersion("same");
-            Assert.AreEqual("same-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry2-exit72-results3", version);
+            Assert.AreEqual("same-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry2-exit72-results3-name1", version);
+            Assert.AreNotEqual("same-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry2-exit72-results3", version, "닉네임 RPC가 없는 빌드와 섞이지 않는다");
             Assert.AreNotEqual("same-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry2-exit72-results2", version, "숫자 낙하 시작 속도가 없던 빌드와는 접속하지 않는다");
             Assert.AreNotEqual("same-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry2-exit72-results1", version, "결과 점수가 계산 연출이던(숫자 발판 없음) 빌드와는 접속하지 않는다");
             Assert.AreNotEqual("same-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry2-exit72", version, "결과 발표(결과 공간 전용 잠금) 전 빌드와는 접속하지 않는다");
@@ -29,6 +30,32 @@ namespace Knockbox.Tests.EditMode
             Assert.AreNotEqual("same", version);
             Assert.AreNotEqual("same-prediction1-snapshot8692-tick60-delay2", version);
             Assert.AreNotEqual("same-prediction1-snapshot8692-tick60-delay4", version);
+        }
+
+        /// <summary>
+        /// 닉네임(2026-11-21): 입력·저장값·상대가 보낸 값 모두 같은 정리를 거친다. 서식 태그·줄바꿈·이모지는 빼고, 공백은 하나로, 최대 10글자.
+        /// 비어 있으면 자리 이름(P1/P2)으로 보인다.
+        /// </summary>
+        [TestCase("  철수  ", "철수")]
+        [TestCase("<b>굵게</b>", "b굵게b")]
+        [TestCase("두   칸\n이름", "두 칸 이름")]
+        [TestCase("가나다라마바사아자차카타", "가나다라마바사아자차")]
+        [TestCase("Player_1!", "Player_1!")]
+        [TestCase("😀웃음", "웃음")]
+        [TestCase("   ", "")]
+        [TestCase(null, "")]
+        public void PlayerNickname_IsCleanedForDisplayAndNetwork(string raw, string expected)
+        {
+            Assert.AreEqual(expected, Knockbox.Game.GameSettings.CleanNickname(raw));
+            Assert.LessOrEqual(Knockbox.Game.GameSettings.CleanNickname(raw).Length, Knockbox.Game.GameSettings.NicknameMaxLength);
+        }
+
+        [Test]
+        public void EmptyNickname_ShowsSlotName()
+        {
+            Assert.AreEqual("P1", Knockbox.Game.GameSettings.DisplayName("", 0));
+            Assert.AreEqual("P2", Knockbox.Game.GameSettings.DisplayName(null, 1));
+            Assert.AreEqual("철수", Knockbox.Game.GameSettings.DisplayName("철수", 1));
         }
 
         [TestCase(null)] [TestCase("")] [TestCase(" ")]

@@ -28,6 +28,14 @@ namespace Knockbox.Game.UI
         readonly float[] changedAt = { -10f, -10f };
         readonly bool[] ready = new bool[2];
         readonly bool[] shown = new bool[2];
+        // 닉네임(2026-11-21): 긴 이름은 이 폭(캔버스 단위)에 맞춰 줄인다. 머리 위 글자가 화면을 가로지르지 않게 한다.
+        const float MaxLabelWidth = 340f;
+        readonly string[] names = { "P1", "P2" };
+        readonly float[] labelFit = { 1f, 1f };
+        /// <summary>표시 전체 배율(2026-11-21: 메인 화면의 근접 구도에서 글자가 화면을 덮지 않게 줄인다). 기본 1.</summary>
+        public float Scale { get; set; } = 1f;
+        /// <summary>머리와 표시 사이에 더 띄우는 거리(월드 단위, 메인 화면의 근접 구도에서 캐릭터와 겹치지 않게). 기본 0.</summary>
+        public float ExtraGap { get; set; }
 
         public LobbyHeadMarkers(Transform parent, ShapeLibrary shapes, PaletteAsset palette, FrontendTheme theme)
         {
@@ -96,7 +104,8 @@ namespace Knockbox.Game.UI
             float fill = isReady ? FrontendMotion.OutBack(t, 2.4f) : 1f - FrontendMotion.Out(t);
             float pop = 1f + (isReady ? .32f : .1f) * Mathf.Sin(t * Mathf.PI);
             float bob = Mathf.Sin(now * Mathf.PI * 2f / BobSeconds + fighter * 1.7f) * BobHeight;
-            root.position = new Vector3(headTop.x, headTop.y + HeadGap + bob, root.position.z);
+            root.position = new Vector3(headTop.x, headTop.y + (HeadGap + bob) * Scale + ExtraGap, root.position.z);
+            root.localScale = Vector3.one / CanvasUnitsPerWorld * Scale;
             groups[fighter].alpha = fade;
             pointers[fighter].localScale = Vector3.one * pop;
             var line = statuses[fighter];
@@ -105,8 +114,39 @@ namespace Knockbox.Game.UI
             line.rectTransform.localScale = Vector3.one * (1f + (isReady ? .18f : .06f) * Mathf.Sin(t * Mathf.PI));
             line.rectTransform.anchoredPosition = new Vector2(0, 112);
             labels[fighter].rectTransform.anchoredPosition = new Vector2(0, 46);
+            labels[fighter].rectTransform.localScale = Vector3.one * labelFit[fighter];
             fills[fighter].localScale = Vector3.one * Mathf.Max(0f, fill);
             holes[fighter].enabled = fill < .98f;
+        }
+
+        /// <summary>머리 위 이름(닉네임, 없으면 P1/P2). 비우면 이름 글자만 숨기고 삼각형은 남는다(메인 화면에서 이름을 고치는 동안).</summary>
+        public void SetName(int fighter, string name)
+        {
+            name ??= "";
+            if (names[fighter] == name) return;
+            names[fighter] = name;
+            var label = labels[fighter];
+            label.text = name;
+            float width = name.Length == 0 ? 0f : label.preferredWidth;
+            labelFit[fighter] = width > MaxLabelWidth ? MaxLabelWidth / width : 1f;
+        }
+
+        /// <summary>
+        /// 이름 글자의 월드 가운데와 크기(보이는 동안만). 메인 화면에서 이름 위에 누를 자리·입력칸을 겹치는 데 쓴다.
+        /// 크기의 높이는 글꼴 크기 기준이라 글자가 없어도 입력칸 높이를 정할 수 있다.
+        /// </summary>
+        public bool TryGetLabel(int fighter, out Vector3 center, out Vector2 size, out float fontWorldHeight)
+        {
+            var label = labels[fighter];
+            center = default; size = default; fontWorldHeight = 0f;
+            if (!roots[fighter].gameObject.activeInHierarchy) return false;
+            var rect = label.rectTransform;
+            center = rect.TransformPoint(Vector3.zero);
+            float scale = rect.parent.lossyScale.y; // 이름 맞춤 축소 전 글꼴 크기(입력칸은 원래 크기로 쓴다)
+            fontWorldHeight = label.fontSize * scale;
+            float width = names[fighter].Length == 0 ? 0f : label.preferredWidth * labelFit[fighter];
+            size = new Vector2(width * rect.parent.lossyScale.x, label.fontSize * 1.2f * scale);
+            return true;
         }
 
         public void Hide()

@@ -80,7 +80,10 @@ namespace Knockbox.Tests.PlayMode
             ButtonAt("Main_and_lobby/Menu/Join_room").onClick.Invoke();yield return null;
             Assert.AreEqual(FrontendScreen.Join,View.Screen);Assert.IsTrue(View.CodeInput.gameObject.activeInHierarchy);
             ButtonAt("Main_and_lobby/Room/Back").onClick.Invoke();yield return null;Assert.AreEqual(FrontendScreen.Main,View.Screen);
-            ButtonAt("Main_and_lobby/Menu/Practice").onClick.Invoke();Idle();yield return null;
+            // 2026-11-21: 코드 입력에서 연 메인 화면 공간이 닫히는 중에 누른 연습은 다 닫힌 뒤 시작된다.
+            ButtonAt("Main_and_lobby/Menu/Practice").onClick.Invoke();
+            for(float until=Time.realtimeSinceStartup+2f;View.Screen!=FrontendScreen.Hidden&&Time.realtimeSinceStartup<until;)yield return null;
+            Idle();yield return null;
             // 2026-11-17: 연습·재시작·온라인 경기는 VS 소개 없이 바로 경기 맵 재구성과 3·2·1·GO로 시작한다.
             Assert.AreEqual(FrontendScreen.Hidden,View.Screen);Assert.AreEqual(0,View.IntroRevealTick);
             for(int i=0;i<80;i++)runner.StepOnce();yield return null;
@@ -162,7 +165,7 @@ namespace Knockbox.Tests.PlayMode
             CollectionAssert.AreEqual(new[]{0,1,2},screenOrder.OrderBy(o=>o.x).Select(o=>o.option).ToArray(),"화면 왼쪽부터 선택지 순서");
             uint before=runner.World.ComputeChecksum();presenter.RenderFrame();Assert.AreEqual(before,runner.World.ComputeChecksum());
             var banner=stage.Banner;Assert.NotNull(banner);Assert.IsTrue(banner.Visible,"누가 고르는 중인지 표시");
-            Assert.AreEqual("P"+(picker+1)+" 선택 중",banner.Label.text);Assert.AreEqual(presenter.Palette.FighterBody(picker),banner.LabelColor);
+            Assert.AreEqual(presenter.PlayerName(picker)+" 선택 중",banner.Label.text,"닉네임(없으면 P1/P2)이 선택 중 표시에 쓰인다");Assert.AreEqual(presenter.Palette.FighterBody(picker),banner.LabelColor);
             Assert.IsFalse(banner.HasBackgroundPlate,"라벨은 배경 판 없이 글자와 화살표만");Assert.IsTrue(banner.TimerVisible,"남은 초는 라벨 옆 작은 글자");
             var inventory=View.Stage.Find(Knockbox.Presentation.SceneObjectName.Path("Acquired_cards")).gameObject;
             Assert.IsTrue(inventory.activeSelf,"선택 장면에서도 양쪽이 고른 카드 목록(하단)이 보인다");
@@ -291,7 +294,7 @@ namespace Knockbox.Tests.PlayMode
             ButtonAt("Main_and_lobby/Menu/Join_room").onClick.Invoke();yield return null;Assert.AreEqual(FrontendScreen.Join,View.Screen);
             ButtonAt("Main_and_lobby/Room/Back").onClick.Invoke();yield return null;
             Assert.AreEqual(FrontendScreen.Main,View.Screen);Assert.IsTrue(View.StartMenuOpen,"코드 입력에서 돌아오면 게임 시작 메뉴 유지");
-            ButtonAt("Main_and_lobby/Menu/Menu_back").onClick.Invoke();yield return null;
+            View.Stage.Find("Menu_esc_back").GetComponent<Button>().onClick.Invoke();yield return null;
             Assert.IsFalse(View.StartMenuOpen);Assert.IsTrue(start.gameObject.activeInHierarchy);
             LogAssert.NoUnexpectedReceived();
         }
@@ -309,6 +312,51 @@ namespace Knockbox.Tests.PlayMode
             Assert.IsFalse(ButtonAt("Main_and_lobby/Menu/Start_game").gameObject.activeInHierarchy,"옵션 동안 메뉴는 숨김");
             ButtonAt("Main_and_lobby/Options_panel/Option_6").onClick.Invoke();yield return null;
             Assert.AreEqual(FrontendScreen.Main,View.Screen);Assert.IsFalse(volume.gameObject.activeInHierarchy);
+            LogAssert.NoUnexpectedReceived();
+        }
+        /// <summary>
+        /// 메인 화면(2026-11-21): 게임 시작 → 왼쪽에 실제 로비 공간(혼자 로비 월드, 조작 잠김)이 열리고 선수가 떨어져 착지한다.
+        /// 머리 위 이름을 눌러 그 자리에서 고치고(확정·Esc 취소), 뒤로 가면 공간이 닫힌 뒤 숨은 연습 월드로 돌아온다.
+        /// 다시 게임 시작 → 연습은 공간이 닫힌 뒤 연습 경기를 시작한다. 저장된 닉네임은 검사 뒤 되돌린다.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator ActualMain_StartMenuOpensLobbySpace_NicknameEdits_BackAndPracticeLeave()
+        {
+            const string key="Knockbox.Profile.Nickname";
+            string saved=PlayerPrefs.GetString(key,"");
+            yield return Load();using var pointer=PlayModeSceneScope.SuspendPointerInput();
+            try
+            {
+                var presenter=runner.GetComponent<MatchPresenter>();
+                Assert.IsFalse(View.MenuSpaceActive,"첫 화면에는 공간이 없다");
+                ButtonAt("Main_and_lobby/Menu/Start_game").onClick.Invoke();yield return null;yield return null;
+                Assert.IsTrue(View.MenuSpaceActive);Assert.IsTrue(runner.World.InLobby);Assert.AreEqual(1,runner.AbsentSlot);
+                Assert.AreEqual(FrontendScreen.Main,View.Screen,"메뉴의 혼자 로비는 로비 화면이 아니다");Assert.IsTrue(runner.MenuInputBlocked);
+                var space=runner.World;
+                yield return new WaitForSecondsRealtime(2.4f);
+                Assert.AreSame(space,runner.World,"열려 있는 동안 공간을 다시 만들지 않는다");Assert.IsTrue(space.State.Fighter0.Grounded,"선수가 떨어져 착지");
+                var hit=View.Stage.Find("Main_nickname_hit");Assert.IsTrue(hit.gameObject.activeInHierarchy,"이름을 누를 자리");
+                var field=View.Stage.Find("Main_nickname_input").GetComponent<InputField>();
+                hit.GetComponent<Button>().onClick.Invoke();yield return null;yield return null;
+                Assert.IsTrue(field.isFocused);Assert.IsTrue(View.NameInputBusy);
+                field.text="검사이름";field.DeactivateInputField();yield return null;
+                Assert.AreEqual("검사이름",PlayerPrefs.GetString(key,""));Assert.AreEqual("검사이름",presenter.PlayerName(0));
+                Assert.AreEqual("검사이름",View.Points.Label(0).text,"경기 점수판도 같은 이름");
+                hit.GetComponent<Button>().onClick.Invoke();yield return null;yield return null;
+                field.text="취소될이름";field.ProcessEvent(Event.KeyboardEvent("escape"));field.DeactivateInputField();yield return null;
+                Assert.AreEqual("검사이름",presenter.PlayerName(0),"Esc는 고치기만 취소");Assert.IsTrue(View.StartMenuOpen,"Esc가 메뉴 뒤로로 번지지 않는다");
+                View.Stage.Find("Menu_esc_back").GetComponent<Button>().onClick.Invoke();yield return null;
+                Assert.IsFalse(View.StartMenuOpen);Assert.AreEqual(FrontendView.SpaceExit.Back,View.CurrentSpaceExit);
+                yield return new WaitForSecondsRealtime(.9f);
+                Assert.IsFalse(View.MenuSpaceActive);Assert.AreEqual(MatchPhase.Countdown,runner.World.State.Match.Phase);Assert.IsFalse(runner.Running);
+                ButtonAt("Main_and_lobby/Menu/Start_game").onClick.Invoke();yield return new WaitForSecondsRealtime(1.2f);
+                ButtonAt("Main_and_lobby/Menu/Practice").onClick.Invoke();yield return null;
+                Assert.AreEqual(FrontendView.SpaceExit.Practice,View.CurrentSpaceExit);Assert.AreEqual(FrontendScreen.Main,View.Screen);
+                yield return new WaitForSecondsRealtime(1.5f);
+                Assert.AreEqual(FrontendScreen.Hidden,View.Screen,"공간이 닫힌 뒤 연습 경기");Assert.IsFalse(View.MenuSpaceActive);
+                Assert.AreEqual(MatchPhase.Countdown,runner.World.State.Match.Phase);Assert.IsTrue(runner.Running);
+            }
+            finally{PlayerPrefs.SetString(key,saved);PlayerPrefs.Save();}
             LogAssert.NoUnexpectedReceived();
         }
         /// <summary>방장 혼자 로비(2026-11-16 CP3): 로비 맵에서 P1만 떨어져 움직이고, P2 자리는 그리지 않는다.</summary>

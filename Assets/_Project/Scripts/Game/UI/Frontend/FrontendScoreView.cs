@@ -38,6 +38,52 @@ namespace Knockbox.Game.UI
             return slot >= 0 && slot < 2 ? labels[slot] : null;
         }
 
+        // 닉네임(2026-11-21): 글자 칸보다 긴 이름은 점수 점 반대쪽(P1은 왼쪽, P2는 오른쪽)으로 늘어나고, 이 폭을 넘으면 줄인다.
+        public const float MaxNameWidth = 240f;
+        // 프리팹에서 되살린 값(직렬화)은 필드 초기값이 돌지 않으므로 처음 쓸 때 만든다.
+        string[] shownNames;
+        int[] nameBaseSize;
+
+        /// <summary>점수판 이름 글자를 닉네임으로 바꾼다(없으면 P1/P2). "P1"/"P2"처럼 칸 안에 들어가면 예전처럼 가운데 정렬이다.</summary>
+        public void SetNames(string p1, string p2)
+        {
+            shownNames ??= new[] { "P1", "P2" };
+            nameBaseSize ??= new int[2];
+            for (int p = 0; p < 2; p++)
+            {
+                var label = Label(p);
+                string name = p == 0 ? p1 : p2;
+                if (label == null || string.IsNullOrEmpty(name) || shownNames[p] == name) continue;
+                shownNames[p] = name;
+                if (nameBaseSize[p] == 0) nameBaseSize[p] = label.fontSize;
+                label.text = name;
+                label.horizontalOverflow = HorizontalWrapMode.Overflow;
+                label.fontSize = FitFontSize(label, nameBaseSize[p], MaxNameWidth);
+                bool wide = label.preferredWidth > label.rectTransform.rect.width;
+                label.alignment = !wide ? TextAnchor.MiddleCenter : p == 0 ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft;
+            }
+        }
+
+        /// <summary>글자를 maxWidth 안에 들도록 글꼴 크기를 줄인다(기본 크기보다 키우지 않는다, 최소 14).</summary>
+        public static int FitFontSize(Text text, int baseSize, float maxWidth)
+        {
+            text.fontSize = baseSize;
+            float width = text.preferredWidth;
+            return width <= maxWidth ? baseSize : Mathf.Max(14, Mathf.FloorToInt(baseSize * maxWidth / width));
+        }
+
+        /// <summary>점수판 이름 글자가 실제로 그려지는 가운데(글자 칸 기준 로컬 좌표). 로비 이름이 이 자리로 날아와 멈춘다.</summary>
+        public Vector2 NameCenterLocal(int slot)
+        {
+            var label = Label(slot);
+            if (label == null) return Vector2.zero;
+            var rect = label.rectTransform.rect;
+            float width = label.preferredWidth;
+            if (label.alignment == TextAnchor.MiddleRight) return new Vector2(rect.xMax - width * .5f, rect.center.y);
+            if (label.alignment == TextAnchor.MiddleLeft) return new Vector2(rect.xMin + width * .5f, rect.center.y);
+            return rect.center;
+        }
+
         /// <summary>
         /// 로비 → 첫 경기 전환(2026-11-19): 빈 세트 점이 안쪽(가운데)부터 차례로 톡 드러나고, 라운드 점이 한 박자 뒤에 따라온다.
         /// 이 동안 "P1"/"P2" 글자는 로비 표시의 이름이 맡으므로 숨긴다(이름이 이 자리에 와서 멈춘다). reveal은 0~1.

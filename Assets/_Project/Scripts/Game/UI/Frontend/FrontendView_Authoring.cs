@@ -37,6 +37,7 @@ namespace Knockbox.Game.UI
                 cardHover[i].Leave=()=>{if(VisualCard<0 && HoveredCard==index)HoveredCard=-1;};
             }
             BuildLobbyHud();
+            BuildMenuSpaceUi();
             Show(FrontendScreen.Main); SetLocalSlot(0);
         }
         static void Bind(Button button, UnityEngine.Events.UnityAction action)
@@ -53,7 +54,7 @@ namespace Knockbox.Game.UI
             foreach(var r in new[]{(RectTransform)menuAlpha.transform,lobby,handRoot,pickTitle.rectTransform,pickHint.rectTransform,
                 resultTitle.rectTransform,resultScore.rectTransform,resultHint.rectTransform,(RectTransform)resultReady.transform,(RectTransform)resultBack.transform})Add(r,pos);
             foreach(var r in menuEntries)Add(r,pos);foreach(var r in roomEntries)Add(r,pos);
-            foreach(var r in portraits)Add(r,pos);foreach(var actor in mainActors)Add((RectTransform)actor.transform,pos);
+            foreach(var r in portraits)Add(r,pos);
             foreach(var plate in nameplates)Add((RectTransform)plate.transform,pos|color);
             foreach(var text in nameTexts)Add(text.rectTransform,color);
             foreach(var card in cards)Add((RectTransform)card.transform,pos|scale|FrontendLayout.Channels.Rotation|color);

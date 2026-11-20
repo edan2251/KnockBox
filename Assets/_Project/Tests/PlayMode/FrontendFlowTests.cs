@@ -124,15 +124,18 @@ namespace Knockbox.Tests.PlayMode
             }
         }
 
+        /// <summary>
+        /// 2026-11-21 메인 화면: 메뉴의 UI 초상 캐릭터·바닥 선은 쓰지 않는다(게임 시작 메뉴의 캐릭터는 실제 로비 공간의 선수).
+        /// 메인·코드 입력·대기 화면을 오가는 동안 UI 캐릭터는 숨은 채로 있고 메뉴 애니메이션은 유지된다.
+        /// </summary>
         [UnityTest]
-        public IEnumerator MainCharacterStaysFixedAcrossMainJoinAndWaiting_WhileMenusAnimate()
+        public IEnumerator MainMenuUiCharacterStaysHidden_WhileMenusAnimate()
         {
             controller.enabled=false; // 방 만들기 네트워크 요청 없이 동일한 화면 전환 경로를 검사한다.
             foreach(int slot in new[]{0,1})
             {
                 View.SetLocalSlot(slot);View.Show(FrontendScreen.Main);yield return null;
-                var actor=View.Stage.Find(Knockbox.Presentation.SceneObjectName.Path("Main_and_lobby/Actual P"+(slot+1))).GetComponent<RectTransform>();
-                var position=actor.anchoredPosition;var rotation=actor.localRotation;var scale=actor.localScale;
+                var menuRoot=View.Stage.Find(Knockbox.Presentation.SceneObjectName.Path("Main_and_lobby"));
                 foreach(var screen in new[]{FrontendScreen.Join,FrontendScreen.Waiting,FrontendScreen.Main})
                 {
                     View.Show(screen);yield return null;
@@ -141,9 +144,8 @@ namespace Knockbox.Tests.PlayMode
                     for(int frame=0;frame<18;frame++)
                     {
                         yield return null;
-                        Assert.AreEqual(position,actor.anchoredPosition,"배경 캐릭터는 전환 중 고정");
-                        Assert.AreEqual(rotation,actor.localRotation);Assert.AreEqual(scale,actor.localScale);
-                        Assert.IsTrue(actor.gameObject.activeInHierarchy);
+                        Assert.IsNull(menuRoot.Find("Actual_P1"),"메뉴의 UI 캐릭터는 없다(2026-11-21 정리)");
+                        Assert.IsNull(menuRoot.Find("Floor"),"메뉴의 바닥 선은 없다(2026-11-21 정리)");
                     }
                     if(screen==FrontendScreen.Join || screen==FrontendScreen.Main)
                         Assert.Greater(Vector2.Distance(menuBefore,menu.anchoredPosition),.01f,"메뉴 애니메이션은 유지");
@@ -273,16 +275,18 @@ namespace Knockbox.Tests.PlayMode
             Assert.AreEqual(FrontendScreen.Main,View.Screen);Assert.IsFalse(runner.Running);
             Assert.IsNotNull(View.Theme.titleFont);Assert.IsNotNull(View.Theme.textFont);Assert.IsNotNull(View.Theme.boldFont);
             var actors=View.Stage.Find(Knockbox.Presentation.SceneObjectName.Path("Main_and_lobby"));
-            Assert.IsTrue(actors.Find(Knockbox.Presentation.SceneObjectName.Path("Actual_P1")).gameObject.activeSelf);Assert.IsFalse(actors.Find(Knockbox.Presentation.SceneObjectName.Path("Actual_P2")).gameObject.activeSelf);
-            View.SetLocalSlot(1);
-            Assert.IsFalse(actors.Find(Knockbox.Presentation.SceneObjectName.Path("Actual_P1")).gameObject.activeSelf);Assert.IsTrue(actors.Find(Knockbox.Presentation.SceneObjectName.Path("Actual_P2")).gameObject.activeSelf);
+            // 2026-11-21: 첫 화면에는 캐릭터·바닥이 없다(게임 시작 메뉴의 캐릭터는 실제 로비 공간의 선수, 메뉴 UI 캐릭터·바닥 선은 정리함).
+            Assert.IsNull(actors.Find("Actual_P1"));Assert.IsNull(actors.Find("Floor"));
             ButtonAt("Main_and_lobby/Menu/Join_room").onClick.Invoke();yield return null;
             Assert.AreEqual(FrontendScreen.Join,View.Screen);
             ButtonAt("Main_and_lobby/Room/Join").onClick.Invoke();yield return null;
             StringAssert.Contains("방 코드",View.Status.text);Assert.IsFalse(root.GetComponent<OnlineLobby>().Busy);
             ButtonAt("Main_and_lobby/Room/Back").onClick.Invoke();yield return null;
             Assert.AreEqual(FrontendScreen.Main,View.Screen);
-            ButtonAt("Main_and_lobby/Menu/Practice").onClick.Invoke();runner.Running=false;yield return null;
+            // 2026-11-21: 코드 입력에서 연 메인 화면 공간(로비 맵이 있는 설정)이 닫히는 중이면 다 닫힌 뒤 연습이 시작된다.
+            ButtonAt("Main_and_lobby/Menu/Practice").onClick.Invoke();
+            for(float until=Time.realtimeSinceStartup+2f;View.Screen!=FrontendScreen.Hidden&&Time.realtimeSinceStartup<until;)yield return null;
+            runner.Running=false;yield return null;
             Assert.AreEqual(FrontendScreen.Hidden,View.Screen,"2026-11-17: 연습은 VS 소개 없이 바로 시작");
             var title=View.Stage.Find(Knockbox.Presentation.SceneObjectName.Path("Main_and_lobby/Menu/Logo")).GetComponent<Text>();
             Assert.AreEqual(VerticalWrapMode.Overflow,title.verticalOverflow,"제목 폰트 행 높이에 의한 누락 방지");

@@ -56,7 +56,6 @@ namespace Knockbox.Game.UI
         [SerializeField] RectTransform[] menuEntries, roomEntries;
         [SerializeField] Vector2[] menuEntryPositions, roomEntryPositions;
         [SerializeField] CanvasGroup[] menuEntryAlpha, roomEntryAlpha;
-        [SerializeField] Vector2[] mainPositions = new Vector2[2];
         int resultWinner;
         bool resultReady0, resultReady1;
         float resultAge;
@@ -74,7 +73,6 @@ namespace Knockbox.Game.UI
         {
             lobbyAlpha = lobby.gameObject.AddComponent<CanvasGroup>();
             lobbyAlpha.alpha = 0; menuAlpha.alpha = 0;
-            for (int p = 0; p < 2; p++) mainPositions[p] = ((RectTransform)mainActors[p].transform).anchoredPosition;
             winAlpha = resultTitle.gameObject.AddComponent<CanvasGroup>();
             scoreAlpha = resultScore.gameObject.AddComponent<CanvasGroup>();
             questionAlpha = resultHint.gameObject.AddComponent<CanvasGroup>();
@@ -151,20 +149,22 @@ namespace Knockbox.Game.UI
         {
             float age = Time.unscaledTime - enteredAt;
             veil.color = PaletteAsset.Transparent;
+            ApplyMenuBackdrop(false);
             if (Screen == FrontendScreen.Main || Screen == FrontendScreen.Join || Screen == FrontendScreen.Waiting || Screen == FrontendScreen.Options)
             {
                 bool main = Screen == FrontendScreen.Main, room = Screen == FrontendScreen.Join || Screen == FrontendScreen.Waiting;
                 float speed = 1 - Mathf.Exp(-16 * Time.unscaledDeltaTime);
-                menuAlpha.alpha = Mathf.Lerp(menuAlpha.alpha, main ? 1 : 0, speed);
-                lobbyAlpha.alpha = Mathf.Lerp(lobbyAlpha.alpha, room ? 1 : 0, speed);
-                menuAlpha.interactable = menuAlpha.blocksRaycasts = main;
-                lobbyAlpha.interactable = lobbyAlpha.blocksRaycasts = room;
-                ((RectTransform)menuAlpha.transform).anchoredPosition = new Vector2(845 - 100 * (1 - menuAlpha.alpha), -205);
+                // 연습으로 나가는 동안(2026-11-21)은 메뉴도 함께 사라져 연습 경기의 재구성으로 이어진다.
+                menuAlpha.alpha = Mathf.Lerp(menuAlpha.alpha, main && spaceExit != SpaceExit.Practice ? 1 : 0, speed);
+                lobbyAlpha.alpha = Mathf.Lerp(lobbyAlpha.alpha, room && !HideRoomPanel ? 1 : 0, speed);
+                // 연습으로 나가는 동안은 메뉴를 누를 수 없다(공간이 닫힌 뒤 연습이 시작된다).
+                menuAlpha.interactable = menuAlpha.blocksRaycasts = main && spaceExit != SpaceExit.Practice;
+                lobbyAlpha.interactable = lobbyAlpha.blocksRaycasts = room && !HideRoomPanel;
+                AnimateMenuColumn(main, age);
                 lobby.anchoredPosition = new Vector2(900 + 100 * (1 - lobbyAlpha.alpha), -230);
-                AnimateEntries(main ? menuEntries : roomEntries, main ? menuEntryPositions : roomEntryPositions,
-                    main ? menuEntryAlpha : roomEntryAlpha, age);
-                // 메인/방 만들기/코드 참가 전환은 메뉴만 움직인다. 배경 캐릭터는 같은 자리에서 유지한다.
-                for (int p = 0; p < 2; p++) ((RectTransform)mainActors[p].transform).anchoredPosition = mainPositions[p];
+                if (!main) AnimateEntries(roomEntries, roomEntryPositions, roomEntryAlpha, age);
+                // 메인 화면 공간(2026-11-21)이 열려 있으면 단색 배경을 장면이 보이는 만큼 걷어 월드(로비 공간)가 보이게 한다.
+                ApplyMenuBackdrop(true);
                 return;
             }
             if (Screen == FrontendScreen.Hidden) return;
@@ -413,6 +413,8 @@ namespace Knockbox.Game.UI
         {
             if (motionRunner == null || points == null) return;
             var w = motionRunner.World;var m = w.State.Match;
+            // 메인 화면 공간의 근접 구도(2026-11-21)는 그 공간에서만 쓴다.
+            if (!(MenuSpaceActive && w.InLobby && MenuScreen)) ResetCloseFraming(w.InLobby);
             // 결과 글자는 결과 공간(발표가 켜진 설정)에서만 보이고, 새 경기·로비로 나가면 사라진다.
             if (!ResultsCeremony(w)) HideResultSign();
             if (w.Config.Match.IntroCountdownTicks <= 0)

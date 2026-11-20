@@ -37,6 +37,8 @@ namespace Knockbox.Game.Online
         internal bool PredictionPeerReady { get; private set; }
         /// <summary>받은 카드 호버를 넘길 곳(OnlineMatch가 경기마다 연결). 없으면 버린다.</summary>
         internal CardHoverRelay CardHover { get; set; }
+        /// <summary>상대가 보낸 닉네임(표시 전용, 2026-11-21)을 넘길 곳. 없으면 버린다.</summary>
+        internal Action<string> PlayerNameReceived { get; set; }
 
         internal bool CanSend => !stopping && transport != null && !transport.Ended && hasPeer && network != null && network.IsRunning;
 
@@ -300,6 +302,13 @@ namespace Knockbox.Game.Online
         { if (CanSend) Rpc_PredictionBatch(network, peer, batch); }
         internal void SendCardHover(ushort round, ushort sequence, sbyte option)
         { if (CanSend) Rpc_CardHover(network, peer, round, sequence, option); }
+        /// <summary>내 닉네임(UTF-8, 정리된 값). 보낼 수 없으면 false.</summary>
+        internal bool SendPlayerName(string name)
+        {
+            if (!CanSend) return false;
+            Rpc_PlayerName(network, peer, System.Text.Encoding.UTF8.GetBytes(name ?? ""));
+            return true;
+        }
 
         [Rpc(Channel = RpcChannel.Reliable, TickAligned = false, InvokeLocal = false, HostMode = RpcHostMode.SourceIsHostPlayer)]
         public static void Rpc_PredictionReady(NetworkRunner runner, [RpcTarget] PlayerRef target, RpcInfo info = default)
@@ -336,6 +345,19 @@ namespace Knockbox.Game.Online
             var connection = runner.GetComponent<FusionConnection>();
             if (connection == null || connection.stopping || !connection.hasPeer || info.Source != connection.peer) return;
             connection.CardHover?.Receive(round, sequence, option, Time.realtimeSinceStartupAsDouble);
+        }
+
+        // 닉네임(표시 전용, 2026-11-21). 머리 위·점수판 글자에만 쓰며 시뮬레이션 입력·확정 기록·체크섬·리플레이에는 들어가지 않는다.
+        // 연결 직후 서로 한 번씩 보내고, 처음 받은 쪽이 한 번 더 보내 상대 준비 전에 보낸 값이 버려져도 맞춰진다.
+        [Rpc(Channel = RpcChannel.Reliable, TickAligned = false, InvokeLocal = false, HostMode = RpcHostMode.SourceIsHostPlayer)]
+        public static void Rpc_PlayerName(NetworkRunner runner, [RpcTarget] PlayerRef target, byte[] name, RpcInfo info = default)
+        {
+            var connection = runner.GetComponent<FusionConnection>();
+            if (connection == null || connection.stopping || !connection.hasPeer || info.Source != connection.peer) return;
+            if (name == null || name.Length > 64) return;
+            string text;
+            try { text = System.Text.Encoding.UTF8.GetString(name); } catch (ArgumentException) { return; }
+            connection.PlayerNameReceived?.Invoke(text);
         }
 
         internal void RequestShutdown() => _ = ShutdownAsync();

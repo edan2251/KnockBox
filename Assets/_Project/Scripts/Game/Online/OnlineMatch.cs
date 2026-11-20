@@ -63,6 +63,12 @@ namespace Knockbox.Game.Online
         /// </summary>
         public event Action ReturnedToSoloLobby;
 
+        /// <summary>내 닉네임(정리된 값, 비어 있으면 상대 화면에 자리 이름). 화면(FrontendController)이 정한다.</summary>
+        public string LocalName { get; set; } = "";
+        /// <summary>상대가 보낸 닉네임(표시 전용, 2026-11-21). 아직 못 받았거나 비어 있으면 빈 문자열.</summary>
+        public string PeerName { get; private set; } = "";
+        bool nameSent, nameReceived;
+
         /// <summary>
         /// 씬이 뜬 뒤: 일반 Brawl 실행/에디터 Play에는 공통 UI를 붙인다.
         /// 배치 모드·재생 검사·자동 봇 실행에는 로비를 붙이지 않는다.
@@ -134,6 +140,7 @@ namespace Knockbox.Game.Online
                 var wire = fusionTransport;
                 cardHover = new CardHoverRelay((round, sequence, option) => wire.Connection?.SendCardHover(round, sequence, option));
                 if (wire.Connection != null) wire.Connection.CardHover = cardHover;
+                if (wire.Connection != null) wire.Connection.PlayerNameReceived = ReceivePeerName;
             }
             if (usePrediction) delay = FusionPredictionPolicy.DelayTicks;
             connectionTiming = FusionTransport.ConnectionTiming.Unavailable;
@@ -166,6 +173,22 @@ namespace Knockbox.Game.Online
             Debug.Log($"[Knockbox][online] {(host ? "방장" : "손님")} 시작({connection.GetType().Name}): 설정 {configChecksum:X8}, 맵 {arenaChecksum:X8}, 봇 {bot}");
         }
 
+        /// <summary>닉네임 교환(표시 전용): 상대가 보이면 한 번 보낸다.</summary>
+        void SendNameOnce()
+        {
+            if (nameSent || fusionTransport == null || fusionTransport.Connection == null) return;
+            nameSent = fusionTransport.Connection.SendPlayerName(LocalName);
+        }
+
+        /// <summary>처음 받으면 내 이름을 한 번 더 보낸다(상대가 나를 알기 전에 보낸 첫 값이 버려졌어도 맞춰진다).</summary>
+        void ReceivePeerName(string name)
+        {
+            PeerName = Knockbox.Game.GameSettings.CleanNickname(name);
+            if (nameReceived) return;
+            nameReceived = true;
+            if (nameSent) fusionTransport?.Connection?.SendPlayerName(LocalName);
+        }
+
         /// <summary>세션을 닫고 혼자 연습(로컬 경기)으로 돌아간다.</summary>
         public void LeaveToPractice()
         {
@@ -195,6 +218,8 @@ namespace Knockbox.Game.Online
             session.Dispose();
             session = null;
             if (fusionTransport != null && fusionTransport.Connection != null) fusionTransport.Connection.CardHover = null;
+            if (fusionTransport != null && fusionTransport.Connection != null) fusionTransport.Connection.PlayerNameReceived = null;
+            PeerName = ""; nameSent = nameReceived = false;
             fusionTransport = null;
             cardHover = null;
             connectionTiming = FusionTransport.ConnectionTiming.Unavailable;
@@ -206,6 +231,7 @@ namespace Knockbox.Game.Online
                 return;
             double now = Time.realtimeSinceStartupAsDouble;
             session.Poll(now);
+            SendNameOnce();
             if (!started && session.State == SessionState.Running)
                 BeginMatch();
             prediction?.Pump();
@@ -359,7 +385,8 @@ namespace Knockbox.Game.Online
         void SaveRecords(string detail)
         {
             var recording = prediction != null ? prediction.Finish() : runner.StopRecording();
-            if (recording == null)
+            // 배포용 빌드(2026-11-21)는 진단 기록을 남기지 않는다. 설치 폴더(예: Program Files)에 쓰지 못해 문제가 되지 않게 한다.
+            if (recording == null || (!Application.isEditor && !Debug.isDebugBuild))
                 return;
             string name = $"online_P{session.LocalSlot + 1}_{DateTime.Now:yyyyMMdd_HHmmss}";
             string path = ReplayFiles.Save(recording, name);

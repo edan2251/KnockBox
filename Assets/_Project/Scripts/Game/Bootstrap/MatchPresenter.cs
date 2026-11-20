@@ -557,6 +557,30 @@ namespace Knockbox.Game
         string lobbyReadyLabel = "[R] 준비";
         readonly Vector2[] markerHeads = new Vector2[2];
         readonly bool[] markerShown = new bool[2];
+        // 머리 위 이름(2026-11-21 닉네임): 화면(FrontendController)이 내 닉네임·상대가 보낸 닉네임으로 매 프레임 정한다. 비어 있으면 P1/P2.
+        readonly string[] playerNames = { "P1", "P2" };
+
+        /// <summary>화면에 쓰는 선수 이름(닉네임, 없으면 P1/P2). 로비·경기 점수판·카드 선택·결과 머리 위가 같은 이름을 쓴다.</summary>
+        public string PlayerName(int slot) => playerNames[slot == 1 ? 1 : 0];
+
+        public void SetPlayerNames(string p1, string p2)
+        {
+            playerNames[0] = string.IsNullOrEmpty(p1) ? "P1" : p1;
+            playerNames[1] = string.IsNullOrEmpty(p2) ? "P2" : p2;
+        }
+
+        /// <summary>메인 화면에서 이름을 고치는 동안 그 선수의 머리 위 이름 글자만 숨긴다(-1이면 모두 보임). 삼각형은 남는다.</summary>
+        public int HiddenLobbyName { get; set; } = -1;
+
+        /// <summary>머리 위 표시 전체의 투명도(메인 화면 공간이 닫힐 때 빠르게 사라진다). 기본 1.</summary>
+        public float LobbyMarkerFade { get; set; } = 1f;
+
+        /// <summary>머리 위 이름 글자의 월드 가운데·크기(보이는 동안만). 메인 화면의 이름 고치기 자리에 쓴다.</summary>
+        public bool TryGetLobbyName(int slot, out Vector3 center, out Vector2 size, out float fontWorldHeight)
+        {
+            center = default; size = default; fontWorldHeight = 0f;
+            return lobbyMarkers != null && lobbyMarkersVisible && lobbyMarkers.TryGetLabel(slot, out center, out size, out fontWorldHeight);
+        }
 
         /// <summary>
         /// 로비의 머리 위 "준비 상태 + P1/P2 + 삼각형" 표시(2026-11-19). 화면(FrontendController)이 내 준비 의도와 상대의 확정 입력으로 매 프레임 정한다.
@@ -583,6 +607,7 @@ namespace Knockbox.Game
             }
             // 둘 다 준비해 퇴장 전환이 시작되면 몸을 누르는 동안 빠르게 사라진다.
             float fade = world.InLobbyExit ? 1f - UI.FrontendMotion.Out(UI.FrontendMotion.Range(s.Match.PhaseTick + runner.RenderAlpha, 0f, 7f)) : 1f;
+            fade *= Mathf.Clamp01(LobbyMarkerFade);
             float half = world.Config.Movement.BodySize * 0.5f;
             for (int k = 0; k < 2; k++)
             {
@@ -603,6 +628,11 @@ namespace Knockbox.Game
                     else if (k == lobbyLocalSlot) { status = lobbyReadyLabel; statusColor = PaletteAsset.WithAlpha(PaletteAsset.Neutral, lobbyCanReady ? .72f + .28f * (.5f + .5f * Mathf.Sin(Time.unscaledTime * Mathf.PI * 2f / 1.4f)) : .45f); }
                     else if (lobbyShowOther) { status = "준비 전"; statusColor = PaletteAsset.WithAlpha(PaletteAsset.Neutral, .55f); }
                 }
+                lobbyMarkers.SetName(k, k == HiddenLobbyName ? "" : playerNames[k]);
+                // 메인 화면의 근접 구도에서는 화면에 보이는 크기가 평소의 약 3배가 되게 줄이고, 머리에서 더 띄운다(2026-11-21).
+                float close = cameraRig != null ? cameraRig.CloseWeight : 0f;
+                lobbyMarkers.Scale = cameraRig != null ? cameraRig.FramingScale * Mathf.Lerp(1f, 3f, close) : 1f;
+                lobbyMarkers.ExtraGap = Mathf.Lerp(0f, .2f, close);
                 lobbyMarkers.Render(markerShown[k], k, markerHeads[k], ready, fade, Time.unscaledTime, status, statusColor);
             }
         }
@@ -696,6 +726,10 @@ namespace Knockbox.Game
             var center0 = fighter0.BodyCenter; var center1 = fighter1.BodyCenter;
             fighter0.transform.localScale = Vector3.one * Mathf.Max(.0001f, scale0);
             fighter1.transform.localScale = Vector3.one * Mathf.Max(.0001f, scale1);
+            // 아직 등장하지 않아 그림이 숨은 선수(로비·결과 공간의 낙하 대기 등)는 그림자도 드리우지 않는다(2026-11-21: 이어 간 로비 장면에서
+            // 화면 위에서 기다리는 손님 선수의 그림자가 긴 띠로 보였다).
+            if (scale0 < .01f || scale1 < .01f)
+                fighterShadows.Render(fighter0.transform.localPosition, fighter1.transform.localPosition, runner.World.Config.Movement.BodySize / .9f * .5f, scale0 >= .01f, scale1 >= .01f);
             if (runner.World.State.Match.Phase == MatchPhase.KO)
             {
                 fighter0.transform.position += (Vector3)(center0 - fighter0.BodyCenter);
@@ -707,7 +741,8 @@ namespace Knockbox.Game
             hud.FrontendFlow = runner.World.Config.Match.IntroCountdownTicks > 0;
             hud.gameObject.SetActive(healthBars ?? combat);
             fighterShadows.gameObject.SetActive(combat || (entering && shadowsReady));
-            aimLine.gameObject.SetActive(combat);
+            // 떨어지며 등장하는 중(낙하 대기 포함)인 내 선수의 조준선은 그리지 않는다(2026-11-21: 등장 전 자리에 점선이 먼저 보였다).
+            aimLine.gameObject.SetActive(combat && !runner.World.State.GetFighter(runner.LocalPlayerSlot).Arriving);
             boundaryView.gameObject.SetActive(combat);
             brawlWeaponView.gameObject.SetActive(combat);
             fx.gameObject.SetActive(opacity > .05f);
@@ -861,10 +896,24 @@ namespace Knockbox.Game
         /// <summary>화면에서만 두 선수의 바닥 그림자를 숨긴다(로비 퇴장에서 선수가 튀어 올라 떠난 뒤 그림자가 바닥에 남지 않게).</summary>
         public void HideFighterShadows() => fighterShadows.gameObject.SetActive(false);
 
+        /// <summary>화면에서 옮긴 선수 그림(낙하를 화면 위에서 시작하게 올린 것 등)에 맞춰 그림자를 다시 그린다. 숨은 선수는 드리우지 않는다.</summary>
+        public void RefreshFighterShadows()
+        {
+            float half = runner.World.Config.Movement.BodySize / .9f * .5f;
+            fighterShadows.Render(fighter0.transform.localPosition, fighter1.transform.localPosition, half,
+                fighter0.transform.localScale.y >= .01f, fighter1.transform.localScale.y >= .01f);
+        }
+
         /// <summary>화면에서만 선수를 위아래로 옮긴다(시상대와 함께 솟음·자동 점프). 판정 위치는 그대로다.</summary>
         public void OffsetFighterVisual(int fighter, float dy)
         {
             if (dy != 0f) Fighter(fighter).transform.localPosition += Vector3.up * dy;
+        }
+
+        /// <summary>화면에서만 선수를 옮긴다(메인 화면에서 뒤로 갈 때 왼쪽으로 뛰어 나감, 2026-11-21). 판정 위치는 그대로다.</summary>
+        public void OffsetFighterVisual(int fighter, Vector2 delta)
+        {
+            if (delta != Vector2.zero) Fighter(fighter).transform.localPosition += (Vector3)delta;
         }
 
         void Consume(in SimEvent e)

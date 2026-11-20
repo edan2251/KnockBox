@@ -475,6 +475,12 @@ namespace Knockbox.Game
         /// <summary>화면 전용: 혼자 로비에서 이어 간 선수(이어 가지 못했으면 -1). 그 선수만 등장 연출 없이 바로 보인다.</summary>
         public int ContinuedLobbySlot { get; private set; } = -1;
 
+        /// <summary>
+        /// 화면 전용(2026-11-21): 다음 Begin이 로비 단계면 로비 장면을 이어 간 것으로 표시한다(한 번만, 다른 단계면 그냥 지운다).
+        /// 메인 화면의 로비 공간에서 코드로 참가한 손님 화면이 공유 로비를 처음부터 다시 쌓지 않게 한다. 판정·기록과 무관하다.
+        /// </summary>
+        public bool KeepLobbySceneOnNextBegin { get; set; }
+
         public void MarkLobbyContinued(int continuedSlot)
         {
             LobbySceneContinued = true;
@@ -676,7 +682,10 @@ namespace Knockbox.Game
         {
             EndPrediction();
             AbsentSlot = -1;
-            LobbySceneContinued = false; ContinuedLobbySlot = -1;
+            // 화면 전용(2026-11-21): 메인 화면의 로비 공간에서 코드로 참가하면 같은 로비 맵 장면을 다시 쌓지 않고 이어 간다(방장 P1은 바로 보임).
+            bool keepScene = KeepLobbySceneOnNextBegin && initial.Match.Phase == MatchPhase.Lobby;
+            KeepLobbySceneOnNextBegin = false;
+            LobbySceneContinued = keepScene; ContinuedLobbySlot = keepScene ? 0 : -1;
             ClearDisplayCorrection();
             World = new SimWorld(config, arenas, initial);
             PreviousState = initial;

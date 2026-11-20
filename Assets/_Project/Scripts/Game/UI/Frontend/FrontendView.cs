@@ -37,7 +37,6 @@ namespace Knockbox.Game.UI
         [SerializeField] GameObject[] cardActors = new GameObject[2];
         [SerializeField] RectTransform[] portraits = new RectTransform[2];
         [SerializeField] CanvasGroup[] portraitAlpha = new CanvasGroup[2];
-        [SerializeField] GameObject[] mainActors = new GameObject[2];
         [SerializeField] Text[] nameTexts = new Text[2];
         [SerializeField] GameObject[] nameplates = new GameObject[2];
         [SerializeField] Button[] cards = new Button[3];
@@ -97,20 +96,13 @@ namespace Knockbox.Game.UI
 
             menu=Rect(stage,"Main_and_lobby",0,0,1920,1080);
             Image(menu,"Background",new Rect(0,0,1920,1080),Theme.background);
-            Image(menu,"Floor",new Rect(0,960,1920,2),Theme.floor);
-            for(int slot=0;slot<2;slot++)
-            {
-                var actor=source.Create(menu,slot,new Rect(58,225,730,820),false);
-                if(slot==1) actor.localScale=new Vector3(-1,1,1);
-                mainActors[slot]=actor.gameObject;
-            }
             var mainContent=Rect(menu,"Menu",845,205,960,700);
             logo=Text(mainContent,"Logo",new Rect(0,0,960,150),Theme.logo,Theme.titleFont,128,Theme.white);
             create=Button(mainContent,"Create_room",new Rect(120,240,720,94),Theme.createRoom,Theme,PaletteAsset.Transparent,Theme.white,()=>CreateRoom?.Invoke(),40);
             joinMenu=Button(mainContent,"Join_room",new Rect(120,354,720,94),Theme.joinRoom,Theme,PaletteAsset.Transparent,Theme.white,()=>OpenJoin?.Invoke(),40);
             practice=Button(mainContent,"Practice",new Rect(120,468,720,94),Theme.practice,Theme,PaletteAsset.Transparent,Theme.white,()=>Practice?.Invoke(),40);
             BuildMenuPages(mainContent);
-            menuButtons=new[]{create,joinMenu,practice,startGame,optionsButton,quitButton,menuBack}
+            menuButtons=new[]{create,joinMenu,practice,startGame,optionsButton,quitButton}
                 .Select(b=>b.GetComponent<FrontendButtonMotion>()).ToArray();
             menuAlpha=mainContent.gameObject.AddComponent<CanvasGroup>();
 
@@ -209,6 +201,7 @@ namespace Knockbox.Game.UI
             veil=Image(stage,"Transition",new Rect(0,0,1920,1080),PaletteAsset.Transparent);
             BuildMotionUI();
             BuildLobbyHud();
+            BuildMenuSpaceUi();
             Show(FrontendScreen.Main);
             SetLocalSlot(0);
             for (int p=0;p<2;p++) for(int i=0;i<4;i++) ownedCardReferences[p*4+i]=ownedCards[p,i];
@@ -217,11 +210,7 @@ namespace Knockbox.Game.UI
         public void SetLocalSlot(int slot)
         {
             localSlot=slot;
-            for(int i=0;i<2;i++)
-            {
-                mainActors[i].SetActive(i==slot);
-                nameTexts[i].text="P"+(i+1)+(i==slot?"  나":"");
-            }
+            for(int i=0;i<2;i++)nameTexts[i].text="P"+(i+1)+(i==slot?"  나":"");
             foreach(var button in menuButtons)button.UsePointerHighlight(playerColors[slot],ink,Theme.white);
             join.image.color=roomCode.color=playerColors[slot];
         }
@@ -231,9 +220,8 @@ namespace Knockbox.Game.UI
             if(Screen==screen && enteredAt>0) return;
             // 코드 입력·방 화면에서 돌아오면 게임 시작 하위 메뉴를 유지하고, 경기·결과에서 돌아오면 첫 메뉴로.
             if(screen==FrontendScreen.Main && Screen!=FrontendScreen.Join && Screen!=FrontendScreen.Waiting) StartMenuOpen=false;
-            // 메뉴(메인·방 만들기·코드 참가)에서 로비로 들어가면 큰 캐릭터의 도약·낙하 퇴장을 먼저 보여준다(CP5).
-            lobbyFromMenu=screen==FrontendScreen.Lobby && (Screen==FrontendScreen.Main||Screen==FrontendScreen.Join||Screen==FrontendScreen.Waiting);
-            Screen=screen;enteredAt=Time.unscaledTime;acquired=-1;acquiredProgress=0;
+            Screen=screen;enteredAt=pageChangedAt=Time.unscaledTime;acquired=-1;acquiredProgress=0;
+            if(screen!=FrontendScreen.Main)CancelNameEdit();
             ApplyMenuPage();
             bool main=screen==FrontendScreen.Main;
             bool room=screen==FrontendScreen.Join||screen==FrontendScreen.Waiting;
@@ -331,7 +319,7 @@ namespace Knockbox.Game.UI
 
         }
 
-        void LateUpdate() { if (authored) layout.AfterAnimation(); }
+        void LateUpdate() { if (authored) layout.AfterAnimation(); PlaceNameEditor(); }
 
         void DrawHand()
         {

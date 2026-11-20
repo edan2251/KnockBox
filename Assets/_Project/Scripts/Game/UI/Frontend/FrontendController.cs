@@ -36,6 +36,14 @@ namespace Knockbox.Game.UI
         // 옵션(CP6): 메인 메뉴에서 열고 닫는다. 값은 누를 때마다 바로 적용·저장한다.
         bool optionsOpen;
         GameSettings settings;
+        // 메인 화면의 로비 공간(2026-11-21): 게임 시작 메뉴·코드 입력·방 만들기 대기 동안 여는 혼자 로비 월드(기록·전송 없음, 조작 잠김).
+        // 방을 만들면 이 월드가 그대로 방장의 혼자 로비가 된다(OnlineMatch가 이어 감). 로비 맵이 없는 설정(Sandbox 등)은 열지 않는다.
+        SimWorld spaceWorld;
+        bool spaceAvailable;
+        // 뒤로로 공간이 닫히는 중에 연습을 누르면(빠른 반복) 다 닫힌 뒤 바로 연습을 시작한다.
+        bool practiceQueued;
+        // Esc로 멈춘 연습 월드(같은 월드일 때만 Esc로 이어 간다).
+        SimWorld pausedPractice;
         [field: SerializeField] public FrontendView View { get; private set; }
         public static bool UseFrontendForThisRun => !Application.isBatchMode
             && !AutoPlayDebug.HasArg(ReplayCheck.Arg) && !AutoPlayDebug.HasArg("-autobots");
@@ -50,10 +58,10 @@ namespace Knockbox.Game.UI
             if (View != null && View.IsAuthored) View.BindAuthored(runner,presenter);
             else if(gameObject.scene.name=="Main") throw new System.InvalidOperationException("Main requires an authored FrontendView reference.");
             else { View=gameObject.AddComponent<FrontendView>(); View.Build(runner,presenter); }
-            View.CreateRoom+=()=>{joinEntry=false;createEntry=true;lobby.CreateRoom();};
+            View.CreateRoom+=()=>{joinEntry=false;createEntry=true;lobby.CreateRoom();LeaveSpaceForRoom(FrontendView.SpaceExit.Room);};
             View.OpenJoin+=()=>{joinEntry=true;createEntry=false;};
             View.JoinRoom+=Join;
-            View.Practice+=()=>{joinEntry=false;createEntry=false;lobby.StartPractice();};
+            View.Practice+=()=>{joinEntry=false;createEntry=false;if(!LeaveSpaceForPractice())lobby.StartPractice();};
             View.Back+=()=>{joinEntry=false;createEntry=false;lobby.CancelAndOpen();};
             View.CopyCode+=()=>GUIUtility.systemCopyBuffer=lobby.RoomCode;
             View.CardClicked+=Choose;
@@ -64,6 +72,9 @@ namespace Knockbox.Game.UI
             View.Options+=()=>{optionsOpen=true;View.SetOptionLabels(settings.Labels(),GameSettings.ControlsGuide);};
             View.OptionPressed+=PressOption;
             settings=GameSettings.Load();settings.Apply(presenter);
+            View.NicknameEdited+=value=>{settings.SaveNickname(value);View.Nickname=settings.Nickname;};
+            View.Nickname=settings.Nickname;
+            spaceAvailable=!runner.IsAuthoringPreview && runner.CreateConfig().Match.LobbySpace;
             presenter.SetDebugLabels(false);
             if(presenter.Help!=null)presenter.Help.Visible=false;
             // 제작기 시험(CP4): 경기 맵은 바로 연습, 로비 맵은 혼자 기다리는 로비, 결과 공간 맵은 연습을 시작해 첫 싸움에서 P1 승리로 바로 결과 공간까지 간다.
@@ -71,7 +82,114 @@ namespace Knockbox.Game.UI
             else if(runner.IsAuthoringPreview){lobby.StartPractice();resultsPreviewPending=runner.PreviewUsage==Knockbox.Game.Maps.MapUsage.Results;}
         }
 
-        void Join() {lobby.JoinCode=View.CodeInput.text;lobby.Join();}
+        void Join() {lobby.JoinCode=View.CodeInput.text;lobby.Join();if(lobby.Busy)LeaveSpaceForRoom(FrontendView.SpaceExit.Join);}
+
+        /// <summary>
+        /// 방 만들기·참가(2026-11-21 2차): 처음 메인 화면에서 로비로 넘어가던 것처럼 선수가 한 번 튀어 올랐다가 아래로 떨어져 나가고
+        /// 넓은 로비 구도로 물러난다. 방 만들기는 이어서 같은 장면에 선수가 다시 떨어지고(방이 열리면 이 월드가 혼자 로비),
+        /// 참가는 공유 로비가 장면을 이어 받는다(연결이 안 되면 다시 떨어진다).
+        /// </summary>
+        void LeaveSpaceForRoom(FrontendView.SpaceExit kind)
+        {
+            if(spaceWorld==null || runner.World!=spaceWorld || View.SpaceExiting || View.SpaceFighterAway) return;
+            View.BeginSpaceExit(kind);
+            if(kind==FrontendView.SpaceExit.Join) runner.KeepLobbySceneOnNextBegin=true;
+        }
+
+        /// <summary>
+        /// 메인 화면 공간 월드의 설정: Main 설정 그대로에 선수가 떨어지기 시작하는 틱만 앞당긴다(2026-11-21: 게임 시작 뒤 캐릭터가 늦게 나옴).
+        /// 기록·전송하지 않는 로컬 월드이며, 방장 혼자 로비로 이어질 수 있는 월드(방 만들기 뒤 다시 떨어뜨림·대기 화면)에는 쓰지 않는다.
+        /// </summary>
+        SimConfig SpaceConfig()
+        {
+            var config=runner.CreateConfig();
+            var match=config.Match;
+            match.ResultsDropTick=FrontendView.MenuDropTick;
+            return new SimConfig(config.Movement,match,config.Combat,config.Rules,config.Augments);
+        }
+
+        /// <summary>같은 로비 장면(이어 간 장면)에 선수만 다시 떨어뜨린다. 기록·전송 없는 로컬 혼자 로비 월드다.</summary>
+        void RedropSpace()
+        {
+            if(runner.PredictionDriven) return;
+            // 방 만들기 뒤 다시 떨어뜨린 월드는 방장 혼자 로비로 이어지므로 Main 설정 그대로다.
+            var config=runner.CreateConfig();
+            runner.KeepLobbySceneOnNextBegin=false;
+            runner.StartSoloLobby(config,runner.PrepareMatchArenas(config),(uint)System.Environment.TickCount|1u);
+            runner.MarkLobbyContinued(-1);
+            spaceWorld=runner.World;
+            View.SpaceFighterAway=false;
+        }
+
+        /// <summary>게임 시작 메뉴의 연습: 로비 공간이 열려 있으면 로비 → 경기와 같은 퇴장 뒤 연습을 시작한다(그동안 누름은 무시).</summary>
+        bool LeaveSpaceForPractice()
+        {
+            if(View.CurrentSpaceExit==FrontendView.SpaceExit.Back){practiceQueued=true;return true;}
+            if(View.SpaceExiting) return true;
+            if(spaceWorld==null || runner.World!=spaceWorld) return false;
+            View.BeginSpaceExit(FrontendView.SpaceExit.Practice);
+            return true;
+        }
+
+        /// <summary>
+        /// 메인 화면의 로비 공간(2026-11-21): 게임 시작 메뉴·코드 입력·방 만들기 대기에서는 혼자 로비 월드를 열고(바닥·조명·낙하는 로비 입장 연출),
+        /// 첫 화면으로 돌아가면 선수가 왼쪽으로 뛰어 나가고 공간이 걷힌 뒤 원래의 숨은 연습 월드로 되돌린다.
+        /// 닫는 동안 다시 게임 시작을 누르면 다 닫힌 다음 새로 연다(중복 생성·되감기 없음). 방장이 되면 월드를 넘기고, 손님은 선수만 나간 뒤 공유 로비가 장면을 이어 간다.
+        /// </summary>
+        void UpdateMenuSpace()
+        {
+            if(spaceWorld!=null && runner.World!=spaceWorld) ReleaseSpace();
+            // 방장: 선수가 다시 떨어진 뒤에는 이 월드가 그대로 혼자 로비다(손님은 공유 로비로 월드가 바뀔 때 놓는다).
+            if(spaceWorld!=null && online.Active && online.Session.LocalSlot==0 && !View.SpaceExiting && !View.SpaceFighterAway){ReleaseSpace();return;}
+            if(View.SpaceExitFinished)
+            {
+                var kind=View.CurrentSpaceExit;
+                if(kind==FrontendView.SpaceExit.Practice){ReleaseSpace();lobby.StartPractice();return;}
+                if(kind==FrontendView.SpaceExit.Back && practiceQueued){ReleaseSpace();lobby.StartPractice();return;}
+                if(kind==FrontendView.SpaceExit.Back){ReleaseSpace();runner.StartNewMatch();runner.Running=false;}
+                else if(kind==FrontendView.SpaceExit.Room){View.ClearSpaceExit();RedropSpace();}
+                else if(kind==FrontendView.SpaceExit.Join){View.ClearSpaceExit();View.SpaceFighterAway=true;}
+            }
+            // 참가가 안 되었으면(코드 오류·연결 실패·돌아가기) 같은 장면에 선수를 다시 떨어뜨린다.
+            if(spaceWorld!=null && View.SpaceFighterAway && !online.Active && !lobby.Busy) RedropSpace();
+            bool want=spaceAvailable && !online.Active && !lobby.Reopening && lobby.IsOpen && !optionsOpen
+                && ((View.Screen==FrontendScreen.Main && View.StartMenuOpen) || View.Screen==FrontendScreen.Join || View.Screen==FrontendScreen.Waiting);
+            if(spaceWorld==null && want && !View.SpaceExiting)
+            {
+                // 게임 시작 메뉴에서 연 공간만 빨리 떨어지는 설정을 쓴다. 방 만들기 대기·코드 입력에서 연 공간은 방장 혼자 로비로
+                // 이어질 수 있으므로 Main 설정 그대로다(온라인으로 이어지는 월드에 다른 설정이 섞이지 않게).
+                var config=View.Screen==FrontendScreen.Main?SpaceConfig():runner.CreateConfig();
+                runner.KeepLobbySceneOnNextBegin=false;
+                runner.StartSoloLobby(config,runner.PrepareMatchArenas(config),(uint)System.Environment.TickCount|1u);
+                spaceWorld=runner.World;
+            }
+            else if(spaceWorld!=null && !want && !online.Active && !View.SpaceExiting) View.BeginSpaceExit(FrontendView.SpaceExit.Back);
+            View.MenuSpaceActive=spaceWorld!=null;
+            // 열려 있는 동안 월드는 계속 돈다(코드 입력에서 돌아가기가 멈춰도 다시 돈다). 닫는 동안은 멈춘 그림에서 퇴장만 그린다.
+            if(spaceWorld!=null && !online.Active) runner.Running=!View.SpaceExiting || View.CurrentSpaceExit==FrontendView.SpaceExit.Room || View.CurrentSpaceExit==FrontendView.SpaceExit.Join;
+        }
+
+        void ReleaseSpace()
+        {
+            spaceWorld=null;
+            practiceQueued=false;
+            View.SpaceFighterAway=false;
+            View.ClearSpaceExit();
+            View.MenuSpaceActive=false;
+        }
+
+        /// <summary>
+        /// 이름(2026-11-21 닉네임): 내 자리는 저장한 닉네임, 상대 자리는 온라인 상대가 보낸 닉네임(없으면 P1/P2).
+        /// 로비 머리 위·경기 점수판·카드 선택 표시·결과 머리 위가 같은 이름을 쓴다. 판정·기록과 무관하다.
+        /// </summary>
+        void UpdateNames(int slot)
+        {
+            online.LocalName=settings.Nickname;
+            string mine=GameSettings.DisplayName(settings.Nickname,slot);
+            string theirs=online.Active && !string.IsNullOrEmpty(online.PeerName)?online.PeerName:GameSettings.SlotName(1-slot);
+            presenter.SetPlayerNames(slot==0?mine:theirs,slot==0?theirs:mine);
+            View.Points?.SetNames(presenter.PlayerName(0),presenter.PlayerName(1));
+        }
 
         void PressOption(int index)
         {
@@ -193,30 +311,44 @@ namespace Knockbox.Game.UI
             // 손님은 메인으로 가고 방장은 같은 로비에서 같은 코드로 다시 기다린다. 둘 다 준비해 퇴장 전환이 시작된 뒤에는 받지 않는다.
             bool roomLobby=View.Screen==FrontendScreen.Lobby && (online.Active||lobby.Reopening) && !online.Ended;
             // 결과 공간의 나가기도 Esc(2026-11-20: 화면 한쪽의 "[Esc] 나가기"). 기존 결과 공간 나가기(X)와 같은 동작이다.
-            if(keyboard!=null && keyboard.escapeKey.wasPressedThisFrame && View.Screen==FrontendScreen.Podium && !online.Ended)
+            // 닉네임을 고치는 중의 Esc는 고치기만 취소한다(입력칸이 처리, 메뉴는 움직이지 않음).
+            bool escape=keyboard!=null && keyboard.escapeKey.wasPressedThisFrame && !View.NameInputBusy;
+            if(escape && View.Screen==FrontendScreen.Podium && !online.Ended)
             {joinEntry=false;createEntry=false;lobby.CancelAndOpen();}
-            else if(keyboard!=null && keyboard.escapeKey.wasPressedThisFrame && roomLobby)
+            else if(escape && roomLobby)
             {
                 if(!runner.World.InLobbyExit && !runner.FrontendWorld.InLobbyExit){joinEntry=false;createEntry=false;lobby.CancelAndOpen();}
             }
-            else if(keyboard!=null && keyboard.escapeKey.wasPressedThisFrame && !online.Active)
+            else if(escape && !online.Active)
             {
                 if(optionsOpen) optionsOpen=false;
+                else if(View.CurrentSpaceExit==FrontendView.SpaceExit.Practice) {}
                 else if(joinEntry||createEntry||lobby.Busy) {joinEntry=false;createEntry=false;lobby.CancelAndOpen();}
                 else if(View.Screen==FrontendScreen.Main&&View.StartMenuOpen) View.SetMenuPage(false);
-                else lobby.TogglePracticeMenu();
+                // 연습 중 Esc는 메뉴(일시정지)를 열고, 그렇게 멈춘 연습만 메뉴에서 Esc로 다시 이어 간다. 처음 켠 메인 화면의 Esc는
+                // 아무것도 하지 않는다(2026-11-21: 숨은 연습 월드가 바로 시작되던 문제). 메인 화면 공간이 있는 동안도 마찬가지.
+                else if(spaceWorld==null && !View.SpaceExiting)
+                {
+                    if(!lobby.IsOpen){pausedPractice=runner.World;lobby.TogglePracticeMenu();}
+                    else if(pausedPractice!=null && runner.World==pausedPractice){pausedPractice=null;lobby.TogglePracticeMenu();}
+                }
             }
             if(joinEntry && keyboard!=null && keyboard.enterKey.wasPressedThisFrame && !lobby.Busy && !online.Active)Join();
             if((View.Screen==FrontendScreen.Podium||View.Screen==FrontendScreen.Lobby) && keyboard!=null && keyboard.rKey.wasPressedThisFrame)TogglePodiumReady();
             ReturnToMainAfterSessionEnded();
             if(!lobby.IsOpen||online.Active)optionsOpen=false;
+            UpdateMenuSpace();
             int slot=runner.LocalPlayerSlot;
             if(slot!=shownSlot){shownSlot=slot;View.SetLocalSlot(slot);}
+            UpdateNames(slot);
             var m=runner.FrontendWorld.State.Match;
             FrontendScreen desired;
             var session=online.Session;
             // 방장이 혼자 기다리는 로컬 로비와 둘이 들어온 공유 로비는 같은 로비 화면이다(2026-11-16 CP3).
-            bool soloLobby=(session==null || session.State==SessionState.WaitingPeer) && runner.AbsentSlot>=0 && runner.World.InLobby;
+            // 메뉴가 열려 있는 동안의 혼자 로비 월드는 메인 화면의 로비 공간이다(2026-11-21). 로비 화면은 방을 만든 뒤(손님이 나가 같은 코드로
+            // 다시 여는 동안 포함)·로비 맵 시험에서만.
+            bool soloLobby=(session==null || session.State==SessionState.WaitingPeer) && runner.AbsentSlot>=0 && runner.World.InLobby
+                && (online.Active || lobby.Reopening || !lobby.IsOpen) && spaceWorld==null;
             if(resultsPreviewPending && runner.World.State.Match.Phase==MatchPhase.Fighting) resultsPreviewPending=!runner.TryDebugMatchWin(0);
             if(soloLobby) desired=FrontendScreen.Lobby;
             else if(EndedInLobby) desired=FrontendScreen.Lobby;
@@ -234,6 +366,8 @@ namespace Knockbox.Game.UI
                 if(desired==FrontendScreen.Versus||desired==FrontendScreen.Cards)presenter.SfxPlayer.Play(Presentation.Sfx.Dash,.25f,1.3f);
             }
             runner.MenuInputBlocked=!(online.Active||lobby.Reopening)&&lobby.IsOpen;
+            // 메인 화면 공간에서 방을 만들거나 참가하는 동안은 예전 방 패널을 띄우지 않는다(오류가 나면 이유를 보여 준다).
+            View.HideRoomPanel=spaceWorld!=null && View.Screen==FrontendScreen.Waiting && (lobby.Busy||online.Active);
             UpdatePracticeReady();
             // 과거 리플레이/개발 시나리오는 원래 HUD와 선택 화면을 사용한다.
             bool oldReplay=!runner.World.Config.Match.CollectCardsOnly && !lobby.IsOpen;
@@ -299,6 +433,8 @@ namespace Knockbox.Game.UI
             bool resultsOpen=podium && fw.InFreeSpace && fw.State.Match.PhaseTick>=fw.FreeSpaceUnlockTick;
             presenter.SetReadyMarkers(resultsOpen && !ceremony, ready0, ready1);
             if(ceremony) presenter.SetLobbyMarkers(resultsOpen && !online.Ended, ready0, ready1, slot, View.PodiumReadyVisible, false, "[R] 재대전", online.Active);
+            // 메인 화면 공간(2026-11-21)의 선수 머리 위에는 이름(닉네임)과 삼각형만 띄운다.
+            else if(View.MenuSpaceShowsName && !lobbyScreen) presenter.SetLobbyMarkers(true, false, false, slot, false, true);
             else presenter.SetLobbyMarkers(lobbyScreen && !EndedInLobby, ready0, ready1, slot, View.PodiumReadyVisible, soloLobby);
             if(desired==FrontendScreen.Result)
                 View.Result(m.SetScore0>=m.SetScore1?0:1,m.SetScore0,m.SetScore1,online.Active,

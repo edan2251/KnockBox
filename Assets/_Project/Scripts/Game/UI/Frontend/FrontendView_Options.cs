@@ -5,7 +5,7 @@ using UnityEngine.UI;
 namespace Knockbox.Game.UI
 {
     /// <summary>
-    /// 옵션 화면(2026-11-16 게임 흐름 CP6, 임시 배치): 메인의 큰 캐릭터 옆에 버튼 목록을 띄운다. 버튼을 누를 때마다 값이 바뀌고(음량은 20%씩),
+    /// 옵션 화면(2026-11-16 게임 흐름 CP6): 첫 화면의 가운데 구도에서 버튼 목록을 띄운다(2026-11-21). 버튼을 누를 때마다 값이 바뀌고(음량은 20%씩),
     /// 바로 적용·저장한다. 순서: 음량, 화면 모드, 해상도, 화면 흔들림 줄이기, 강한 섬광 줄이기, 기본값, 뒤로. 아래에 조작 안내를 둔다.
     /// 버튼은 Frontend 프리팹 Main_and_lobby/Options_panel 아래 실제 오브젝트다.
     /// </summary>
@@ -41,7 +41,7 @@ namespace Knockbox.Game.UI
         /// <summary>절차식 화면(Sandbox·검사용)에도 같은 버튼을 만든다. Main은 프리팹의 저장된 오브젝트를 쓴다.</summary>
         void BuildOptions(RectTransform parent)
         {
-            optionsPanel = FrontendWidgets.Rect(parent, "Options_panel", 900, 110, 860, 900);
+            optionsPanel = FrontendWidgets.Rect(parent, "Options_panel", 530, 110, 860, 900); // 2026-11-21: 첫 화면의 가운데 구도에서 열린다
             optionButtons = new Button[7];
             for (int i = 0; i < optionButtons.Length; i++)
             {

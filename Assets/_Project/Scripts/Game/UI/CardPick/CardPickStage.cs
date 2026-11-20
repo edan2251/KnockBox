@@ -720,7 +720,7 @@ namespace Knockbox.Game.UI
             else if (banner != null)
             {
                 banner.transform.localScale = new Vector3(bannerScale.x, bannerScale.y, 1);
-                string text = chosen >= 0 ? monoliths[chosen].Title.text + " 획득" : "P" + (shownPicker + 1) + " 선택 중";
+                string text = chosen >= 0 ? monoliths[chosen].Title.text + " 획득" : presenter.PlayerName(shownPicker) + " 선택 중";
                 // 남은 시간은 확정 월드 PhaseTick에서 계산한다(시간 제한 자체는 시뮬레이션 설정 그대로).
                 float remaining = Mathf.Max(0, (confirmed.Config.Match.PickTimeoutTicks - m.PhaseTick - Alpha) / SimConfig.TickRate);
                 int seconds = chosen >= 0 ? -1 : Mathf.Max(0, Mathf.CeilToInt(remaining));

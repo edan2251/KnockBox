@@ -50,7 +50,18 @@ namespace Knockbox.Presentation
             if (baseMaterial != null) baseMaterial.SetFloat("_Opacity", transitionOpacity);
             if (ShadowMaterial != null) ShadowMaterial.SetFloat("_Opacity", transitionOpacity);
             // 반짝이는 입자는 조명과 독립적으로 보이며 기존 경기장 등장/퇴장 페이드만 따른다.
-            foreach (var mote in motes) if (mote != null) mote.color = PaletteAsset.WithAlpha(moteColor, .4f * transitionOpacity);
+            foreach (var mote in motes) if (mote != null) mote.color = PaletteAsset.WithAlpha(moteColor, .4f * transitionOpacity * moteVisibility);
+        }
+
+        float moteVisibility = 1f;
+
+        /// <summary>반짝이는 입자의 보임(0~1, 기본 1). 메인 화면 공간에서는 숨긴다(2026-11-21). 화면 전용.</summary>
+        public void SetMoteVisibility(float visibility)
+        {
+            visibility = Mathf.Clamp01(visibility);
+            if (Mathf.Approximately(visibility, moteVisibility)) return;
+            moteVisibility = visibility;
+            SetTransitionOpacity(transitionOpacity);
         }
 
         /// <summary>GO 전에는 배경 전체를 그림자 명암으로 놓고, GO에서 밝은 영역을 연다. 퇴장 페이드와 독립적이다.</summary>
