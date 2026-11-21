@@ -81,12 +81,14 @@ namespace Knockbox.Tests.EditMode
                 || path == "Weapon.ThrowHit" || path.StartsWith("Weapon.Velocity.", StringComparison.Ordinal));
         }
 
-        static SimState StateForChecksum(bool weaponsEnabled, bool throwEnabled = false, bool graphEnabled = false)
+        static SimState StateForChecksum(bool weaponsEnabled, bool throwEnabled = false, bool graphEnabled = false, bool forfeit = false)
         {
             var state = TestWorlds.Create().State;
             state.Props.Graph.Enabled=graphEnabled;
             state.Weapon.Enabled = weaponsEnabled;
             state.Weapon.ThrowEnabled = throwEnabled;
+            // 항복 확장은 활성 상태에서 모든 말단 필드를 검사한다. 기본 상태·구 리플레이 해시 검사는 확장을 끈 채 유지한다.
+            if (forfeit) state.Match.EndKind = MatchEndKind.SurrenderP1;
             return state;
         }
 
@@ -97,7 +99,7 @@ namespace Knockbox.Tests.EditMode
         [TestCase(true, true, true)]
         public void Checksum_ChangesWhenAnyStateFieldChanges(bool weaponsEnabled, bool throwEnabled, bool graphEnabled)
         {
-            var baseState = StateForChecksum(weaponsEnabled, throwEnabled, graphEnabled);
+            var baseState = StateForChecksum(weaponsEnabled, throwEnabled, graphEnabled, forfeit: true);
             uint baseChecksum = baseState.ComputeChecksum();
             var missing = new StringBuilder();
             int count = 0;
@@ -131,7 +133,7 @@ namespace Knockbox.Tests.EditMode
             foreach (var (path, _) in Leaves(typeof(SimState), ""))
                 if (StateLeafIsActive(path, weaponsEnabled, throwEnabled, graphEnabled))
                     leafCount++;
-            var recorded = StateDiff.Record(StateForChecksum(weaponsEnabled, throwEnabled, graphEnabled));
+            var recorded = StateDiff.Record(StateForChecksum(weaponsEnabled, throwEnabled, graphEnabled, forfeit: true));
             // 필드가 없어진 폼 시대 자리도 기록 호환을 위해 고정값으로 해시에 남는다. 목록에 적은 것만 허용한다.
             foreach (string slot in LegacyHashSlots)
                 CollectionAssert.Contains(recorded.Names, slot, "기록 호환용 고정값 자리가 해시에서 빠짐");

@@ -12,6 +12,7 @@ namespace Knockbox.Game.Online
         public int CardRound;
         public int Sequence;
         public double SampledAt;
+        public MatchCommand Command;
 
         public static int Pack(InputFrame f) => (byte)f.MoveX | ((byte)f.MoveY << 8) | ((byte)f.Buttons << 16) | (f.Aim << 24);
         public static InputFrame Unpack(int packed) => new InputFrame(unchecked((sbyte)packed),
@@ -19,6 +20,9 @@ namespace Knockbox.Game.Online
 
         public InputFrame ForState(in SimState state)
         {
+            if (Command != MatchCommand.None)
+                return state.Match.Round == CardRound && SimWorld.CanForfeit(state.Match)
+                    ? new InputFrame(0, 0, InputButtons.None, 0, Command) : default;
             // A retransmitted card click must never become an attack in a later round.
             if (CardRound > 0 && (state.Match.Round != CardRound || state.Match.Phase != MatchPhase.SetPick)) return default;
             return Unpack(Packed);
@@ -41,6 +45,11 @@ namespace Knockbox.Game.Online
             var world = confirmedWorld();
             var frame = source?.Poll(world.State.Tick) ?? default;
             var match = world.State.Match;
+            if (frame.Command != MatchCommand.None)
+            {
+                choice = 0; choiceRound = -1;
+                return new FusionPlayerInput { Command = frame.Command, CardRound = match.Round, Sequence = ++sequence, SampledAt = now };
+            }
             bool choosing = world.Config.Match.CollectCardsOnly && match.Phase == MatchPhase.SetPick
                 && match.Picker == localSlot && match.PickedAt < 0;
             if (!choosing || choiceRound != match.Round) { choice = 0; choiceRound = -1; }

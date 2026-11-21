@@ -97,7 +97,7 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(InputRecording.ComputeArenaChecksum(first),InputRecording.ComputeArenaChecksum(second));
             Assert.AreNotEqual(OnlineMapManifest.Compute(first),OnlineMapManifest.Compute(second));
             Assert.AreEqual(legacy,InputRecording.ComputeArenaChecksum(a));
-            Assert.AreEqual(8,InputRecording.FormatVersion);Assert.AreEqual(9,LockstepSession.ProtocolVersion);
+            Assert.AreEqual(8,InputRecording.FormatVersion);Assert.AreEqual(10,LockstepSession.ProtocolVersion);
         }
 
         [TestCase(false)] [TestCase(true)]

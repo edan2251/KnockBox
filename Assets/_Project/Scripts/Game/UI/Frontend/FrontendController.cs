@@ -14,7 +14,7 @@ namespace Knockbox.Game.UI
         [SerializeField] MatchPresenter presenter;
         [SerializeField] OnlineMatch online;
         [SerializeField] OnlineLobby lobby;
-        bool joinEntry, createEntry;
+        bool joinEntry, createEntry, joinQueued;
         int submittedRound=-1, lastPicker=-1, lastPickedAt=-1;
         int shownSlot=-1;
         FrontendScreen previous;
@@ -62,17 +62,19 @@ namespace Knockbox.Game.UI
             View.OpenJoin+=()=>{joinEntry=true;createEntry=false;};
             View.JoinRoom+=Join;
             View.Practice+=()=>{joinEntry=false;createEntry=false;if(!LeaveSpaceForPractice())lobby.StartPractice();};
-            View.Back+=()=>{joinEntry=false;createEntry=false;lobby.CancelAndOpen();};
+            View.Back+=()=>{joinQueued=false;joinEntry=false;createEntry=false;lobby.CancelAndOpen();};
             View.CopyCode+=()=>GUIUtility.systemCopyBuffer=lobby.RoomCode;
             View.CardClicked+=Choose;
             View.Rematch+=ReadyForRematch;
             online.ReturnedToSoloLobby+=()=>peerLeftAt=Time.unscaledTime;
-            runner.PointerOverFrontendButton=View.PointerOverPodiumButton;
+            runner.PointerOverFrontendButton=()=>View.PointerOverPodiumButton() || View.PointerOverEscapeMenu();
+            View.Surrender+=()=>{if(online.Active)online.RequestMatchCommand(MatchCommand.Surrender);else runner.RequestMatchCommand(MatchCommand.Surrender);};
+            View.LeaveMatch+=()=>{if(online.Active)online.RequestMatchCommand(MatchCommand.Leave);else lobby.CancelAndOpen();};
             View.Quit+=QuitGame;
             View.Options+=()=>{optionsOpen=true;View.SetOptionLabels(settings.Labels(),GameSettings.ControlsGuide);};
             View.OptionPressed+=PressOption;
             settings=GameSettings.Load();settings.Apply(presenter);
-            View.NicknameEdited+=value=>{settings.SaveNickname(value);View.Nickname=settings.Nickname;};
+            View.NicknameEdited+=value=>{settings.SaveNickname(value);View.Nickname=settings.Nickname;online.LocalName=settings.Nickname;};
             View.Nickname=settings.Nickname;
             spaceAvailable=!runner.IsAuthoringPreview && runner.CreateConfig().Match.LobbySpace;
             presenter.SetDebugLabels(false);
@@ -82,7 +84,15 @@ namespace Knockbox.Game.UI
             else if(runner.IsAuthoringPreview){lobby.StartPractice();resultsPreviewPending=runner.PreviewUsage==Knockbox.Game.Maps.MapUsage.Results;}
         }
 
-        void Join() {lobby.JoinCode=View.CodeInput.text;lobby.Join();if(lobby.Busy)LeaveSpaceForRoom(FrontendView.SpaceExit.Join);}
+        void Join()
+        {
+            if(joinQueued || lobby.Busy || online.Active || View.SpaceExiting) return;
+            lobby.JoinCode=View.CodeInput.text;
+            if(!string.IsNullOrWhiteSpace(lobby.JoinCode)) LeaveSpaceForRoom(FrontendView.SpaceExit.Join);
+            // 참가는 접속 직후 월드가 교체된다. 방 만들기처럼 도약·낙하를 끝까지 보여준 다음 요청한다.
+            joinQueued=View.CurrentSpaceExit==FrontendView.SpaceExit.Join;
+            if(!joinQueued) lobby.Join();
+        }
 
         /// <summary>
         /// 방 만들기·참가(2026-11-21 2차): 처음 메인 화면에서 로비로 넘어가던 것처럼 선수가 한 번 튀어 올랐다가 아래로 떨어져 나가고
@@ -148,7 +158,11 @@ namespace Knockbox.Game.UI
                 if(kind==FrontendView.SpaceExit.Back && practiceQueued){ReleaseSpace();lobby.StartPractice();return;}
                 if(kind==FrontendView.SpaceExit.Back){ReleaseSpace();runner.StartNewMatch();runner.Running=false;}
                 else if(kind==FrontendView.SpaceExit.Room){View.ClearSpaceExit();RedropSpace();}
-                else if(kind==FrontendView.SpaceExit.Join){View.ClearSpaceExit();View.SpaceFighterAway=true;}
+                else if(kind==FrontendView.SpaceExit.Join)
+                {
+                    View.ClearSpaceExit();View.SpaceFighterAway=true;
+                    if(joinQueued){joinQueued=false;lobby.Join();}
+                }
             }
             // 참가가 안 되었으면(코드 오류·연결 실패·돌아가기) 같은 장면에 선수를 다시 떨어뜨린다.
             if(spaceWorld!=null && View.SpaceFighterAway && !online.Active && !lobby.Busy) RedropSpace();
@@ -172,6 +186,7 @@ namespace Knockbox.Game.UI
         void ReleaseSpace()
         {
             spaceWorld=null;
+            joinQueued=false;
             practiceQueued=false;
             View.SpaceFighterAway=false;
             View.ClearSpaceExit();
@@ -185,7 +200,7 @@ namespace Knockbox.Game.UI
         void UpdateNames(int slot)
         {
             online.LocalName=settings.Nickname;
-            string mine=GameSettings.DisplayName(settings.Nickname,slot);
+            string mine=GameSettings.DisplayName(settings.Nickname,!online.Active && View.MenuSpaceActive ? View.MenuPreviewSlot : slot);
             string theirs=online.Active && !string.IsNullOrEmpty(online.PeerName)?online.PeerName:GameSettings.SlotName(1-slot);
             presenter.SetPlayerNames(slot==0?mine:theirs,slot==0?theirs:mine);
             View.Points?.SetNames(presenter.PlayerName(0),presenter.PlayerName(1));
@@ -269,11 +284,11 @@ namespace Knockbox.Game.UI
 
         /// <summary>
         /// 연결이 끝난 쪽(상대가 X로 나감·연결 끊김 등)도 이유를 보여준 뒤 스스로 메인으로 돌아간다. 내가 나간 쪽은 이미 바로 메인이다.
-        /// 끝난 동안의 화면은 기존 방 화면의 "연결 종료"와 이유이며, 돌아가기를 누르면 바로 돌아간다.
+        /// 경기 중 종료는 중앙의 제목·안내·돌아가기만 표시하며, 돌아가기를 누르면 바로 돌아간다.
         /// </summary>
         void ReturnToMainAfterSessionEnded()
         {
-            if(!online.Ended){endedAt=-1;return;}
+            if(!online.Ended && !online.PeerDeparture){endedAt=-1;return;}
             if(endedAt<0){endedAt=Time.unscaledTime;return;}
             if(Time.unscaledTime-endedAt<(EndedInLobby?LobbyEndedNoticeSeconds:EndedNoticeSeconds))return;
             endedAt=-1;joinEntry=false;createEntry=false;
@@ -307,13 +322,22 @@ namespace Knockbox.Game.UI
         {
             if(View==null || runner.World==null)return;
             var keyboard=Keyboard.current;
+            if (online.DepartureDelivered)
+            {
+                View.SetEscapeMenu(false); joinEntry=false; createEntry=false; lobby.CancelAndOpen();
+            }
+            bool battleMenu = online.Active && !online.Ended && !online.DeparturePending && !online.PeerDeparture
+                && SimWorld.CanForfeit(runner.FrontendWorld.State.Match, runner.FrontendWorld.Config.Match)
+                && View.Screen != FrontendScreen.Lobby && View.Screen != FrontendScreen.Waiting;
+            if (!battleMenu && View.EscapeMenuOpen) View.SetEscapeMenu(false);
             // 로비의 나가기는 Esc 하나(2026-11-19). 방장은 방을 닫고 메인으로(손님도 메인으로 돌아간다),
             // 손님은 메인으로 가고 방장은 같은 로비에서 같은 코드로 다시 기다린다. 둘 다 준비해 퇴장 전환이 시작된 뒤에는 받지 않는다.
             bool roomLobby=View.Screen==FrontendScreen.Lobby && (online.Active||lobby.Reopening) && !online.Ended;
             // 결과 공간의 나가기도 Esc(2026-11-20: 화면 한쪽의 "[Esc] 나가기"). 기존 결과 공간 나가기(X)와 같은 동작이다.
             // 닉네임을 고치는 중의 Esc는 고치기만 취소한다(입력칸이 처리, 메뉴는 움직이지 않음).
             bool escape=keyboard!=null && keyboard.escapeKey.wasPressedThisFrame && !View.NameInputBusy;
-            if(escape && View.Screen==FrontendScreen.Podium && !online.Ended)
+            if(escape && battleMenu) View.SetEscapeMenu(!View.EscapeMenuOpen);
+            else if(escape && View.Screen==FrontendScreen.Podium && !online.Ended)
             {joinEntry=false;createEntry=false;lobby.CancelAndOpen();}
             else if(escape && roomLobby)
             {
@@ -323,7 +347,7 @@ namespace Knockbox.Game.UI
             {
                 if(optionsOpen) optionsOpen=false;
                 else if(View.CurrentSpaceExit==FrontendView.SpaceExit.Practice) {}
-                else if(joinEntry||createEntry||lobby.Busy) {joinEntry=false;createEntry=false;lobby.CancelAndOpen();}
+                else if(joinEntry||createEntry||lobby.Busy) {joinQueued=false;joinEntry=false;createEntry=false;lobby.CancelAndOpen();}
                 else if(View.Screen==FrontendScreen.Main&&View.StartMenuOpen) View.SetMenuPage(false);
                 // 연습 중 Esc는 메뉴(일시정지)를 열고, 그렇게 멈춘 연습만 메뉴에서 Esc로 다시 이어 간다. 처음 켠 메인 화면의 Esc는
                 // 아무것도 하지 않는다(2026-11-21: 숨은 연습 월드가 바로 시작되던 문제). 메인 화면 공간이 있는 동안도 마찬가지.
@@ -333,7 +357,7 @@ namespace Knockbox.Game.UI
                     else if(pausedPractice!=null && runner.World==pausedPractice){pausedPractice=null;lobby.TogglePracticeMenu();}
                 }
             }
-            if(joinEntry && keyboard!=null && keyboard.enterKey.wasPressedThisFrame && !lobby.Busy && !online.Active)Join();
+            if(joinEntry && View.CodeSubmitPressed && !View.NameInputBusy && !lobby.Busy && !online.Active)Join();
             if((View.Screen==FrontendScreen.Podium||View.Screen==FrontendScreen.Lobby) && keyboard!=null && keyboard.rKey.wasPressedThisFrame)TogglePodiumReady();
             ReturnToMainAfterSessionEnded();
             if(!lobby.IsOpen||online.Active)optionsOpen=false;
@@ -350,10 +374,11 @@ namespace Knockbox.Game.UI
             bool soloLobby=(session==null || session.State==SessionState.WaitingPeer) && runner.AbsentSlot>=0 && runner.World.InLobby
                 && (online.Active || lobby.Reopening || !lobby.IsOpen) && spaceWorld==null;
             if(resultsPreviewPending && runner.World.State.Match.Phase==MatchPhase.Fighting) resultsPreviewPending=!runner.TryDebugMatchWin(0);
-            if(soloLobby) desired=FrontendScreen.Lobby;
+            if(online.PeerDeparture || (online.Ended && !EndedInLobby)) desired=FrontendScreen.Ended;
+            else if(soloLobby) desired=FrontendScreen.Lobby;
             else if(EndedInLobby) desired=FrontendScreen.Lobby;
             else if(session!=null && session.State!=SessionState.Running) desired=FrontendScreen.Waiting;
-            else if(!online.Active && lobby.IsOpen) desired=optionsOpen?FrontendScreen.Options:joinEntry?FrontendScreen.Join:createEntry||lobby.Busy?FrontendScreen.Waiting:FrontendScreen.Main;
+            else if(!online.Active && lobby.IsOpen) desired=optionsOpen?FrontendScreen.Options:joinQueued||lobby.Busy?FrontendScreen.Waiting:joinEntry?FrontendScreen.Join:createEntry?FrontendScreen.Waiting:FrontendScreen.Main;
             else if(runner.FrontendWorld.InLobby || runner.FrontendWorld.InLobbyExit || runner.World.InLobbyExit) desired=FrontendScreen.Lobby;
             else if(m.Phase==MatchPhase.Countdown && m.Round==1 && m.PhaseTick<View.IntroRevealTick) desired=FrontendScreen.Versus;
             else if(m.Phase==MatchPhase.SetPick) desired=MonolithPick?FrontendScreen.Hidden:FrontendScreen.Cards;
@@ -365,9 +390,9 @@ namespace Knockbox.Game.UI
                 if(desired!=FrontendScreen.Cards)submittedRound=-1;
                 if(desired==FrontendScreen.Versus||desired==FrontendScreen.Cards)presenter.SfxPlayer.Play(Presentation.Sfx.Dash,.25f,1.3f);
             }
-            runner.MenuInputBlocked=!(online.Active||lobby.Reopening)&&lobby.IsOpen;
+            runner.MenuInputBlocked=View.EscapeInputBlocked || online.DeparturePending || online.PeerDeparture || (!(online.Active||lobby.Reopening)&&lobby.IsOpen);
             // 메인 화면 공간에서 방을 만들거나 참가하는 동안은 예전 방 패널을 띄우지 않는다(오류가 나면 이유를 보여 준다).
-            View.HideRoomPanel=spaceWorld!=null && View.Screen==FrontendScreen.Waiting && (lobby.Busy||online.Active);
+            View.HideRoomPanel=spaceWorld!=null && View.Screen==FrontendScreen.Waiting && (joinQueued||lobby.Busy||online.Active);
             UpdatePracticeReady();
             // 과거 리플레이/개발 시나리오는 원래 HUD와 선택 화면을 사용한다.
             bool oldReplay=!runner.World.Config.Match.CollectCardsOnly && !lobby.IsOpen;
@@ -375,15 +400,18 @@ namespace Knockbox.Game.UI
             if(oldReplay) {View.Show(FrontendScreen.Hidden);previous=FrontendScreen.Hidden;presenter.SetReadyMarkers(false,false,false);presenter.SetLobbyMarkers(false,false,false);return;}
             View.Inventory(runner.FrontendWorld.State.Fighter0.Augments,runner.FrontendWorld.State.Fighter1.Augments);
             View.Score(m.SetScore0,m.SetScore1);
-            if(desired==FrontendScreen.Join||desired==FrontendScreen.Waiting)
+            if(desired==FrontendScreen.Ended)
+                View.MatchEnded(online.PeerDeparture || session.Reason==EndReason.PeerLeft
+                    ? "상대가 게임을 종료했습니다" : online.EndNotice);
+            else if(desired==FrontendScreen.Join||desired==FrontendScreen.Waiting)
             {
                 string title=joinEntry?"코드로 참가":"방 만들기";
                 string message=lobby.StatusMessage;
                 bool canCopy=session!=null&&session.State==SessionState.WaitingPeer;
                 if(canCopy)message="상대를 기다리는 중…";
                 else if(session!=null&&session.State==SessionState.Connecting)message="상대와 연결하는 중…";
-                else if(session!=null&&session.State==SessionState.Ended){title="연결 종료";message=EndMessage(session);}
-                View.Room(title,lobby.RoomCode,message,lobby.Busy,canCopy);
+                else if(session!=null&&session.State==SessionState.Ended){title="경기 종료";message=online.EndNotice;}
+                View.Room(title,lobby.RoomCode,message,joinQueued||lobby.Busy,canCopy);
             }
             if(desired==FrontendScreen.Cards)
             {
@@ -442,8 +470,8 @@ namespace Knockbox.Game.UI
                     (runner.FrontendWorld.State.Fighter1.PrevButtons&InputButtons.Attack)!=0 || (practiceReadyWorld!=null && slot==1));
         }
 
-        public static string EndMessage(LockstepSession session) =>
-            session.Reason==EndReason.PeerLeft?"상대가 방을 나갔습니다.":session.Reason==EndReason.Timeout?"연결이 끊겼습니다.":
+        public static string EndMessage(LockstepSession session) => session==null?"연결이 끊겨 경기가 종료됐습니다":
+            session.Reason==EndReason.PeerLeft || session.Reason==EndReason.Timeout?"연결이 끊겨 경기가 종료됐습니다":
             session.Reason==EndReason.Rejected?"서로 같은 버전의 게임으로 접속해주세요.":
             session.Reason==EndReason.Desync?"경기 상태가 달라 진행을 멈췄습니다.":"연결이 종료되었습니다.";
     }

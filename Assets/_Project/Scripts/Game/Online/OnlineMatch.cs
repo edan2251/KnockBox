@@ -68,6 +68,61 @@ namespace Knockbox.Game.Online
         /// <summary>상대가 보낸 닉네임(표시 전용, 2026-11-21). 아직 못 받았거나 비어 있으면 빈 문자열.</summary>
         public string PeerName { get; private set; } = "";
         bool nameSent, nameReceived;
+        bool departureRequested;
+        int departureAck = -1, sentDepartureAck = -1, departureOutcomeTick = -1;
+        public bool DepartureDelivered { get; private set; }
+        public bool DeparturePending => departureRequested && !DepartureDelivered;
+        public bool PeerDeparture => Active && runner.FrontendWorld != null && runner.FrontendWorld.State.Match.Departed
+            && runner.FrontendWorld.State.Match.ForfeitLoser != runner.LocalPlayerSlot;
+        public string EndNotice
+        {
+            get
+            {
+                var m = runner.FrontendWorld.State.Match;
+                if (PeerDeparture) return $"상대가 나갔습니다 · 기권승\n{m.SetScore0} : {m.SetScore1}";
+                return UI.FrontendController.EndMessage(session);
+            }
+        }
+
+        public bool RequestMatchCommand(MatchCommand command)
+        {
+            if (!Active || Ended || !runner.RequestMatchCommand(command)) return false;
+            departureRequested = command == MatchCommand.Leave;
+            return true;
+        }
+
+        void UpdateDeparture()
+        {
+            if (runner.FrontendWorld == null) return;
+            var m = runner.FrontendWorld.State.Match;
+            departureOutcomeTick = DepartureConfirmationTick(runner.FrontendWorld);
+            int tick = departureOutcomeTick;
+            if (tick < 0) return;
+            // 손님은 확정 기록을 받은 뒤에만 응답한다. KO가 이미 끝났어도 같은 퇴장 틱을 확인한다.
+            if (runner.LocalPlayerSlot == 1 && (!m.Departed || m.ForfeitLoser == 0) && sentDepartureAck != tick
+                && fusionTransport?.Connection?.SendDepartureAcknowledgement(tick) == true) sentDepartureAck = tick;
+            if (departureRequested && (!m.Departed || m.ForfeitLoser == runner.LocalPlayerSlot)
+                && (runner.LocalPlayerSlot == 1 || departureAck == tick)) DepartureDelivered = true;
+        }
+
+        static int DepartureConfirmationTick(SimWorld world)
+        {
+            var m = world.State.Match;
+            if (m.Departed)
+                return world.State.Tick - m.PhaseTick - (m.Phase == MatchPhase.MatchEnd ? SimWorld.ForfeitKoTicks : 0);
+            // 마지막 정상 KO나 먼저 확정된 항복과 경합했다면 최종 점수까지 전달한 뒤 일반 퇴장한다.
+            return m.Phase == MatchPhase.MatchEnd ? world.State.Tick - m.PhaseTick : -1;
+        }
+
+        void ReceiveDepartureAcknowledgement(int tick)
+        {
+            if (!Active || Ended || !departureRequested || runner.LocalPlayerSlot != 0 || runner.FrontendWorld == null) return;
+            var m = runner.FrontendWorld.State.Match;
+            if (m.Departed && m.ForfeitLoser != 0) return;
+            int expected = DepartureConfirmationTick(runner.FrontendWorld);
+            // 단독 응답·이전 경기·다른 틱은 퇴장이나 승패의 근거가 될 수 없다.
+            if (expected >= 0 && tick == expected) departureAck = tick;
+        }
 
         /// <summary>
         /// 씬이 뜬 뒤: 일반 Brawl 실행/에디터 Play에는 공통 UI를 붙인다.
@@ -141,6 +196,7 @@ namespace Knockbox.Game.Online
                 cardHover = new CardHoverRelay((round, sequence, option) => wire.Connection?.SendCardHover(round, sequence, option));
                 if (wire.Connection != null) wire.Connection.CardHover = cardHover;
                 if (wire.Connection != null) wire.Connection.PlayerNameReceived = ReceivePeerName;
+                if (wire.Connection != null) wire.Connection.DepartureAcknowledged = ReceiveDepartureAcknowledgement;
             }
             if (usePrediction) delay = FusionPredictionPolicy.DelayTicks;
             connectionTiming = FusionTransport.ConnectionTiming.Unavailable;
@@ -220,6 +276,9 @@ namespace Knockbox.Game.Online
             if (fusionTransport != null && fusionTransport.Connection != null) fusionTransport.Connection.CardHover = null;
             if (fusionTransport != null && fusionTransport.Connection != null) fusionTransport.Connection.PlayerNameReceived = null;
             PeerName = ""; nameSent = nameReceived = false;
+            if (fusionTransport != null && fusionTransport.Connection != null) fusionTransport.Connection.DepartureAcknowledged = null;
+            departureRequested = DepartureDelivered = false;
+            departureAck = sentDepartureAck = departureOutcomeTick = -1;
             fusionTransport = null;
             cardHover = null;
             connectionTiming = FusionTransport.ConnectionTiming.Unavailable;
@@ -235,6 +294,7 @@ namespace Knockbox.Game.Online
             if (!started && session.State == SessionState.Running)
                 BeginMatch();
             prediction?.Pump();
+            UpdateDeparture();
             if (session.State == SessionState.Ended && !finished)
             {
                 if (CanReturnToSoloLobby()) { ReturnToSoloLobby(); return; }
@@ -344,6 +404,7 @@ namespace Knockbox.Game.Online
             // 방장이 공유 첫 틱을 기다리며 혼자 로비를 돌리는 동안의 틱은 로컬 월드다(체크섬·경기 수에 넣지 않는다).
             if (prediction != null && !r.PredictionDriven) return;
             var w = r.EventWorld;
+            UpdateDeparture();
             int tick = w.State.Tick;
             if (LockstepSession.NeedsChecksum(tick))
                 session.ReportChecksum(tick, w.ComputeChecksum());
@@ -453,6 +514,8 @@ namespace Knockbox.Game.Online
 
         void OnGUI()
         {
+            // Main은 실제 Frontend 점수판·머리 위 닉네임만 사용한다. 개발 상태 줄과 YOU는 그리지 않는다.
+            if (runner != null && runner.FrontendEnabled) return;
             if (!guiWarmed) WarmGuiFont();
             var frontend = GetComponent<UI.FrontendController>();
             if (frontend != null && frontend.View != null && frontend.View.Screen != UI.FrontendScreen.Hidden) return;

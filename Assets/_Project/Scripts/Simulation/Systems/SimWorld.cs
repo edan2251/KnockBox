@@ -139,6 +139,15 @@ namespace Knockbox.Simulation
             ValidateTerrainFeatures(config,arenas);Config=config;
         }
 
+        /// <summary>혼자 로비를 공유 로비로 이어 갈 때 합의한 설정을 적용한다. 월드·장면·선수 위치는 유지한다.</summary>
+        public void ConfigureSharedLobby(SimConfig config)
+        {
+            if (!InLobby || config == null || !config.Match.LobbySpace || config.Match.ResultsSpace != Config.Match.ResultsSpace)
+                throw new InvalidOperationException("공유 로비 시작 설정은 같은 공간의 로비에서만 적용할 수 있습니다.");
+            ValidateTerrainFeatures(config, arenas);
+            Config = config;
+        }
+
         public void Step(in InputFrame p1, in InputFrame p2)
         {
             Events.Clear();
@@ -146,6 +155,12 @@ namespace Knockbox.Simulation
             s.Tick++;
             var phase = s.Match.Phase;
             s.Match.PhaseTick++;
+            if (CanForfeit(s.Match, Config.Match) && (p1.Command != MatchCommand.None || p2.Command != MatchCommand.None))
+            {
+                int loser = p1.Command != MatchCommand.None ? 0 : 1;
+                Forfeit(ref s, loser, loser == 0 ? p1.Command : p2.Command);
+                return;
+            }
 
             // 구조물은 카운트다운·싸움·KO 동안 움직인다(히트스탑과 상관없이, 09 4절).
             // 결과 공간 물리(2026-11-20 실험)가 켜진 설정은 결과 공간에서도 시작 틱부터 움직인다.
@@ -167,7 +182,7 @@ namespace Knockbox.Simulation
                     break;
                 case MatchPhase.KO:
                     // 두 파이터 모두 정지. 연출이 KO 순간을 보여준다.
-                    if (s.Match.PhaseTick >= Config.Match.KoTicks)
+                    if (s.Match.PhaseTick >= (s.Match.Forfeited ? ForfeitKoTicks : Config.Match.KoTicks))
                         EndRound(ref s);
                     break;
                 case MatchPhase.RoundEnd:
@@ -313,6 +328,13 @@ namespace Knockbox.Simulation
 
         void EndRound(ref SimState s)
         {
+            if (s.Match.Forfeited)
+            {
+                s.Match.SetPhase(MatchPhase.MatchEnd);
+                Events.Add(new SimEvent(s.Tick, SimEventType.MatchEnd, s.Match.RoundWinner, Vec2.Zero, Vec2.Zero, s.Match.Round));
+                if (resultsArena != null) EnterResultsSpace(ref s);
+                return;
+            }
             if (s.Match.RoundWinner == 0)
                 s.Match.Score0++;
             else if (s.Match.RoundWinner == 1)
@@ -406,5 +428,44 @@ namespace Knockbox.Simulation
         }
 
         public uint ComputeChecksum() => State.ComputeChecksum();
+
+        public const int ForfeitFillStart = 24, ForfeitFillInterval = 9, ForfeitKoTicks = 108;
+
+        public static bool CanForfeit(in MatchState match) => !match.Forfeited && match.Phase != MatchPhase.MatchEnd
+            && match.Phase != MatchPhase.Lobby && match.Phase != MatchPhase.LobbyExit;
+
+        public static bool CanForfeit(in MatchState match, in MatchParams config)
+        {
+            if (!CanForfeit(match)) return false;
+            // 마지막 승리 KO가 이미 확정됐으면 뒤늦은 메뉴 입력으로 결과를 뒤집지 않는다.
+            if ((match.Phase == MatchPhase.KO || match.Phase == MatchPhase.RoundEnd) && match.RoundWinner >= 0
+                && match.GetSetScore(match.RoundWinner) + 1 >= config.SetsToWinMatch
+                && match.GetScore(match.RoundWinner) + (match.Phase == MatchPhase.KO ? 1 : 0) >= config.RoundsToWinSet) return false;
+            return true;
+        }
+
+        void Forfeit(ref SimState s, int loser, MatchCommand command)
+        {
+            ref var m = ref s.Match;
+            int winner = 1 - loser;
+            m.EndKind = command == MatchCommand.Leave
+                ? (loser == 0 ? MatchEndKind.LeaveP1 : MatchEndKind.LeaveP2)
+                : (loser == 0 ? MatchEndKind.SurrenderP1 : MatchEndKind.SurrenderP2);
+            m.WinnerSetsBeforeForfeit = m.GetSetScore(winner);
+            if (winner == 0) m.SetScore0 = Config.Match.SetsToWinMatch;
+            else m.SetScore1 = Config.Match.SetsToWinMatch;
+            m.RoundWinner = winner;
+            m.Score0 = m.Score1 = 0;
+            m.Picker = m.PickedAt = -1;
+            for (int i = 0; i < MatchState.MaxOptions; i++) m.SetOption(i, PickOption.None);
+            ref var fighter = ref loser == 0 ? ref s.Fighter0 : ref s.Fighter1;
+            bool alreadyKo = fighter.Action == ActionState.KO;
+            fighter.Health = 0;
+            fighter.RestartAction(ActionState.KO);
+            fighter.HitstopTicks = Config.Combat.KoHitstop;
+            if (!alreadyKo) Events.Add(new SimEvent(s.Tick, SimEventType.KO, loser, fighter.Position, fighter.Velocity, Config.Combat.KoHitstop));
+            m.SetPhase(MatchPhase.KO);
+            BrawlWeapons.Clear(ref s.Weapon);
+        }
     }
 }

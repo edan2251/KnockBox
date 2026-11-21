@@ -15,7 +15,7 @@ namespace Knockbox.Tests.EditMode
         public void DefaultPredictionVersion_IsTrimmedAndIsolatesEarlierComparisonBuilds()
         {
             string version = FusionPredictionPolicy.ConnectionVersion("same");
-            Assert.AreEqual("same-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry2-exit72-results3-name1", version);
+            Assert.AreEqual("same-prediction1-snapshot8708-tick60-delay0-hover1-hold144-carry2-exit72-results3-name1-end1", version);
             Assert.AreNotEqual("same-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry2-exit72-results3", version, "닉네임 RPC가 없는 빌드와 섞이지 않는다");
             Assert.AreNotEqual("same-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry2-exit72-results2", version, "숫자 낙하 시작 속도가 없던 빌드와는 접속하지 않는다");
             Assert.AreNotEqual("same-prediction1-snapshot8700-tick60-delay0-hover1-hold144-carry2-exit72-results1", version, "결과 점수가 계산 연출이던(숫자 발판 없음) 빌드와는 접속하지 않는다");
@@ -58,6 +58,37 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual("철수", Knockbox.Game.GameSettings.DisplayName("철수", 1));
         }
 
+        [Test]
+        public void FreshBuild_StartsWithWombat_AndKeepsOnlyItsOwnNickname()
+        {
+            // 실제 사용자의 에디터/배포본 닉네임을 건드리지 않고 두 빌드의 저장 범위를 검사한다.
+            string buildA = "NicknameTest_" + Guid.NewGuid().ToString("N"), buildB = "NicknameTest_" + Guid.NewGuid().ToString("N");
+            var load = typeof(Knockbox.Game.GameSettings).GetMethod("LoadForBuild", BindingFlags.Static | BindingFlags.NonPublic);
+            Knockbox.Game.GameSettings Load(string build) => (Knockbox.Game.GameSettings)load.Invoke(null, new object[] { build });
+            try
+            {
+                Assert.AreEqual("wombat", new Knockbox.Game.GameSettings().Nickname);
+                var first = Load(buildA);
+                Assert.AreEqual("wombat", first.Nickname);
+                first.SaveNickname("  첫선수  ");
+                Assert.AreEqual("첫선수", Load(buildA).Nickname, "같은 빌드 재실행은 수정한 이름을 유지한다");
+                var next = Load(buildB);
+                Assert.AreEqual("wombat", next.Nickname, "새 빌드에는 이전 빌드의 이름이 이어지지 않는다");
+                next.SaveNickname("");
+                Assert.AreEqual("", Load(buildB).Nickname, "직접 비운 이름은 wombat으로 덮어쓰지 않는다");
+                Assert.AreEqual("P2", Knockbox.Game.GameSettings.DisplayName(Load(buildB).Nickname, 1));
+                Assert.AreEqual("첫선수", Load(buildA).Nickname, "다른 빌드의 저장값은 보존한다");
+                first.ResetToDefaults();
+                Assert.AreEqual("첫선수", first.Nickname, "옵션 초기화는 닉네임을 지우지 않는다");
+            }
+            finally
+            {
+                PlayerPrefs.DeleteKey("Knockbox.Profile.Nickname." + buildA);
+                PlayerPrefs.DeleteKey("Knockbox.Profile.Nickname." + buildB);
+                PlayerPrefs.Save();
+            }
+        }
+
         [TestCase(null)] [TestCase("")] [TestCase(" ")]
         public void MissingConnectionVersion_IsRejected(string version)
             => Assert.Throws<FusionSetupException>(() => FusionPredictionPolicy.ConnectionVersion(version));
@@ -70,7 +101,7 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(FusionConnectionSettings.DefaultRegion, policy.Region);
             Assert.AreEqual(FusionConnectionSettings.DefaultAppVersion, policy.AppVersion);
             Assert.AreEqual(FusionPredictionPolicy.DelayTicks, OnlineMatch.DefaultOnlineDelay);
-            Assert.AreEqual(9, LockstepSession.ProtocolVersion);
+            Assert.AreEqual(10, LockstepSession.ProtocolVersion);
         }
 
         [TestCase(false)]

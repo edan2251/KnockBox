@@ -105,7 +105,7 @@ namespace Knockbox.Tests.EditMode
         {
             // 호버는 별도 RPC로만 다닌다. 시뮬레이션 입력 구조체·InputFrame에는 호버 칸이 없다.
             var inputFields = typeof(FusionPlayerInput).GetFields().Select(f => f.Name).OrderBy(n => n).ToArray();
-            CollectionAssert.AreEqual(new[] { "CardRound", "Packed", "SampledAt", "Sequence" }, inputFields);
+            CollectionAssert.AreEqual(new[] { "CardRound", "Command", "Packed", "SampledAt", "Sequence" }, inputFields);
             Assert.IsFalse(typeof(InputFrame).GetFields().Any(f => f.Name.ToLowerInvariant().Contains("hover")));
             Assert.IsFalse(typeof(MatchState).GetFields().Any(f => f.Name.ToLowerInvariant().Contains("hover")));
         }

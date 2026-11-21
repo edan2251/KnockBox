@@ -148,6 +148,14 @@ namespace Knockbox.Game.UI
         /// <summary>머리 위 이름을 띄울지(메인 화면 공간이 열려 있고 선수가 나가는 중이 아닐 때).</summary>
         public bool MenuSpaceShowsName => MenuSpaceActive && Screen != FrontendScreen.Options && MenuScreen && spaceExit == SpaceExit.None && !SpaceFighterAway;
 
+        // 접속 전의 색 미리보기일 뿐 실제 네트워크 슬롯은 바꾸지 않는다.
+        public int MenuPreviewSlot => Screen == FrontendScreen.Join || spaceExit == SpaceExit.Join ? 1 : 0;
+        float menuColorBlend;
+        Color MenuPlayerColor => Color.Lerp(playerColors[0], playerColors[1], menuColorBlend);
+        public bool CodeSubmitPressed => Screen == FrontendScreen.Join && !NameInputBusy
+            && EventSystem.current != null && EventSystem.current.currentSelectedGameObject == CodeInput.gameObject
+            && Keyboard.current != null && (Keyboard.current.enterKey.wasPressedThisFrame || Keyboard.current.numpadEnterKey.wasPressedThisFrame);
+
         // ── 근접 구도(2026-11-21 2차: 처음 메인 화면의 큰 캐릭터 크기) ───────────────────────────
         // 화면 높이 1080 기준 선수 몸 약 350px(처음 메인 화면의 UI 캐릭터와 같은 크기), 발은 화면 위에서 960px, 몸 가운데는 왼쪽에서 423px.
         const float CloseSize = 1.25f, CloseFeetFromCenter = 420f / 540f, CloseSideFromCenter = 537f / 540f, CloseSeconds = .32f;
@@ -236,6 +244,9 @@ namespace Knockbox.Game.UI
         /// </summary>
         void PresentMenuSpace(SimWorld w, float tick)
         {
+            menuColorBlend = Mathf.MoveTowards(menuColorBlend, MenuPreviewSlot, Time.unscaledDeltaTime / .28f);
+            motionPresenter.MenuPreviewColor = MenuPlayerColor;
+            motionPresenter.Fighter(0).SetMenuTint(MenuPlayerColor);
             var match = w.Config.Match;
             points.Root.gameObject.SetActive(false);
             startCue.gameObject.SetActive(false);
@@ -435,7 +446,7 @@ namespace Knockbox.Game.UI
             rect.offsetMin = rect.offsetMax = Vector2.zero;
         }
 
-        bool CanEditName => Screen == FrontendScreen.Main && StartMenuOpen && MenuSpaceActive && spaceExit == SpaceExit.None && !SpaceFighterAway
+        bool CanEditName => (Screen == FrontendScreen.Join || Screen == FrontendScreen.Main && StartMenuOpen) && MenuSpaceActive && spaceExit == SpaceExit.None && !SpaceFighterAway
             && motionRunner != null && motionRunner.World != null && motionRunner.World.InLobby && motionRunner.World.State.Fighter0.Grounded;
 
         void BeginNameEdit()
@@ -443,9 +454,10 @@ namespace Knockbox.Game.UI
             if (editingName || !CanEditName || nameField == null) return;
             editingName = true;
             nameCommitFrame = 0;
+            if (CodeInput.isFocused) CodeInput.DeactivateInputField();
             nameField.gameObject.SetActive(true);
             nameField.text = Nickname ?? "";
-            namePlaceholder.text = "P" + (localSlot + 1);
+            namePlaceholder.text = "P" + (MenuPreviewSlot + 1);
             motionPresenter.HiddenLobbyName = localSlot;
             PlaceNameEditor();
             nameField.Select();
@@ -528,8 +540,8 @@ namespace Knockbox.Game.UI
             rect.anchoredPosition = middle;
             rect.sizeDelta = new Vector2(fontPx * (GameSettings.NicknameMaxLength + 2), fontPx * 1.6f);
             nameFieldText.fontSize = namePlaceholder.fontSize = fontSize;
-            nameFieldText.color = playerColors[localSlot];
-            nameField.selectionColor = PaletteAsset.WithAlpha(playerColors[localSlot], .35f);
+            nameFieldText.color = MenuPlayerColor;
+            nameField.selectionColor = PaletteAsset.WithAlpha(MenuPlayerColor, .35f);
             float outline = 3f * fontPx / 54f; // 머리 위 글자(54)의 외곽선 3과 같은 비율
             nameFieldOutline.effectDistance = new Vector2(outline, -outline);
         }
@@ -561,6 +573,12 @@ namespace Knockbox.Game.UI
         void CommitOnEnter()
         {
             var keyboard = Keyboard.current;
+            if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
+            {
+                CancelNameEdit();
+                nameField.DeactivateInputField();
+                return;
+            }
             if (keyboard != null && (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame))
             {
                 nameCommitFrame = Time.frameCount + 1;

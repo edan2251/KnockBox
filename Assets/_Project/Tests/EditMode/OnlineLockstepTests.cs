@@ -166,8 +166,8 @@ namespace Knockbox.Tests.EditMode
             U(0u);
             U(3u);
             bytes.Add(1);
-            var buffer = new byte[InputFrame.Size];
-            new InputFrame(1, 1, InputButtons.Attack | InputButtons.Grab | InputButtons.Jump, 63).Write(buffer, 0);
+            var buffer = new byte[InputFrame.CommandSize];
+            new InputFrame(1, 1, InputButtons.Attack | InputButtons.Grab | InputButtons.Jump, 63).WriteCommand(buffer, 0);
             bytes.AddRange(buffer);
             U(unchecked((uint)-1));
             U(0u);

@@ -1,6 +1,7 @@
 using Knockbox.Presentation;
 using Knockbox.Simulation;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace Knockbox.Game
 {
@@ -13,7 +14,7 @@ namespace Knockbox.Game
     {
         const float BarWidth = 1.2f;
         const float BarHeight = 0.12f;
-        const float BarOffsetY = 1.05f;
+        const float BarOffsetY = .82f;
         /// <summary>에너지 줄(CR-003 4.4): 체력 바 바로 아래의 얇은 민트 줄. 다음 공격 비용보다 적으면 흐린 색.</summary>
         const float TrailHold = 0.4f;
         const float TrailSpeed = 2.5f;
@@ -53,6 +54,23 @@ namespace Knockbox.Game
         string shownBanner;
         string shownSub;
         float bannerAge;
+        readonly Text[] playerNames = new Text[2];
+        readonly Canvas[] nameCanvases = new Canvas[2];
+        readonly string[] names = { "P1", "P2" };
+
+        public void SetNames(string p1, string p2) { names[0] = p1; names[1] = p2; }
+
+        public void SetMenuFocus(int slot, bool active)
+        {
+            for (int p = 0; p < 2; p++)
+            {
+                int order = active && p == slot ? 110 : 0;
+                bars[p].Back.sortingOrder = order;
+                bars[p].Trail.sortingOrder = order + 1;
+                bars[p].Fill.sortingOrder = order + 2;
+                if (nameCanvases[p] != null) nameCanvases[p].sortingOrder = order + 3;
+            }
+        }
 
         /// <summary>지금 가운데 문구(없으면 빈 문자열). 테스트·캡처 확인용.</summary>
         public string Banner => shownBanner ?? "";
@@ -78,6 +96,24 @@ namespace Knockbox.Game
                 bars[i].Shown = 1f;
                 bars[i].Trailing = 1f;
                 bars[i].Back.enabled=bars[i].Trail.enabled=bars[i].Fill.enabled=true;
+                if (playerNames[i] == null)
+                {
+                    var go = new GameObject("Combat_name_P" + (i + 1), typeof(RectTransform), typeof(Canvas));
+                    go.transform.SetParent(transform, false);
+                    nameCanvases[i] = go.GetComponent<Canvas>();
+                    nameCanvases[i].renderMode = RenderMode.WorldSpace;
+                    nameCanvases[i].sortingLayerName = SortingLayers.UI;
+                    nameCanvases[i].sortingOrder = 3;
+                    ((RectTransform)go.transform).sizeDelta = new Vector2(180, 30);
+                    go.transform.localScale = Vector3.one * .01f;
+                    var theme = UI.FrontendTheme.Load();
+                    playerNames[i] = UI.FrontendWidgets.Text(go.transform, "Nickname", new Rect(0, 0, 180, 30),
+                        names[i], theme.boldFont, 22, palette.FighterBody(i));
+                    playerNames[i].supportRichText = false;
+                    playerNames[i].horizontalOverflow = HorizontalWrapMode.Overflow;
+                    var outline = playerNames[i].gameObject.AddComponent<Outline>();
+                    outline.effectColor = palette.ink; outline.effectDistance = new Vector2(1, -1);
+                }
             }
             for (int i = 0; i < 2; i++)
             {
@@ -190,6 +226,15 @@ namespace Knockbox.Game
             RenderBanner(state, match, dt);
             RenderBar(ref bars[0], body0, Health(state.Fighter0, maxHealth), dt);
             RenderBar(ref bars[1], body1, Health(state.Fighter1, maxHealth), dt);
+            for (int p = 0; p < 2; p++)
+            {
+                var label = playerNames[p];
+                label.text = names[p];
+                label.fontSize = UI.FrontendScoreView.FitFontSize(label, 22, 180);
+                var at = p == 0 ? body0 : body1;
+                nameCanvases[p].transform.localPosition = new Vector3(at.x, at.y + BarOffsetY + .22f, 0);
+                nameCanvases[p].gameObject.SetActive(state.GetFighter(p).Action != ActionState.KO);
+            }
 
             int count = Mathf.Clamp(roundsToWin, 0, MaxSlots);
             for (int k = 0; k < MaxSlots; k++)

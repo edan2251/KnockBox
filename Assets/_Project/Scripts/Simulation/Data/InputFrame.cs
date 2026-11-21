@@ -2,6 +2,8 @@ using System;
 
 namespace Knockbox.Simulation
 {
+    /// <summary>메뉴에서 확인한 경기 종료 의도. 전투 버튼과 구분하며 확정 입력으로 기록한다.</summary>
+    public enum MatchCommand : byte { None, Surrender, Leave }
     [Flags]
     public enum InputButtons : byte
     {
@@ -36,18 +38,20 @@ namespace Knockbox.Simulation
         public InputButtons Buttons;
         /// <summary>0 없음, 1~64 = AimDirections 번호 + 1.</summary>
         public byte Aim;
+        public MatchCommand Command;
 
         public InputFrame(int moveX, int moveY, InputButtons buttons)
             : this(moveX, moveY, buttons, 0)
         {
         }
 
-        public InputFrame(int moveX, int moveY, InputButtons buttons, byte aim)
+        public InputFrame(int moveX, int moveY, InputButtons buttons, byte aim, MatchCommand command = MatchCommand.None)
         {
             MoveX = (sbyte)SimMath.Clamp(moveX, -1, 1);
             MoveY = (sbyte)SimMath.Clamp(moveY, -1, 1);
             Buttons = buttons & InputButtons.All;
             Aim = aim <= AimDirections.Count ? aim : (byte)0;
+            Command = command <= MatchCommand.Leave ? command : MatchCommand.None;
         }
 
         public bool HasAim => Aim != 0;
@@ -59,6 +63,7 @@ namespace Knockbox.Simulation
 
         /// <summary>기록 파일용 바이트 수(기록 형식 5부터 조준 포함 4바이트, 4 이하는 3바이트).</summary>
         public const int Size = 4;
+        public const int CommandSize = 5;
         public const int LegacySize = 3;
 
         /// <summary>기록 파일용 4바이트 표현.</summary>
@@ -73,13 +78,27 @@ namespace Knockbox.Simulation
         public static InputFrame Read(byte[] buffer, int offset) =>
             new InputFrame(unchecked((sbyte)buffer[offset]), unchecked((sbyte)buffer[offset + 1]), (InputButtons)buffer[offset + 2], buffer[offset + 3]);
 
+        public void WriteCommand(byte[] buffer, int offset)
+        {
+            Write(buffer, offset);
+            buffer[offset + Size] = (byte)Command;
+        }
+
+        public static InputFrame ReadCommand(byte[] buffer, int offset)
+        {
+            if (buffer[offset + Size] > (byte)MatchCommand.Leave) throw new System.IO.InvalidDataException("알 수 없는 경기 종료 입력");
+            var frame = Read(buffer, offset);
+            frame.Command = (MatchCommand)buffer[offset + Size];
+            return frame;
+        }
+
         /// <summary>조준이 없던 기록 형식(4 이하)의 3바이트 표현.</summary>
         public static InputFrame ReadLegacy(byte[] buffer, int offset) =>
             new InputFrame(unchecked((sbyte)buffer[offset]), unchecked((sbyte)buffer[offset + 1]), (InputButtons)buffer[offset + 2]);
 
-        public bool Equals(InputFrame other) => MoveX == other.MoveX && MoveY == other.MoveY && Buttons == other.Buttons && Aim == other.Aim;
+        public bool Equals(InputFrame other) => MoveX == other.MoveX && MoveY == other.MoveY && Buttons == other.Buttons && Aim == other.Aim && Command == other.Command;
         public override bool Equals(object obj) => obj is InputFrame other && Equals(other);
-        public override int GetHashCode() => (MoveX + 1) | ((MoveY + 1) << 2) | ((int)Buttons << 4) | (Aim << 12);
+        public override int GetHashCode() => (MoveX + 1) | ((MoveY + 1) << 2) | ((int)Buttons << 4) | (Aim << 12) | ((int)Command << 20);
         public static bool operator ==(InputFrame a, InputFrame b) => a.Equals(b);
         public static bool operator !=(InputFrame a, InputFrame b) => !a.Equals(b);
         public override string ToString() => Aim == 0 ? $"({MoveX},{MoveY}) {Buttons}" : $"({MoveX},{MoveY}) {Buttons} aim{Aim - 1}";

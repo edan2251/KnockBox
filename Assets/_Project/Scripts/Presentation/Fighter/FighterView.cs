@@ -408,6 +408,13 @@ namespace Knockbox.Presentation
             return k >= 1f ? 3 : k >= ChargeStage2 ? 2 : 1;
         }
 
+        /// <summary>코드 참가 미리보기. 다음 Render에서 실제 슬롯 색으로 복원된다.</summary>
+        public void SetMenuTint(Color color)
+        {
+            body.color = color;
+            glow.color = PaletteAsset.WithAlpha(color, BodyGlowAlpha);
+        }
+
         void UpdateColors(in FighterState f, float dt, SimConfig config)
         {
             body.color = flashLeft > 0f ? palette.flash : f.Action == ActionState.KO ? palette.FighterShade(index) : palette.FighterBody(index);

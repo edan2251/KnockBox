@@ -26,7 +26,7 @@ namespace Knockbox.Game.Online
             // results2: 결과 공간 점수가 실제 물리 숫자 발판(깎은 조각 모양 접촉, 점수와 다른 숫자 몸은 없앰)인 빌드끼리만 접속한다(2026-11-20).
             // results3: 숫자 발판이 낙하 시작 속도를 받고(PropDef.ReleaseSpeed) 줄이 실제 획에 붙는 빌드끼리만 접속한다(2026-11-20).
             // name1: 닉네임을 표시 전용 RPC(Rpc_PlayerName)로 주고받는 빌드끼리만 접속한다(2026-11-21, 판정·기록과 무관).
-            return $"{version.Trim()}-prediction1-snapshot{FusionWorldSnapshot.ByteCount}-tick60-delay{DelayTicks}-hover1-hold{CardCollectionRules.LongPickHoldTicks}-carry2-exit{CardCollectionRules.LobbyExitTicks}-results3-name1";
+            return $"{version.Trim()}-prediction1-snapshot{FusionWorldSnapshot.ByteCount}-tick60-delay{DelayTicks}-hover1-hold{CardCollectionRules.LongPickHoldTicks}-carry2-exit{CardCollectionRules.LobbyExitTicks}-results3-name1-end1";
         }
 
         public static NetworkProjectConfig CreateConfig(NetworkProjectConfig source)

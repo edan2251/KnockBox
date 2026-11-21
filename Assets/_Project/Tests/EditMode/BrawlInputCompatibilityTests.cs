@@ -115,7 +115,7 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(12, runner.CreateConfig().Combat.Body.MinLungeChargeTicks);
             Assert.AreEqual(0f, runner.CreateConfig().Combat.Weapons.ThrowSpeed, "현재 경기는 무기 보류. 위에서 구 투척 수치를 별도 검증");
             Assert.AreEqual(8, InputRecording.FormatVersion);
-            Assert.AreEqual(9, LockstepSession.ProtocolVersion, "맵 목록/지형 검증 규격이 다른 이전 실행 파일과 접속을 분리한다");
+            Assert.AreEqual(10, LockstepSession.ProtocolVersion, "맵 목록/지형·종료 입력 규격이 다른 이전 실행 파일과 접속을 분리한다");
         }
 
         [Test]
@@ -373,7 +373,7 @@ namespace Knockbox.Tests.EditMode
         [TestCase(8)]
         public void OldProtocolPeer_IsRejectedBeforeAnyInputIsRead(int protocol)
         {
-            Assert.AreEqual(9, LockstepSession.ProtocolVersion);
+            Assert.AreEqual(10, LockstepSession.ProtocolVersion);
             MemoryTransport.Pair(out var local, out var oldPeer);
             using var session = new LockstepSession(local, true, 1u, 2u, 7u, 3);
             var header = new byte[6];

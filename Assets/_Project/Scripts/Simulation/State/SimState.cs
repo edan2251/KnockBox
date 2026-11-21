@@ -190,6 +190,8 @@ namespace Knockbox.Simulation
         /// </summary>
         public static void StartNewMatch(ref SimState state, SimConfig config, ArenaDef arena)
         {
+            state.Match.EndKind = MatchEndKind.Normal;
+            state.Match.WinnerSetsBeforeForfeit = 0;
             state.Match.Score0 = 0;
             state.Match.Score1 = 0;
             state.Match.Round = 0;

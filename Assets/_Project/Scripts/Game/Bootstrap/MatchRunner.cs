@@ -108,6 +108,7 @@ namespace Knockbox.Game
 
         /// <summary>화면 버튼 위인지(결과 공간 O/X). 화면(FrontendController)이 연결한다. 판정 상태에는 저장하지 않는다.</summary>
         public Func<bool> PointerOverFrontendButton { get; set; }
+        public bool RequestMatchCommand(MatchCommand command) => frontendInputs[LocalPlayerSlot]?.RequestMatchCommand(command) == true;
 
         /// <summary>결과 공간의 다시하기 준비를 켜고 끈다.</summary>
         public bool ToggleReady(int slot) =>
@@ -814,6 +815,9 @@ namespace Knockbox.Game
         public void BeginPrediction(int localSlot, SimWorld confirmed)
         {
             if (confirmed == null) throw new ArgumentNullException(nameof(confirmed));
+            // 혼자 기다리던 로비는 연습용 재대결 설정이었다. 첫 공유 틱부터 예측·확정 월드가 같은 합의 설정을 쓴다.
+            if (World.InLobby && World.Config.ComputeChecksum() != confirmed.Config.ComputeChecksum())
+                World.ConfigureSharedLobby(confirmed.Config);
             predictionSlot = localSlot; confirmedWorld = confirmed; predictionAlpha = 1;
             PredictionDriven = true;
             if (AbsentSlot == 1 && World != null && World.InLobby) AbsentSlot = -1; // 혼자 로비를 이어 공유 로비가 됨

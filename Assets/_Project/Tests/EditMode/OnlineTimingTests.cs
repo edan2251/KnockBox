@@ -142,7 +142,7 @@ namespace Knockbox.Tests.EditMode
             writer.Write(LockstepSession.Magic); writer.Write(LockstepSession.ProtocolVersion); writer.Write((byte)4);
             writer.Write(0u); writer.Write(0u); writer.Write((ushort)0);
             writer.Write(3); writer.Write(tick); writer.Write((byte)1);
-            writer.Write(0u); // Neutral InputFrame, four bytes.
+            writer.Write(0u); writer.Write((byte)0); // Neutral input plus match command.
             writer.Write(-1); writer.Write(0u);
             return bytes.ToArray();
         }

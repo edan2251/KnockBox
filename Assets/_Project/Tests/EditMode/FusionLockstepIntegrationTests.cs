@@ -102,11 +102,11 @@ namespace Knockbox.Tests.EditMode
             guest.Begin(0, new SequenceInput(1));
 
             // 포화된 미확인 입력 묶음을 강제로 만든다. 둘 다 상대 입력이 없으므로 확정 틱은 진행하지 않는다.
-            // 255 frames * 4 bytes + 33-byte lockstep header/trailer = 1053 bytes (> Fusion RPC limit).
+            // 255 frames * 5 bytes(종료 명령 포함) + 33-byte lockstep header/trailer = 1308 bytes (> Fusion RPC limit).
             Assert.IsFalse(host.TryGetInputs(254, out _, out _));
             Assert.IsFalse(guest.TryGetInputs(254, out _, out _));
-            Assert.AreEqual(1053, leftLink.LargestPacket);
-            Assert.AreEqual(1053, rightLink.LargestPacket);
+            Assert.AreEqual(1308, leftLink.LargestPacket);
+            Assert.AreEqual(1308, rightLink.LargestPacket);
 
             var hostTrace = new Trace();
             var guestTrace = new Trace();

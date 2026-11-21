@@ -131,6 +131,13 @@ namespace Knockbox.Game.UI
             labelFit[fighter] = width > MaxLabelWidth ? MaxLabelWidth / width : 1f;
         }
 
+        public void SetColor(int fighter, Color color)
+        {
+            labels[fighter].color = color;
+            pointers[fighter].Find("Edge").GetComponent<Image>().color = color;
+            fills[fighter].GetComponent<Image>().color = color;
+        }
+
         /// <summary>
         /// 이름 글자의 월드 가운데와 크기(보이는 동안만). 메인 화면에서 이름 위에 누를 자리·입력칸을 겹치는 데 쓴다.
         /// 크기의 높이는 글꼴 크기 기준이라 글자가 없어도 입력칸 높이를 정할 수 있다.

@@ -12,24 +12,32 @@ namespace Knockbox.Game
         const string Prefix = "Knockbox.Settings.";
         /// <summary>닉네임(2026-11-21 메인 화면): 옵션이 아니라 프로필 값이라 기본값으로 되돌리기에서 지우지 않는다.</summary>
         const string NicknameKey = "Knockbox.Profile.Nickname";
+        public const string DefaultNickname = "wombat";
         public const int NicknameMaxLength = 10;
+        string nicknameKey = NicknameKeyForBuild(Application.buildGUID);
         public float Volume = 1f;
         /// <summary>정리된 닉네임. 비어 있으면 자리 이름(P1/P2)을 쓴다.</summary>
-        public string Nickname = "";
+        public string Nickname = DefaultNickname;
         public bool Fullscreen = true;
         /// <summary>0이면 모니터 기본 해상도.</summary>
         public int Width, Height;
         public bool ReduceShake, ReduceFlash;
 
-        public static GameSettings Load() => new GameSettings
+        public static GameSettings Load() => LoadForBuild(Application.buildGUID);
+
+        // 에디터의 buildGUID는 빈 문자열이다. 새 빌드는 다른 키에서 기본 이름으로 시작하고, 같은 빌드의 수정은 유지한다.
+        static string NicknameKeyForBuild(string buildGuid) => string.IsNullOrEmpty(buildGuid) ? NicknameKey : NicknameKey + "." + buildGuid;
+
+        static GameSettings LoadForBuild(string buildGuid) => new GameSettings
         {
+            nicknameKey = NicknameKeyForBuild(buildGuid),
             Volume = Mathf.Clamp01(PlayerPrefs.GetFloat(Prefix + "Volume", 1f)),
             Fullscreen = PlayerPrefs.GetInt(Prefix + "Fullscreen", 1) != 0,
             Width = PlayerPrefs.GetInt(Prefix + "Width", 0),
             Height = PlayerPrefs.GetInt(Prefix + "Height", 0),
             ReduceShake = PlayerPrefs.GetInt(Prefix + "ReduceShake", 0) != 0,
             ReduceFlash = PlayerPrefs.GetInt(Prefix + "ReduceFlash", 0) != 0,
-            Nickname = CleanNickname(PlayerPrefs.GetString(NicknameKey, "")),
+            Nickname = CleanNickname(PlayerPrefs.GetString(NicknameKeyForBuild(buildGuid), DefaultNickname)),
         };
 
         /// <summary>
@@ -65,7 +73,7 @@ namespace Knockbox.Game
         public void SaveNickname(string value)
         {
             Nickname = CleanNickname(value);
-            PlayerPrefs.SetString(NicknameKey, Nickname);
+            PlayerPrefs.SetString(nicknameKey, Nickname);
             PlayerPrefs.Save();
         }
 

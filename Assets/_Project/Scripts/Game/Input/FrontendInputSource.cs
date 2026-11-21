@@ -17,7 +17,16 @@ namespace Knockbox.Game
         SimWorld readyWorld;
         int readyRound = -1;
         readonly Func<bool> pointerOverButton;
+        MatchCommand command;
         public IInputSource Combat => combat;
+
+        public bool RequestMatchCommand(MatchCommand value)
+        {
+            var w = world();
+            if (w == null || value == MatchCommand.None || !SimWorld.CanForfeit(w.State.Match, w.Config.Match)) return false;
+            command = value;
+            return true;
+        }
 
         /// <param name="pointerOverButton">결과 공간의 화면 버튼 위인지. 버튼을 누른 클릭은 뗄 때까지 공격·잡기로 보내지 않는다.</param>
         public FrontendInputSource(Func<SimWorld> world, Func<bool> blocked, IInputSource combat, int player, bool automaticPick = false,
@@ -82,7 +91,21 @@ namespace Knockbox.Game
         public InputFrame Poll(int tick)
         {
             var w = world();
-            if (w == null || blocked()) { observedRound = -1; queued = -1; readyRound = -1; readyWorld = null; return default; }
+            if (w == null) return default;
+            if (command != MatchCommand.None)
+            {
+                if (SimWorld.CanForfeit(w.State.Match, w.Config.Match))
+                    return new InputFrame(0, 0, InputButtons.None, 0, command);
+                command = MatchCommand.None;
+            }
+            if (blocked())
+            {
+                // 누르고 있던 포인터 버튼은 메뉴를 닫은 뒤 실제로 뗄 때까지 다시 보내지 않는다.
+                var raw = combat?.Poll(tick) ?? default;
+                awaitingRelease |= raw.Buttons; lastRaw = raw.Buttons;
+                observedRound = -1; queued = -1; readyRound = -1; readyWorld = null;
+                return default;
+            }
             if (!w.Config.Match.CollectCardsOnly) return combat?.Poll(tick) ?? default;
             var m = w.State.Match;
             bool entered = observedPhase != m.Phase || observedRound != m.Round;
@@ -108,6 +131,8 @@ namespace Knockbox.Game
                 queued = -1;
                 if (m.Phase != MatchPhase.Fighting && m.Phase != MatchPhase.MatchEnd) return default;
                 var frame = combat?.Poll(tick) ?? default;
+                if (pointerOverButton?.Invoke() == true)
+                    awaitingRelease |= frame.Buttons & (InputButtons.Attack | InputButtons.Grab | InputButtons.Charge);
                 // 화면을 넘길 때 누르고 있던 버튼은 실제로 뗀 뒤 다시 눌러야 한다.
                 if (entered) { awaitingRelease = frame.Buttons; return default; }
                 awaitingRelease &= frame.Buttons;

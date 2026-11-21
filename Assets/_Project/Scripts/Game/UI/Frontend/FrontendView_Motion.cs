@@ -124,10 +124,10 @@ namespace Knockbox.Game.UI
             startCue.gameObject.SetActive(false);
             points.Root.gameObject.SetActive(MatchHudVisible);
             matte.color = Theme.background;
-            if (screen == FrontendScreen.Main || screen == FrontendScreen.Join || screen == FrontendScreen.Waiting)
+            if (screen == FrontendScreen.Main || screen == FrontendScreen.Join || screen == FrontendScreen.Waiting || screen == FrontendScreen.Ended)
             {
                 // 메인↔로비는 같은 배경 위에서 서로 다른 방향으로 지나간다.
-                menuAlpha.gameObject.SetActive(true); lobby.gameObject.SetActive(true);
+                menuAlpha.gameObject.SetActive(screen != FrontendScreen.Ended); lobby.gameObject.SetActive(true);
             }
             pendingCard = motionCard = -1;
             cardFeedbackOffset = 0;
@@ -150,9 +150,10 @@ namespace Knockbox.Game.UI
             float age = Time.unscaledTime - enteredAt;
             veil.color = PaletteAsset.Transparent;
             ApplyMenuBackdrop(false);
-            if (Screen == FrontendScreen.Main || Screen == FrontendScreen.Join || Screen == FrontendScreen.Waiting || Screen == FrontendScreen.Options)
+            if (Screen == FrontendScreen.Main || Screen == FrontendScreen.Join || Screen == FrontendScreen.Waiting || Screen == FrontendScreen.Options || Screen == FrontendScreen.Ended)
             {
-                bool main = Screen == FrontendScreen.Main, room = Screen == FrontendScreen.Join || Screen == FrontendScreen.Waiting;
+                bool main = Screen == FrontendScreen.Main, ended = Screen == FrontendScreen.Ended;
+                bool room = Screen == FrontendScreen.Join || Screen == FrontendScreen.Waiting || ended;
                 float speed = 1 - Mathf.Exp(-16 * Time.unscaledDeltaTime);
                 // 연습으로 나가는 동안(2026-11-21)은 메뉴도 함께 사라져 연습 경기의 재구성으로 이어진다.
                 menuAlpha.alpha = Mathf.Lerp(menuAlpha.alpha, main && spaceExit != SpaceExit.Practice ? 1 : 0, speed);
@@ -161,8 +162,16 @@ namespace Knockbox.Game.UI
                 menuAlpha.interactable = menuAlpha.blocksRaycasts = main && spaceExit != SpaceExit.Practice;
                 lobbyAlpha.interactable = lobbyAlpha.blocksRaycasts = room && !HideRoomPanel;
                 AnimateMenuColumn(main, age);
-                lobby.anchoredPosition = new Vector2(900 + 100 * (1 - lobbyAlpha.alpha), -230);
-                if (!main) AnimateEntries(roomEntries, roomEntryPositions, roomEntryAlpha, age);
+                if (ended)
+                {
+                    ArrangeEndedRoom();
+                    foreach (var group in roomEntryAlpha) group.alpha = Out(age / .24f);
+                }
+                else
+                {
+                    lobby.anchoredPosition = new Vector2(900 + 100 * (1 - lobbyAlpha.alpha), -230);
+                    if (!main) AnimateEntries(roomEntries, roomEntryPositions, roomEntryAlpha, age);
+                }
                 // 메인 화면 공간(2026-11-21)이 열려 있으면 단색 배경을 장면이 보이는 만큼 걷어 월드(로비 공간)가 보이게 한다.
                 ApplyMenuBackdrop(true);
                 return;
@@ -232,6 +241,20 @@ namespace Knockbox.Game.UI
                 items[i].anchoredPosition = home[i] + Vector2.right * 85 * (1 - Out(t));
                 groups[i].alpha = Out(t);
             }
+        }
+
+        void ArrangeEndedRoom()
+        {
+            var title = lobbyTitle.rectTransform;
+            var message = Status.rectTransform;
+            var back = (RectTransform)lobbyBack.transform;
+            const float gap = 24;
+            float height = title.rect.height + message.rect.height + back.rect.height + gap * 2;
+            float width = lobby.rect.width;
+            lobby.anchoredPosition = new Vector2((menu.rect.width - width) * .5f, -(menu.rect.height - height) * .5f);
+            title.anchoredPosition = new Vector2((width - title.rect.width) * .5f, 0);
+            message.anchoredPosition = new Vector2((width - message.rect.width) * .5f, -title.rect.height - gap);
+            back.anchoredPosition = new Vector2((width - back.rect.width) * .5f, -title.rect.height - message.rect.height - gap * 2);
         }
 
         void AnimateImpactVersus(float tick)
@@ -433,7 +456,7 @@ namespace Knockbox.Game.UI
                 keepCardBackdrop = false;
             // 선택으로 넘어갈 세트 KO에서 지형/파편만 퇴장시킨다. 다음 재구성까지 배경이 한 프레임 꺼지지 않게 유지한다.
             int winner = m.RoundWinner;
-            bool goingToCards = w.Config.Match.CollectCardsOnly && winner >= 0 && (ko || m.Phase == MatchPhase.RoundEnd)
+            bool goingToCards = !m.Forfeited && w.Config.Match.CollectCardsOnly && winner >= 0 && (ko || m.Phase == MatchPhase.RoundEnd)
                 && m.GetScore(winner) + (ko ? 1 : 0) >= w.Config.Match.RoundsToWinSet
                 && m.GetSetScore(winner) + 1 < w.Config.Match.SetsToWinMatch
                 && m.GetPicks(1 - winner) < w.Config.Match.MaxPicks;
@@ -443,14 +466,14 @@ namespace Knockbox.Game.UI
             if (!monolithStage && (goingToCards || m.Phase == MatchPhase.SetPick)) keepCardBackdrop = true;
             float tick = m.PhaseTick + motionRunner.RenderAlpha;
             bool countIn = CardCollectionRules.HasCountIn(w.Config.Match);
-            float t = ko ? Range(tick, countIn ? 84 : 0, w.Config.Match.KoTicks) : 0;
+            float t = ko ? (m.Forfeited ? Range(tick, 72, SimWorld.ForfeitKoTicks) : Range(tick, countIn ? 84 : 0, w.Config.Match.KoTicks)) : 0;
             int buildStart = m.Round == 1 ? IntroRevealTick : 0;
             int buildEnd = countIn ? buildStart + CardCollectionRules.RebuildTicks : w.Config.Match.CountdownForRound(m.Round) - 5;
             bool roundLightOn = !countdown || !countIn || tick >= buildEnd + CardCollectionRules.CountBeatTicks * 3;
             // 화면 전체를 감광하지 않는다. 배경의 그림자 명암은 그대로 두고 GO에서 빛 영역만 연다.
             float build = countdown ? Range(tick, buildStart, buildEnd) : 1;
             float spawn = countdown ? Pop(Range(build, .38f, .84f)) : fighting || ko ? 1 : 0;
-            float shrink = 1 - Out(Range(t, .18f, .38f));
+            float shrink = m.Forfeited ? 1 : 1 - Out(Range(t, .18f, .38f));
             float exit = ko ? Range(t, .48f, 1) : fighting || countdown ? 0 : 1;
             float roundLight = RoundLight(m.Phase, countIn, roundLightOn, exit, keepCardBackdrop);
             float opacity = countdown ? Out(build) : 1 - Smooth(exit);
@@ -461,7 +484,7 @@ namespace Knockbox.Game.UI
                 if (RectTransformUtility.ScreenPointToLocalPointInRectangle(stage, screen, null, out var local))
                     origin = local + new Vector2(960, -540);
             }
-            points.Render(w.State, w.Config, MatchHudVisible, origin, motionRunner.RenderAlpha);
+            points.Render(motionRunner.FrontendWorld.State, w.Config, MatchHudVisible, origin, motionRunner.RenderAlpha);
             float s0 = ko && m.RoundWinner == 0 ? shrink : spawn;
             float s1 = ko && m.RoundWinner == 1 ? shrink : spawn;
             motionPresenter.PresentFrontendStage(countdown ? build : exit, countdown, opacity, s0, s1,

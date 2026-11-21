@@ -9,7 +9,7 @@ namespace Knockbox.Game.Online
     /// </summary>
     public sealed class FusionConfirmedJournal
     {
-        public const byte Version = 2;
+        public const byte Version = 3;
         public const int BatchSize = 4;
         public SimWorld World { get; }
         public InputRecording Recording { get; private set; }
@@ -62,43 +62,47 @@ namespace Knockbox.Game.Online
             if (count < 1 || count > BatchSize || first < 0 || first + count != Recording.Count)
                 throw new ArgumentOutOfRangeException(nameof(count));
             int startBlock = first == 0 ? LobbyCarry.Size : 0;
-            var data = new byte[10 + count * InputFrame.Size * 2 + startBlock];
+            var data = new byte[10 + count * InputFrame.CommandSize * 2 + startBlock];
             data[0] = Version;
             WriteInt(data, 1, first);
             data[5] = (byte)count;
             for (int i = 0; i < count; i++)
             {
-                Recording.GetP1(first + i).Write(data, 6 + i * 8);
-                Recording.GetP2(first + i).Write(data, 10 + i * 8);
+                Recording.GetP1(first + i).WriteCommand(data, 6 + i * 10);
+                Recording.GetP2(first + i).WriteCommand(data, 11 + i * 10);
             }
-            if (startBlock > 0) Carry.Write(data, 6 + count * 8);
+            if (startBlock > 0) Carry.Write(data, 6 + count * 10);
             WriteInt(data, data.Length - 4, unchecked((int)World.ComputeChecksum()));
             return data;
         }
 
         public void AcceptBatch(byte[] data)
         {
-            if (data == null || data.Length < 18 || data[0] != Version || data[5] < 1 || data[5] > BatchSize)
+            if (data == null || data.Length < 20 || data[0] != Version || data[5] < 1 || data[5] > BatchSize)
                 throw new InvalidOperationException("확정 입력 패킷 형식 오류");
             int first = ReadInt(data, 1), count = data[5];
             if (first < 0) throw new InvalidOperationException("확정 입력 순서 오류");
-            if (data.Length != 10 + count * 8 + (first == 0 ? LobbyCarry.Size : 0)) throw new InvalidOperationException("확정 입력 패킷 형식 오류");
+            if (data.Length != 10 + count * 10 + (first == 0 ? LobbyCarry.Size : 0)) throw new InvalidOperationException("확정 입력 패킷 형식 오류");
             if (first + count <= Recording.Count) { DuplicateBatches++; return; }
             if (first != Recording.Count) throw new InvalidOperationException("확정 입력에 빈 구간이 있습니다.");
             if (first == 0)
             {
                 LobbyCarry carry;
-                try { carry = LobbyCarry.Read(data, 6 + count * 8); }
+                try { carry = LobbyCarry.Read(data, 6 + count * 10); }
                 catch (System.IO.InvalidDataException e) { throw new InvalidOperationException(e.Message); }
                 if (carry.Has) ApplyLobbyCarry(carry);
             }
             validation ??= new SimWorld(config, arenas, World.State);
             validation.State = World.State;
-            for (int i = 0; i < count; i++) validation.Step(InputFrame.Read(data, 6 + i * 8), InputFrame.Read(data, 10 + i * 8));
+            try
+            {
+                for (int i = 0; i < count; i++) validation.Step(InputFrame.ReadCommand(data, 6 + i * 10), InputFrame.ReadCommand(data, 11 + i * 10));
+            }
+            catch (System.IO.InvalidDataException e) { throw new InvalidOperationException(e.Message); }
             if (validation.ComputeChecksum() != unchecked((uint)ReadInt(data, data.Length - 4)))
                 throw new InvalidOperationException("확정 입력 재생 체크섬 불일치");
             // Validate before committing any replay frames, card UI transitions or one-shot effects.
-            for (int i = 0; i < count; i++) Append(InputFrame.Read(data, 6 + i * 8), InputFrame.Read(data, 10 + i * 8));
+            for (int i = 0; i < count; i++) Append(InputFrame.ReadCommand(data, 6 + i * 10), InputFrame.ReadCommand(data, 11 + i * 10));
             BatchesVerified++;
         }
 

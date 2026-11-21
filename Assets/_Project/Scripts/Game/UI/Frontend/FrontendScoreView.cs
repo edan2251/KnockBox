@@ -107,7 +107,7 @@ namespace Knockbox.Game.UI
                     int order = p == 0 ? 1 - i : i;
                     float t = Range(reveal, .42f + order * .1f, .76f + order * .1f);
                     var dot = rounds[p*2+i];
-                    dot.gameObject.SetActive(true);
+                    dot.gameObject.SetActive(false);
                     dot.color = PaletteAsset.WithAlpha(empty, Out(t * 2));
                     dot.rectTransform.localScale = Vector3.one * Mathf.Max(0, Pop(t));
                     dot.rectTransform.anchoredPosition = RoundPoint(p, i);
@@ -211,6 +211,7 @@ namespace Knockbox.Game.UI
             // RoundEnd에는 라운드 점수만 확정되어 있다. 다음 틱의 세트 점수 반영까지 미리 켠 점을 유지한다.
             bool pendingSet = m.Phase == MatchPhase.RoundEnd && m.RoundWinner >= 0
                 && m.GetScore(m.RoundWinner) >= config.Match.RoundsToWinSet;
+            if (m.Forfeited) { RenderForfeit(m, alpha); return; }
             float merge = Smooth(Range(t, .77f, .96f));
             for (int p = 0; p < 2; p++)
             {
@@ -224,24 +225,22 @@ namespace Knockbox.Game.UI
                     float pulse = SetPointScale(m, config.Match, p, i, alpha);
                     dot.rectTransform.localScale = Vector3.one * pulse;
                 }
-                for (int i = 0; i < 2; i++)
-                {
-                    var dot = rounds[p*2+i];
-                    bool merging = p == winner && setWon && t >= .77f;
-                    dot.color = i < roundCount ? colors[p] : empty;
-                    dot.rectTransform.anchoredPosition = merging
-                        ? Arc(RoundPoint(p, i), SetPoint(p, Mathf.Min(4, m.GetSetScore(p))), merge, 25)
-                        : RoundPoint(p, i);
-                    dot.rectTransform.localScale = Vector3.one * (merging ? Mathf.Lerp(1, 1.7f, merge) : 1);
-                    dot.gameObject.SetActive(!(setWon && t >= .96f) && !pendingSet);
-                }
+                // 첫 라운드는 다음 빈 세트 원 안에, 세트 승리 때 같은 자리에서 원 전체로 커진다.
+                var inner = rounds[p*2];
+                rounds[p*2+1].gameObject.SetActive(false);
+                inner.color = colors[p];
+                inner.rectTransform.anchoredPosition = SetPoint(p, Mathf.Min(4, m.GetSetScore(p)));
+                inner.rectTransform.sizeDelta = Vector2.one * 13;
+                float setSize = sets[p*5+Mathf.Min(4, m.GetSetScore(p))].rectTransform.sizeDelta.x;
+                inner.rectTransform.localScale = Vector3.one * (p == winner && setWon ? Mathf.Lerp(1, setSize / 13f, merge) : 1);
+                inner.gameObject.SetActive(roundCount > 0 && m.GetSetScore(p) < 5 && !pendingSet && !(setWon && t >= .96f));
                 var travel = travelers[p];
                 bool flying = p == winner && t >= .26f && t < .72f;
                 travel.gameObject.SetActive(flying);
                 if (flying)
                 {
                     float move = Smooth(Range(t, .40f, .72f));
-                    travel.rectTransform.anchoredPosition = Arc(origin, RoundPoint(p, Mathf.Clamp(m.GetScore(p), 0, 1)), move, 140);
+                    travel.rectTransform.anchoredPosition = Arc(origin, SetPoint(p, Mathf.Clamp(m.GetSetScore(p), 0, 4)), move, 140);
                     travel.rectTransform.localScale = Vector3.one * Mathf.Lerp(1.5f, .59f, move);
                     travel.color = PaletteAsset.WithAlpha(colors[p], Range(t, .26f, .38f));
                 }
@@ -251,6 +250,22 @@ namespace Knockbox.Game.UI
             if (soundKo != ko) { soundKo = ko; soundStage = 0; }
             if (t >= .72f && soundStage == 0) { sound.Play(Sfx.Countdown, .35f, 1.5f); soundStage = 1; }
             if (setWon && t >= .96f && soundStage == 1) { sound.Play(Sfx.Grab, .45f, 1.2f); soundStage = 2; }
+        }
+
+        void RenderForfeit(in MatchState match, float alpha)
+        {
+            foreach (var dot in rounds) dot.gameObject.SetActive(false);
+            foreach (var dot in travelers) dot.gameObject.SetActive(false);
+            float age = match.Phase == MatchPhase.KO ? match.PhaseTick + alpha : SimWorld.ForfeitKoTicks;
+            for (int p = 0; p < 2; p++) for (int i = 0; i < 5; i++)
+            {
+                var dot = sets[p*5+i];
+                bool added = p == match.RoundWinner && i >= match.WinnerSetsBeforeForfeit && i < match.GetSetScore(p);
+                float fill = added ? Range(age, SimWorld.ForfeitFillStart + (i-match.WinnerSetsBeforeForfeit)*SimWorld.ForfeitFillInterval,
+                    SimWorld.ForfeitFillStart + (i-match.WinnerSetsBeforeForfeit)*SimWorld.ForfeitFillInterval + 7) : 1;
+                dot.color = i < match.GetSetScore(p) ? Color.Lerp(empty, colors[p], Out(fill)) : empty;
+                dot.rectTransform.localScale = Vector3.one * (added ? 1 + .16f * Mathf.Sin(fill * Mathf.PI) : 1);
+            }
         }
     }
 }

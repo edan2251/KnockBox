@@ -22,8 +22,10 @@ namespace Knockbox.Simulation
         /// 맵 해시 방식을 명시 칸으로 담는다. v4~v9 기록은 그대로 읽고 같은 시작 상태를 만든다.
         /// </summary>
         public const ushort LobbyCarryVersion = 10;
+        public const ushort MatchCommandVersion = 11;
+        bool hasCommands;
         public bool UsesGeometryChecksum { get; private set; }
-        public ushort WrittenVersion => Carry.Has ? LobbyCarryVersion : UsesGeometryChecksum ? PhysicsMapVersion : FormatVersion;
+        public ushort WrittenVersion => hasCommands ? MatchCommandVersion : Carry.Has ? LobbyCarryVersion : UsesGeometryChecksum ? PhysicsMapVersion : FormatVersion;
         const ushort WeaponsVersion = 7;
         const ushort ChargeVersion = 6;
         const ushort AimVersion = 5;
@@ -133,6 +135,7 @@ namespace Knockbox.Simulation
 
         public void Append(in InputFrame a, in InputFrame b)
         {
+            hasCommands |= a.Command != MatchCommand.None || b.Command != MatchCommand.None;
             p1.Add(a);
             p2.Add(b);
         }
@@ -199,7 +202,7 @@ namespace Knockbox.Simulation
                 w.Write(Rotation.Count);
                 w.Write(Rotation.Slot);
                 w.Write(Rotation.Cycle);
-                if (Carry.Has)
+                if (WrittenVersion >= LobbyCarryVersion)
                 {
                     w.Write(UsesGeometryChecksum);
                     var carry = new byte[LobbyCarry.Size];
@@ -207,11 +210,12 @@ namespace Knockbox.Simulation
                     w.Write(carry);
                 }
                 w.Write(p1.Count);
-                var buffer = new byte[InputFrame.Size * 2];
+                int size = hasCommands ? InputFrame.CommandSize : InputFrame.Size;
+                var buffer = new byte[size * 2];
                 for (int i = 0; i < p1.Count; i++)
                 {
-                    p1[i].Write(buffer, 0);
-                    p2[i].Write(buffer, InputFrame.Size);
+                    if (hasCommands) { p1[i].WriteCommand(buffer, 0); p2[i].WriteCommand(buffer, size); }
+                    else { p1[i].Write(buffer, 0); p2[i].Write(buffer, size); }
                     w.Write(buffer);
                 }
             }
@@ -225,7 +229,7 @@ namespace Knockbox.Simulation
             if (r.ReadUInt32() != Magic)
                 throw new InvalidDataException("입력 기록 파일이 아님");
             ushort version = r.ReadUInt16();
-            if (version != LobbyCarryVersion && version != PhysicsMapVersion && version != FormatVersion && version != WeaponsVersion && version != ChargeVersion && version != AimVersion && version != NoAimVersion)
+            if (version != MatchCommandVersion && version != LobbyCarryVersion && version != PhysicsMapVersion && version != FormatVersion && version != WeaponsVersion && version != ChargeVersion && version != AimVersion && version != NoAimVersion)
                 throw new InvalidDataException(version < NoAimVersion
                     ? $"CR-003(폼 전투) 전의 입력 기록(버전 {version})은 호환되지 않음"
                     : $"지원하지 않는 입력 기록 버전: {version}");
@@ -255,21 +259,23 @@ namespace Knockbox.Simulation
                     Cycle = r.ReadInt32(),
                 };
             }
-            if (version == LobbyCarryVersion)
+            if (version >= LobbyCarryVersion)
             {
                 rec.UsesGeometryChecksum = r.ReadBoolean();
                 byte[] carry = r.ReadBytes(LobbyCarry.Size);
                 if (carry.Length != LobbyCarry.Size)
                     throw new InvalidDataException("입력 기록이 중간에 끊김");
                 rec.Carry = LobbyCarry.Read(carry, 0);
-                if (!rec.Carry.Has || rec.StartPhase != MatchPhase.Lobby)
+                if (version == LobbyCarryVersion && (!rec.Carry.Has || rec.StartPhase != MatchPhase.Lobby)
+                    || rec.Carry.Has && rec.StartPhase != MatchPhase.Lobby)
                     throw new InvalidDataException("v10 입력 기록에는 로비 시작과 이어 간 P1 값이 있어야 함");
             }
             int count = r.ReadInt32();
             if (count < 0)
                 throw new InvalidDataException($"잘못된 프레임 수: {count}");
             bool aim = version >= AimVersion;
-            int size = aim ? InputFrame.Size : InputFrame.LegacySize;
+            bool commands = version >= MatchCommandVersion;
+            int size = commands ? InputFrame.CommandSize : aim ? InputFrame.Size : InputFrame.LegacySize;
             for (int i = 0; i < count; i++)
             {
                 byte[] buffer = r.ReadBytes(size * 2);
@@ -279,8 +285,8 @@ namespace Knockbox.Simulation
                 if (version < ChargeVersion && ((buffer[2] | buffer[size + 2]) & (byte)InputButtons.Charge) != 0)
                     throw new InvalidDataException($"입력 기록 버전 {version}에 지원하지 않는 Charge 버튼이 있음");
                 rec.Append(
-                    aim ? InputFrame.Read(buffer, 0) : InputFrame.ReadLegacy(buffer, 0),
-                    aim ? InputFrame.Read(buffer, size) : InputFrame.ReadLegacy(buffer, size));
+                    commands ? InputFrame.ReadCommand(buffer, 0) : aim ? InputFrame.Read(buffer, 0) : InputFrame.ReadLegacy(buffer, 0),
+                    commands ? InputFrame.ReadCommand(buffer, size) : aim ? InputFrame.Read(buffer, size) : InputFrame.ReadLegacy(buffer, size));
             }
             return rec;
         }

@@ -310,6 +310,22 @@ namespace Knockbox.Game.Online
             return true;
         }
 
+        internal Action<int> DepartureAcknowledged;
+        internal bool SendDepartureAcknowledgement(int tick)
+        {
+            if (!CanSend) return false;
+            Rpc_DepartureAcknowledged(network, peer, tick);
+            return true;
+        }
+
+        [Rpc(Channel = RpcChannel.Reliable, TickAligned = false, InvokeLocal = false, HostMode = RpcHostMode.SourceIsHostPlayer)]
+        public static void Rpc_DepartureAcknowledged(NetworkRunner runner, [RpcTarget] PlayerRef target, int tick, RpcInfo info = default)
+        {
+            var c = runner.GetComponent<FusionConnection>();
+            if (c == null || c.stopping || !runner.IsServer || !c.hasPeer || info.Source != c.peer) return;
+            c.DepartureAcknowledged?.Invoke(tick);
+        }
+
         [Rpc(Channel = RpcChannel.Reliable, TickAligned = false, InvokeLocal = false, HostMode = RpcHostMode.SourceIsHostPlayer)]
         public static void Rpc_PredictionReady(NetworkRunner runner, [RpcTarget] PlayerRef target, RpcInfo info = default)
         {

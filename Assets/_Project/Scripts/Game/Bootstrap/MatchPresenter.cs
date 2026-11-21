@@ -567,6 +567,7 @@ namespace Knockbox.Game
         {
             playerNames[0] = string.IsNullOrEmpty(p1) ? "P1" : p1;
             playerNames[1] = string.IsNullOrEmpty(p2) ? "P2" : p2;
+            if (hud != null) hud.SetNames(playerNames[0], playerNames[1]);
         }
 
         /// <summary>메인 화면에서 이름을 고치는 동안 그 선수의 머리 위 이름 글자만 숨긴다(-1이면 모두 보임). 삼각형은 남는다.</summary>
@@ -574,6 +575,7 @@ namespace Knockbox.Game
 
         /// <summary>머리 위 표시 전체의 투명도(메인 화면 공간이 닫힐 때 빠르게 사라진다). 기본 1.</summary>
         public float LobbyMarkerFade { get; set; } = 1f;
+        public Color? MenuPreviewColor { get; set; }
 
         /// <summary>머리 위 이름 글자의 월드 가운데·크기(보이는 동안만). 메인 화면의 이름 고치기 자리에 쓴다.</summary>
         public bool TryGetLobbyName(int slot, out Vector3 center, out Vector2 size, out float fontWorldHeight)
@@ -600,6 +602,7 @@ namespace Knockbox.Game
 
         void RenderLobbyMarkers(in SimState s, SimWorld world)
         {
+            bool frontendMenuSpace = GetComponent<UI.FrontendController>()?.View?.MenuSpaceActive == true;
             if (lobbyMarkers == null)
             {
                 if (!lobbyMarkersVisible) return;
@@ -629,6 +632,7 @@ namespace Knockbox.Game
                     else if (lobbyShowOther) { status = "준비 전"; statusColor = PaletteAsset.WithAlpha(PaletteAsset.Neutral, .55f); }
                 }
                 lobbyMarkers.SetName(k, k == HiddenLobbyName ? "" : playerNames[k]);
+                lobbyMarkers.SetColor(k, k == 0 && frontendMenuSpace ? MenuPreviewColor ?? palette.FighterBody(k) : palette.FighterBody(k));
                 // 메인 화면의 근접 구도에서는 화면에 보이는 크기가 평소의 약 3배가 되게 줄이고, 머리에서 더 띄운다(2026-11-21).
                 float close = cameraRig != null ? cameraRig.CloseWeight : 0f;
                 lobbyMarkers.Scale = cameraRig != null ? cameraRig.FramingScale * Mathf.Lerp(1f, 3f, close) : 1f;

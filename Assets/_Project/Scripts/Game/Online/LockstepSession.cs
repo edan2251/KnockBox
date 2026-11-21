@@ -58,7 +58,7 @@ namespace Knockbox.Game.Online
     public sealed class LockstepSession : ILockstepInputs, IDisposable
     {
         public const uint Magic = 0x4C4E424B; // "KBNL"
-        public const byte ProtocolVersion = 9; // 등록 맵의 정렬된 ID/전체 지형 manifest와 시작 스냅샷을 공유하는 규격.
+        public const byte ProtocolVersion = 10; // 등록 맵의 정렬된 ID/전체 지형 manifest와 시작 스냅샷을 공유하는 규격.
         public const int MaxPlayers = 4;
         public const int ChecksumInterval = 30;
         public const double HeartbeatSeconds = 0.1;
@@ -76,7 +76,7 @@ namespace Knockbox.Game.Online
         readonly bool isHost;
         readonly uint configChecksum;
         readonly uint arenaChecksum;
-        readonly byte[] sendBuffer = new byte[64 + MaxFramesPerPacket * InputFrame.Size];
+        readonly byte[] sendBuffer = new byte[64 + MaxFramesPerPacket * InputFrame.CommandSize];
 
         // 입력: [슬롯, 링]. tag = 틱 + 1(0이면 비어 있음).
         readonly InputFrame[,] frames = new InputFrame[MaxPlayers, Ring];
@@ -388,8 +388,8 @@ namespace Knockbox.Game.Online
             sendBuffer[o++] = (byte)count;
             for (int i = 0; i < count; i++)
             {
-                frames[LocalSlot, (first + i) % Ring].Write(sendBuffer, o);
-                o += InputFrame.Size;
+                frames[LocalSlot, (first + i) % Ring].WriteCommand(sendBuffer, o);
+                o += InputFrame.CommandSize;
             }
             int checkSlot = latestLocalCheck < 0 ? -1 : latestLocalCheck / ChecksumInterval % CheckRing;
             WriteInt(sendBuffer, ref o, latestLocalCheck);
@@ -462,6 +462,10 @@ namespace Knockbox.Game.Online
             {
                 End(EndReason.ProtocolError, "패킷이 잘림");
             }
+            catch (System.IO.InvalidDataException)
+            {
+                End(EndReason.ProtocolError, "알 수 없는 경기 종료 입력");
+            }
         }
 
         void HandleInputs(byte[] p, int o)
@@ -491,8 +495,8 @@ namespace Knockbox.Game.Online
             int remote = 1 - LocalSlot;
             for (int i = 0; i < count; i++)
             {
-                var f = InputFrame.Read(p, o);
-                o += InputFrame.Size;
+                var f = InputFrame.ReadCommand(p, o);
+                o += InputFrame.CommandSize;
                 int index = first + i;
                 int r = index % Ring;
                 if (index <= contiguous[remote])

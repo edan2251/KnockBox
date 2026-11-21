@@ -11,7 +11,7 @@ using static Knockbox.Game.UI.FrontendWidgets;
 namespace Knockbox.Game.UI
 {
     /// <summary>Podium은 결과 공간(경기 뒤 자유 조작) 위의 작은 결과 표시다. 월드가 보이며 매트로 가리지 않는다.</summary>
-    public enum FrontendScreen { Hidden, Main, Join, Waiting, Versus, Cards, Result, Podium, Lobby, Options }
+    public enum FrontendScreen { Hidden, Main, Join, Waiting, Versus, Cards, Result, Podium, Lobby, Options, Ended }
 
     /// <summary>승인된 R5 구도. 화면만 그리며 경기 상태는 쓰지 않는다.</summary>
     [DefaultExecutionOrder(200)]
@@ -117,7 +117,7 @@ namespace Knockbox.Game.UI
             CodeInput.characterLimit=12;
             CodeInput.lineType=InputField.LineType.SingleLine;
             CodeInput.contentType=InputField.ContentType.Alphanumeric;
-            join=Button(lobby,"Join",new Rect(600,155,190,100),"참가",Theme,playerColors[0],ink,()=>JoinRoom?.Invoke(),34);
+            join=Button(lobby,"Join",new Rect(600,155,190,100),"참가",Theme,playerColors[1],ink,()=>JoinRoom?.Invoke(),34);
             copy=Button(lobby,"Copy_code",new Rect(250,280,320,70),"코드 복사",Theme,Theme.button,Theme.white,()=>CopyCode?.Invoke(),28);
             Status=Text(lobby,"Status",new Rect(0,390,820,140),"",Theme.textFont,30,Theme.status);
             lobbyBack=Button(lobby,"Back",new Rect(250,560,320,75),"돌아가기",Theme,PaletteAsset.Transparent,Theme.back,()=>Back?.Invoke(),28);
@@ -212,7 +212,8 @@ namespace Knockbox.Game.UI
             localSlot=slot;
             for(int i=0;i<2;i++)nameTexts[i].text="P"+(i+1)+(i==slot?"  나":"");
             foreach(var button in menuButtons)button.UsePointerHighlight(playerColors[slot],ink,Theme.white);
-            join.image.color=roomCode.color=playerColors[slot];
+            join.image.color=playerColors[1];
+            roomCode.color=playerColors[slot];
         }
 
         public void Show(FrontendScreen screen)
@@ -224,7 +225,7 @@ namespace Knockbox.Game.UI
             if(screen!=FrontendScreen.Main)CancelNameEdit();
             ApplyMenuPage();
             bool main=screen==FrontendScreen.Main;
-            bool room=screen==FrontendScreen.Join||screen==FrontendScreen.Waiting;
+            bool room=screen==FrontendScreen.Join||screen==FrontendScreen.Waiting||screen==FrontendScreen.Ended;
             bool vs=screen==FrontendScreen.Versus, pick=screen==FrontendScreen.Cards, result=screen==FrontendScreen.Result;
             bool podium=screen==FrontendScreen.Podium, lobbyScreen=screen==FrontendScreen.Lobby;
             bool free=podium||lobbyScreen;
@@ -264,6 +265,14 @@ namespace Knockbox.Game.UI
         {
             lobbyTitle.text=title;roomCode.text=code;Status.text=message;
             join.interactable=!busy;CodeInput.interactable=!busy;copy.gameObject.SetActive(canCopy);
+        }
+
+        /// <summary>실제 방 패널의 제목·안내·뒤로 버튼만 재사용한다. 종료 화면에는 참가 코드를 남기지 않는다.</summary>
+        public void MatchEnded(string message)
+        {
+            lobbyTitle.text="경기 종료";Status.text=message;roomCode.text="";
+            lobbyBack.interactable=true;
+            HideRoomPanel=false;
         }
 
         public void Cards(int picker, bool canChoose, int chosenIndex, float progress, int secondsRemaining)
@@ -319,7 +328,7 @@ namespace Knockbox.Game.UI
 
         }
 
-        void LateUpdate() { if (authored) layout.AfterAnimation(); PlaceNameEditor(); }
+        void LateUpdate() { if (authored) layout.AfterAnimation(); PlaceNameEditor(); PresentEscapeMenu(); }
 
         void DrawHand()
         {

@@ -2,6 +2,7 @@ using System;
 
 namespace Knockbox.Simulation
 {
+    public enum MatchEndKind : byte { Normal, SurrenderP1, SurrenderP2, LeaveP1, LeaveP2 }
     /// <summary>
     /// 경기 흐름(06-match-and-tools.md 1절).
     /// Countdown → Fighting → KO → RoundEnd(1틱) → RoundTransition(1틱, 훅) → Countdown, 또는 RoundEnd → MatchEnd.
@@ -71,6 +72,12 @@ namespace Knockbox.Simulation
         public int PickedAt;
         /// <summary>마지막 KO의 승자. 0, 1, 또는 무승부·미정이면 -1.</summary>
         public int RoundWinner;
+        public MatchEndKind EndKind;
+        /// <summary>최종 점수는 즉시 확정하고, 이 값부터 원을 채우는 것은 화면에서만 한다.</summary>
+        public int WinnerSetsBeforeForfeit;
+        public readonly bool Forfeited => EndKind != MatchEndKind.Normal;
+        public readonly bool Departed => EndKind == MatchEndKind.LeaveP1 || EndKind == MatchEndKind.LeaveP2;
+        public readonly int ForfeitLoser => EndKind == MatchEndKind.SurrenderP1 || EndKind == MatchEndKind.LeaveP1 ? 0 : 1;
         /// <summary>라운드마다 맵 교체(CP12). 롤백 대상이라 상태에 둔다.</summary>
         public ArenaRotation Rotation;
 
@@ -109,6 +116,12 @@ namespace Knockbox.Simulation
             v.Value(nameof(Score0), Score0);
             v.Value(nameof(Score1), Score1);
             v.Value(nameof(RoundWinner), RoundWinner);
+            // 예전 기록은 두 값이 0이다. 기존 체크섬 필드 순서와 값을 그대로 보존한다.
+            if (EndKind != MatchEndKind.Normal)
+            {
+                v.Value(nameof(EndKind), (int)EndKind);
+                v.Value(nameof(WinnerSetsBeforeForfeit), WinnerSetsBeforeForfeit);
+            }
             v.Value(nameof(SetScore0), SetScore0);
             v.Value(nameof(SetScore1), SetScore1);
             v.Value(nameof(Set), Set);

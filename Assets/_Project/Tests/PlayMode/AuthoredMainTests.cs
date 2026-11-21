@@ -40,6 +40,66 @@ namespace Knockbox.Tests.PlayMode
         [UnityTearDown] public IEnumerator TearDown()
         {if(loaded.IsValid()&&loaded.isLoaded)yield return SceneManager.UnloadSceneAsync(loaded);yield return PlayModeSceneScope.OpenEmpty();}
         Button ButtonAt(string path)=>View.Stage.Find(Knockbox.Presentation.SceneObjectName.Path(path)).GetComponent<Button>();
+
+        [UnityTest]
+        public IEnumerator ActualMain_JoinPreviewAndNameEditing_KeepCodeAndSlotSeparate()
+        {
+            const string key="Knockbox.Profile.Nickname";
+            string saved=PlayerPrefs.GetString(key, ""); PlayerPrefs.SetString(key, "");
+            try
+            {
+                yield return Load();
+                var presenter=runner.GetComponent<MatchPresenter>();
+                ButtonAt("Main_and_lobby/Menu/Start_game").onClick.Invoke();
+                yield return new WaitForSecondsRealtime(2f);
+                ButtonAt("Main_and_lobby/Menu/Join_room").onClick.Invoke();
+                yield return new WaitForSecondsRealtime(.4f);
+                Assert.AreEqual(FrontendScreen.Join, View.Screen);
+                Assert.AreEqual(0, runner.LocalPlayerSlot, "미리보기는 실제 슬롯을 바꾸지 않는다");
+                Assert.AreEqual("P2", presenter.PlayerName(0));
+                Assert.AreEqual(presenter.Palette.FighterBody(1), presenter.MenuPreviewColor.Value);
+                View.CodeInput.text="ABCDEFGH";
+                View.Stage.Find("Main_nickname_hit").GetComponent<Button>().onClick.Invoke();
+                yield return null; yield return null;
+                var field=View.Stage.Find("Main_nickname_input").GetComponent<InputField>();
+                Assert.IsTrue(field.isFocused); Assert.IsFalse(View.CodeInput.isFocused);
+                field.text="보라선수";field.ProcessEvent(Event.KeyboardEvent("return"));field.DeactivateInputField();
+                yield return null;yield return null;
+                Assert.AreEqual("보라선수", presenter.PlayerName(0));Assert.AreEqual("ABCDEFGH",View.CodeInput.text);
+                Assert.IsFalse(runner.GetComponent<OnlineLobby>().Busy); Assert.AreEqual(FrontendScreen.Join,View.Screen);
+                View.Stage.Find("Main_nickname_hit").GetComponent<Button>().onClick.Invoke();yield return null;yield return null;
+                field.text="취소";field.ProcessEvent(Event.KeyboardEvent("escape"));field.DeactivateInputField();yield return null;
+                Assert.AreEqual("보라선수", presenter.PlayerName(0)); Assert.AreEqual(FrontendScreen.Join,View.Screen);
+                ButtonAt("Main_and_lobby/Room/Back").onClick.Invoke();
+                yield return new WaitForSecondsRealtime(.4f);
+                Assert.AreEqual(presenter.Palette.FighterBody(0),presenter.MenuPreviewColor.Value);
+            }
+            finally { PlayerPrefs.SetString(key,saved); PlayerPrefs.Save(); }
+        }
+
+        [UnityTest]
+        public IEnumerator ActualMain_OneRoundEach_IsInsideNextSetCircle_AndNextSetClearsBoth()
+        {
+            yield return Load();runner.GetComponent<OnlineLobby>().StartPractice();Idle();Until(MatchPhase.Fighting);
+            runner.World.State.Match.SetScore0=2;runner.World.State.Match.SetScore1=1;
+            runner.World.State.Match.Score0=runner.World.State.Match.Score1=1;
+            yield return null;yield return new WaitForEndOfFrame();
+            var root=View.Points.Root;
+            foreach(int p in new[]{0,1})
+            {
+                var inner=root.Find("Round_"+p+"_0").GetComponent<RectTransform>();
+                Assert.IsTrue(inner.gameObject.activeSelf);
+                var set=root.Find("Set_"+p+"_"+(p==0?2:1)).GetComponent<RectTransform>();
+                Assert.AreEqual(set.anchoredPosition,inner.anchoredPosition);
+                Assert.IsFalse(root.Find("Round_"+p+"_1").gameObject.activeSelf);
+            }
+            runner.World.State.Fighter1.Health=0;runner.StepOnce();Until(MatchPhase.SetPick);
+            yield return null;yield return new WaitForEndOfFrame();
+            Assert.AreEqual(3,runner.World.State.Match.SetScore0);
+            Assert.IsFalse(root.Find("Round_0_0").gameObject.activeSelf);
+            Assert.IsFalse(root.Find("Round_1_0").gameObject.activeSelf);
+            Assert.AreEqual(runner.GetComponent<MatchPresenter>().Palette.FighterBody(0),root.Find("Set_0_2").GetComponent<Image>().color);
+        }
         static void CaptureEvidence(string name)
         {
             string root=System.Environment.GetEnvironmentVariable("KNOCKBOX_TASK_OUTPUT");
@@ -444,6 +504,84 @@ namespace Knockbox.Tests.PlayMode
             while(Object.FindObjectsByType<Fusion.NetworkRunner>(FindObjectsSortMode.None).Length>0&&Time.realtimeSinceStartupAsDouble<cleanup)yield return null;
         }
         bool PodiumButtonFontRestored()=>ButtonAt("Shared_VS_and_cards/Ready_for_rematch").GetComponentInChildren<Text>(true).text!="O  다시하기";
+
+        [UnityTest, Explicit("Uses the configured Photon app and two real NetworkRunners.")]
+        public IEnumerator ActualMain_OnlineHostSurrender_Rematch_ThenHostDeparture() { yield return OnlineEnding(0); }
+
+        [UnityTest, Explicit("Uses the configured Photon app and two real NetworkRunners.")]
+        public IEnumerator ActualMain_OnlineGuestSurrender_Rematch_ThenGuestDeparture() { yield return OnlineEnding(1); }
+
+        IEnumerator OnlineEnding(int exitingSlot)
+        {
+            yield return Load();
+            var online=runner.GetComponent<OnlineMatch>();var lobby=runner.GetComponent<OnlineLobby>();
+            GameObject guest=null;FusionTransport wire=null;
+            try
+            {
+                lobby.CreateRoom();
+                double until=Time.realtimeSinceStartupAsDouble+40;
+                while(string.IsNullOrEmpty(lobby.RoomCode)&&Time.realtimeSinceStartupAsDouble<until)yield return null;
+                Assert.IsFalse(string.IsNullOrEmpty(lobby.RoomCode));
+                guest=new GameObject("Ending_Guest");guest.SetActive(false);
+                var gr=guest.AddComponent<MatchRunner>();JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(runner),gr);
+                guest.SetActive(true);gr.FrontendEnabled=true;
+                var gm=guest.AddComponent<OnlineMatch>();
+                var joining=FusionConnection.JoinAsync(lobby.RoomCode);
+                until=Time.realtimeSinceStartupAsDouble+40;
+                while(!joining.IsCompleted&&Time.realtimeSinceStartupAsDouble<until)yield return null;
+                Assert.IsTrue(joining.IsCompleted&&!joining.IsFaulted);wire=joining.Result;gm.StartSession(wire,false,0);
+                until=Time.realtimeSinceStartupAsDouble+15;
+                while((gm.Prediction==null||gr.FrontendWorld.State.Match.PhaseTick<gr.FrontendWorld.FreeSpaceUnlockTick+5)
+                    &&Time.realtimeSinceStartupAsDouble<until)yield return null;
+                Assert.IsTrue(runner.ToggleReady(0));Assert.IsTrue(gr.ToggleReady(1));
+                until=Time.realtimeSinceStartupAsDouble+15;
+                while(gr.FrontendWorld.State.Match.Phase!=MatchPhase.Fighting&&Time.realtimeSinceStartupAsDouble<until)yield return null;
+                Assert.AreEqual(MatchPhase.Fighting,gr.FrontendWorld.State.Match.Phase);
+                Assert.AreEqual(runner.FrontendWorld.Config.ComputeChecksum(),runner.World.Config.ComputeChecksum(),"이어 간 방장 월드도 합의한 온라인 재대결 설정을 사용한다");
+                View.SetEscapeMenu(true);yield return null;yield return null;
+                int tick=gr.FrontendWorld.State.Tick;
+                Assert.IsTrue(runner.MenuInputBlocked);Assert.IsFalse(gr.MenuInputBlocked);
+                yield return new WaitForSecondsRealtime(.3f);
+                Assert.Greater(gr.FrontendWorld.State.Tick,tick+5,"온라인 메뉴는 경기 시간을 멈추지 않는다");
+                View.SetEscapeMenu(false);yield return null;yield return null;
+                var leaving=exitingSlot==0?online:gm;
+                Assert.IsTrue(leaving.RequestMatchCommand(MatchCommand.Surrender));
+                until=Time.realtimeSinceStartupAsDouble+10;
+                while(!gr.FrontendWorld.InResultsSpace&&Time.realtimeSinceStartupAsDouble<until)yield return null;
+                Assert.IsTrue(gr.FrontendWorld.InResultsSpace);Assert.IsTrue(runner.FrontendWorld.InResultsSpace);
+                Assert.AreEqual(1-exitingSlot,SimWorld.ResultsWinner(gr.FrontendWorld.State.Match));
+                Assert.AreEqual(runner.FrontendWorld.State.Match.SetScore0,gr.FrontendWorld.State.Match.SetScore0);
+                Assert.AreEqual(runner.FrontendWorld.State.Match.SetScore1,gr.FrontendWorld.State.Match.SetScore1);
+                until=Time.realtimeSinceStartupAsDouble+8;
+                while(gr.FrontendWorld.State.Match.PhaseTick<gr.FrontendWorld.FreeSpaceUnlockTick+5&&Time.realtimeSinceStartupAsDouble<until)yield return null;
+                Assert.IsTrue(runner.ToggleReady(0));Assert.IsTrue(gr.ToggleReady(1));
+                until=Time.realtimeSinceStartupAsDouble+12;
+                while(gr.FrontendWorld.State.Match.Phase!=MatchPhase.Fighting&&Time.realtimeSinceStartupAsDouble<until)yield return null;
+                Assert.AreEqual(MatchPhase.Fighting,gr.FrontendWorld.State.Match.Phase);Assert.IsFalse(gr.FrontendWorld.State.Match.Forfeited);
+                Assert.IsTrue(leaving.RequestMatchCommand(MatchCommand.Leave));
+                until=Time.realtimeSinceStartupAsDouble+6;
+                if(exitingSlot==0)
+                {
+                    while(online.Active&&Time.realtimeSinceStartupAsDouble<until)yield return null;
+                    Assert.IsFalse(online.Active,"방장은 상대가 확정 종료 입력을 수신한 뒤 메인으로");
+                    Assert.IsTrue(gm.PeerDeparture);StringAssert.Contains("기권승",gm.EndNotice);
+                    Assert.AreEqual(5,gr.FrontendWorld.State.Match.SetScore1);
+                }
+                else
+                {
+                    while(!gm.DepartureDelivered&&Time.realtimeSinceStartupAsDouble<until)yield return null;
+                    Assert.IsTrue(gm.DepartureDelivered);Assert.IsTrue(online.PeerDeparture);
+                    Assert.AreEqual(5,runner.FrontendWorld.State.Match.SetScore0);
+                    gm.LeaveToPractice();
+                    until=Time.realtimeSinceStartupAsDouble+6;
+                    while(online.Active&&Time.realtimeSinceStartupAsDouble<until)yield return null;
+                    Assert.IsFalse(online.Active,"남은 쪽은 짧은 결과 알림 뒤 메인으로");
+                }
+            }
+            finally { if(guest!=null)Object.Destroy(guest);wire?.Dispose();lobby.CancelAndOpen(); }
+            double cleanup=Time.realtimeSinceStartupAsDouble+10;
+            while(Object.FindObjectsByType<Fusion.NetworkRunner>(FindObjectsSortMode.None).Length>0&&Time.realtimeSinceStartupAsDouble<cleanup)yield return null;
+        }
         /// <summary>결과 공간(2026-11-16 게임 흐름 CP1): 경기 끝 → 결과 공간 맵·낙하·체력바 숨김 → O 토글(연습: 표시 중 다시 누르면 취소) → 새 경기, X → 메인.</summary>
         [UnityTest]
         public IEnumerator ActualMain_ResultsSpace_PodiumReadyToggle_ThenRematchOrX()
